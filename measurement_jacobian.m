@@ -19,5 +19,5 @@ Hp(2,1) = - (rho_z*rho_x)/(rho^2*s); Hp(2,2) = -(rho_z*rho_y)/(rho^2*s);
 Hp(2,3) = s/rho^2;
 
 % translate to ekf state
-H = [-Hp zeros(2,3) Hp zeros(2,3)];
+H = [Hp zeros(2,3)];
 end
