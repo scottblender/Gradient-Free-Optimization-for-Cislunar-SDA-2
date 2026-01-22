@@ -1,61 +1,38 @@
-function [A] = cr3bp_jacobian(s, pi2)
+function [A] = cr3bp_jacobian(s, mu)
 % s - state vector, [x, y, z, vx, vy, vz]
-% pi2 - mass2/(mass1 + mass2)
+% mu - mass ratio (mass2/(mass1 + mass2))
 % This function calculates the 6x6 dynamics jacobian (A matrix)
+
 
 % position and velocity
 x = s(1); y = s(2); z = s(3);
-% vx, vy, vz are not needed for this calculation
 
-% mass properties
-pi1 = 1 - pi2;
+% define common terms
+x1 = x + mu; x2 = x - 1 + mu;
+r1 = sqrt(x1^2+y^2+z^2); r2 = sqrt(x2^2+y^2+z^2);
+alpha1 = (1-mu)/r1^5; alpha2 = mu/r2^5;
+beta1 = (1-mu)/r1^3; beta2 = mu/r2^3;
+S = beta1 + beta2;
 
-% position components relative to primaries
-x_p_pi2 = x + pi2;         % x-component to m1
-x_m_1_p_pi2 = x - 1 + pi2; % x-component to m2
+% diagonal entries 
+Omega_xx = 1 - S + 3*(alpha1*x1^2 + alpha2*x2^2);
+Omega_yy = 1 - S + 3*(alpha1 + alpha2)*y^2;
+Omega_zz = -S + 3*(alpha1 + alpha2)*z^2;
 
-% distances squared
-r13_sq = x_p_pi2^2 + y^2 + z^2;
-r23_sq = x_m_1_p_pi2^2 + y^2 + z^2;
+% off-diagonal entries
+Omega_xy = 3*(alpha1*x1 + alpha2*x2)*y;
+Omega_xz = 3*(alpha1*x1 + alpha2*x2)*z;
+Omega_yz = 3*(alpha1 + alpha2)*y*z;
 
-% pre-compute powers of distances
-r13_3 = r13_sq^(3/2);
-r13_5 = r13_sq^(5/2);
-r23_3 = r23_sq^(3/2);
-r23_5 = r23_sq^(5/2);
+% define pseudo-potential hessian
+Omega_dd = zeros(3); % Initialize the Jacobian matrix
+Omega_dd(1, 1) = Omega_xx; Omega_dd(1, 2) = Omega_xy; Omega_dd(1, 3) = Omega_xz;
+Omega_dd(2, 1) = Omega_xy; Omega_dd(2, 2) = Omega_yy; Omega_dd(2, 3) = Omega_yz;
+Omega_dd(3, 1) = Omega_xz; Omega_dd(3, 2) = Omega_yz; Omega_dd(3, 3) = Omega_zz;
 
-% --- Build A(2,1) sub-matrix (the "gravity gradient") ---
-% These are the second partial derivatives (Uxx, Uxy, etc.)
-% of the pseudo-potential function.
-Uxx = 1 - (pi1/r13_3 - (3*pi1*x_p_pi2^2)/r13_5) - ...
-          (pi2/r23_3 - (3*pi2*x_m_1_p_pi2^2)/r23_5);
+% define coriolis 
+C = 2*[0 1 0; -1 0 0; 0 0 0];
 
-Uxy = (3*pi1*x_p_pi2*y)/r13_5 + (3*pi2*x_m_1_p_pi2*y)/r23_5;
-
-Uxz = (3*pi1*x_p_pi2*z)/r13_5 + (3*pi2*x_m_1_p_pi2*z)/r23_5;
-
-Uyy = 1 - (pi1/r13_3 - (3*pi1*y^2)/r13_5) - ...
-          (pi2/r23_3 - (3*pi2*y^2)/r23_5);
-
-Uyz = (3*pi1*y*z)/r13_5 + (3*pi2*y*z)/r23_5;
-
-Uzz = - (pi1/r13_3 - (3*pi1*z^2)/r13_5) - ...
-        (pi2/r23_3 - (3*pi2*z^2)/r23_5);
-
-% Jacobian is symmetric (Uyx = Uxy, etc.)
-A21 = [Uxx, Uxy, Uxz;
-       Uxy, Uyy, Uyz;
-       Uxz, Uyz, Uzz];
-
-% --- Build A(2,2) sub-matrix (Coriolis terms) ---
-% These are the partials of acceleration w.r.t velocity
-A22 = [ 0,  2,  0;
-       -2,  0,  0;
-        0,  0,  0];
-
-% --- Assemble the full 6x6 A matrix ---
-% Top-left is d(f_pos)/d(pos) = zeros(3,3)
-% Top-right is d(f_pos)/d(vel) = eye(3,3)
-A = [ zeros(3,3),  eye(3,3);
-      A21,         A22     ];
+% define A matrix
+A = [zeros(3) eye(3); Omega_dd C];
 end

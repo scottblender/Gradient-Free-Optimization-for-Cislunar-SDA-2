@@ -8,31 +8,16 @@ rho_y = rho_vec(2);
 rho_z = rho_vec(3);
 
 % Pre-compute common terms
-rho_xy_sq = rho_x^2 + rho_y^2;
-rho_xy = sqrt(rho_xy_sq);
-rho_sq = rho_xy_sq + rho_z^2;
-rho = sqrt(rho_sq);
 
-% Partial derivatives for Right Ascension (RA)
-dRA_dx = -rho_y / rho_xy_sq;
-dRA_dy =  rho_x / rho_xy_sq;
-dRA_dz =  0;
+rho = sqrt(rho_x^2 + rho_y^2 + rho_z^2);
+q = rho_x^2 + rho_y^2; s = sqrt(q); 
 
-% Partial derivatives for Declination (Dec)
-% Using: d(asin(u))/dx = (1/sqrt(1-u^2)) * du/dx, where u = rho_z / rho
-dDec_dx = (rho_xy * (-rho_x * rho_z)) / (rho_sq * rho_xy);
-dDec_dy = (rho_xy * (-rho_y * rho_z)) / (rho_sq * rho_xy);
-dDec_dz = rho_xy / rho_sq;
+% Compute relative Jacobian
+Hp = zeros(2,6);
+Hp(1,1) = -rho_y/q; Hp(1,2) = rho_x/q;
+Hp(2,1) = - (rho_z*rho_x)/(rho^2*s); Hp(2,2) = -(rho_z*rho_y)/(rho^2*s); 
+Hp(2,3) = s/rho^2;
 
-% Handle potential singularity if rho_xy is near zero (poles)
-if rho_xy < 1e-10 
-    dDec_dx = 0;
-    dDec_dy = 0;
-else
-    dDec_dx = -rho_x * rho_z / (rho_sq * rho_xy);
-    dDec_dy = -rho_y * rho_z / (rho_sq * rho_xy);
-end
-
-H = [dRA_dx, dRA_dy, dRA_dz, 0, 0, 0;
-     dDec_dx, dDec_dy, dDec_dz, 0, 0, 0];
+% translate to ekf state
+H = [-Hp zeros(2,3) Hp zeros(2,3)];
 end
