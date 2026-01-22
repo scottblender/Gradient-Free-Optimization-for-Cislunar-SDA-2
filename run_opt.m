@@ -31,8 +31,8 @@ Q_k = diag(repmat(1e-8, 6, 1));
 R_k_base = diag([1e-8, 1e-8]);
 
 % --- Lunar Gateway ICs ---
-s_lg = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]';
-tspan_lg = [0, 1.51110546287394];
+s_lg_ic = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]';
+tspan_lg_ic = [0, 1.51110546287394];
 
 % MILP-Implementation
 num_orbits = int32(height(T1)); % number of candidate orbits 
@@ -55,3 +55,11 @@ parfor i = 1:num_orbits
     % interpolated propagated trajectories for specific time slots
     state_interp{i} = interp1(t_raw, s_raw, t_query, 'linear', 'extrap');
 end
+
+% define EKF timestep
+dt = 0.01; % TU ~ 1.04 hours
+N_periods = 1; % number of periods to propagate
+
+% propagate truth trajectory (Lunar Gateway)
+tspan_lg = tspan_lg_ic(1):dt:N_periods*tspan_lg_ic(2);
+[t_lg, s_lg] = ode45(@(t,s) cr3bp_dynamics(t,s,mu), tspan_lg, s_lg_ic, ode_opts);
