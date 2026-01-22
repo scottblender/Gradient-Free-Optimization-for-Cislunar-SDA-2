@@ -35,7 +35,7 @@ s_lg = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]';
 tspan_lg = [0, 1.51110546287394];
 
 % MILP-Implementation
-num_orbits = int32(height(T1)); % number of candidate orbits
+num_orbits = int32(height(T1)); % number of candidate orbits 
 slots_per_orbit = 100;          % number of discrete slots per orbit
 
 tf    = T1.("Period (TU) ");
