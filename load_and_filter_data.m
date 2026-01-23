@@ -5,7 +5,7 @@ close all;
 clear all;
 clc
 tic
-path = "C:\Users\scott\Documents\MATLAB\Gradient-Free Optimization for Cislunar SDA\JPL_Data";
+path = "C:\Users\scott\Documents\MATLAB\Gradient-Free-Optimization-for-Cislunar-SDA-2\JPL_Data";
 files = dir(fullfile(path,'*.csv'));
 data = cell(length(files),1); % preallocate cell based on size of each file
 parfor i = 1:length(files) % loop through each file and store each file in a table within the cell
