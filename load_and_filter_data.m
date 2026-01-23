@@ -2,7 +2,7 @@
 % this script loads and filters data from the JPL Periodic Orbit Database
 % based on shape and whether the orbit collides with the moon
 close all;
-clear all;
+clear;
 clc
 tic
 path = "C:\Users\scott\Documents\MATLAB\Gradient-Free-Optimization-for-Cislunar-SDA-2\JPL_Data";
