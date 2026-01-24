@@ -128,7 +128,7 @@ switch upper(OPTIMIZER_MODE)
         vars = [];
         for i = 1:3 % For 3 observers
             vars = [vars, ...
-                optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
+                optimizableVariable(['Orbiz',num2str(i)], [1, num_orbits], 'Type','integer'), ...
                 optimizableVariable(['Slot',num2str(i)], [1, slots_per_orbit], 'Type','integer')];
         end
         
@@ -155,7 +155,7 @@ switch upper(OPTIMIZER_MODE)
             'Display', 'iter', ...
             'PlotFcn', @gaplotpareto); % Built-in 2D/3D Plotter
 
-        % 4. Run Optimizer
+        % Run Optimizer
         [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
         
         % x_best is now a Matrix (N_solutions x 6)
