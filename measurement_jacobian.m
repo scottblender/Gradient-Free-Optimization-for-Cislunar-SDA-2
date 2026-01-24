@@ -13,7 +13,7 @@ rho = sqrt(rho_x^2 + rho_y^2 + rho_z^2);
 q = rho_x^2 + rho_y^2; s = sqrt(q); 
 
 % Compute relative Jacobian
-Hp = zeros(2,6);
+Hp = zeros(2,3);
 Hp(1,1) = -rho_y/q; Hp(1,2) = rho_x/q;
 Hp(2,1) = - (rho_z*rho_x)/(rho^2*s); Hp(2,2) = -(rho_z*rho_y)/(rho^2*s); 
 Hp(2,3) = s/rho^2;

@@ -35,25 +35,29 @@ s_lg_ic = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]';
 tspan_lg_ic = [0, 1.51110546287394];
 
 % MILP-Implementation
-num_orbits = int32(height(T1)); % number of candidate orbits 
-slots_per_orbit = 100;          % number of discrete slots per orbit
+num_orbits = height(T1); % number of candidate orbits 
+slots_per_orbit = 500;          % number of discrete slots per orbit
 
 tf    = T1.("Period (TU) ");
 states = T1.("state");
 times  = T1.("time");
 
-time_interp  = cell(num_orbits, 1);
-state_interp = cell(num_orbits, 1);
+orbit_database = cell(num_orbits, 1);
 
 parfor i = 1:num_orbits
-    t_query = linspace(0, tf(i), slots_per_orbit)';  % query times for this orbit
-    time_interp{i} = t_query;
-
     t_raw = times{i};
     s_raw = states{i};
+    period = tf(i);
+    % create vector of times
+    t_slots = linspace(0, period, slots_per_orbit)';
 
-    % interpolated propagated trajectories for specific time slots
-    state_interp{i} = interp1(t_raw, s_raw, t_query, 'linear', 'extrap');
+    % interpolate propagated trajectories for specific time slots
+    [t_unique, idx_u] = unique(t_raw);
+    s_unique = s_raw(idx_u, :);
+    F = griddedInterpolant(t_unique, s_unique, 'spline');
+    s_slots = F(t_slots);
+    % store the interpolated states in the orbit database
+    orbit_database{i} = s_slots;
 end
 
 % define EKF timestep
@@ -63,3 +67,78 @@ N_periods = 1; % number of periods to propagate
 % propagate truth trajectory (Lunar Gateway)
 tspan_lg = tspan_lg_ic(1):dt:N_periods*tspan_lg_ic(2);
 [t_lg, s_lg] = ode45(@(t,s) cr3bp_dynamics(t,s,mu), tspan_lg, s_lg_ic, ode_opts);
+
+% set up data logging
+% Create DataQueue on the Client
+dq = parallel.pool.DataQueue;
+
+% Initialize the Log Variable in Base Workspace
+assignin('base', 'OptimizationLog', []); 
+
+% Define Listener Callback (Runs on Client)
+afterEach(dq, @(data) append_log(data));
+
+% Helper function to update the variable in the Command Window Workspace
+function append_log(new_row)
+    current_log = evalin('base', 'OptimizationLog');
+    assignin('base', 'OptimizationLog', [current_log; new_row]);
+end
+
+% set flag for single or multi-objective
+opt_flag = 'SOO'; 
+ObjFcn = @(x) objective_wrapper(x, orbit_database, ...
+                                          s_lg, t_lg, P_0_base, Q_k, R_k_base, mu, opt_flag, upper(OPTIMIZER_MODE), dq);
+% swtich between optimizers
+switch upper(OPTIMIZER_MODE)
+    
+    % ---------------------------------------------------------------------
+    case 'GA'
+        fprintf('Starting Genetic Algorithm...\n');
+        nVars = 6;
+        
+        % Integers: [Orb1, Slt1, Orb2, Slt2, Orb3, Slt3]
+        LB = [1, 1, 1, 1, 1, 1];
+        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+        IntCon = 1:nVars; % All variables are integers
+        
+        options = optimoptions('ga', 'MaxGenerations', 30, 'UseParallel', true, ...
+                               'Display', 'iter');
+                           
+        [x_best, min_cost] = ga(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
+
+    % ---------------------------------------------------------------------
+    case 'PSO'
+        fprintf('Starting Particle Swarm Optimization...\n');
+        nVars = 6;
+        LB = [1, 1, 1, 1, 1, 1];
+        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+        
+        options = optimoptions('particleswarm', 'MaxIterations', 30, 'UseParallel', true, ...
+                               'Display', 'iter');
+                           
+        [x_best, min_cost] = particleswarm(ObjFcn, nVars, LB, UB, options);
+        x_best = round(x_best);
+
+    % ---------------------------------------------------------------------
+    case 'BAYESIAN'
+        fprintf('Starting Bayesian Optimization...\n');
+        
+        % Define Variables with Names
+        vars = [];
+        for i = 1:3 % For 3 observers
+            vars = [vars, ...
+                optimizableVariable(['Orb',num2str(i)], [1, num_orbits], 'Type','integer'), ...
+                optimizableVariable(['Slt',num2str(i)], [1, slots_per_orbit], 'Type','integer')];
+        end
+        
+        results = bayesopt(ObjFcn, vars, 'MaxObjectiveEvaluations', 30, ...
+                           'UseParallel', true, 'IsObjectiveDeterministic', false);
+                       
+        x_best = table2array(results.XAtMinObjective);
+        min_cost = results.MinObjective;
+end
+
+fprintf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
+fprintf('Orbits: %s\n', mat2str(x_best(1:2:end)));
+fprintf('Slots:  %s\n', mat2str(x_best(2:2:end)));
+fprintf('Cost:   %.4f\n', min_cost);

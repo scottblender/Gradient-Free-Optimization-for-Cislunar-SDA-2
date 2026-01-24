@@ -1,9 +1,10 @@
-function [s_ekf, cov] = cr3bp_ekf(observer_indices, state_interp, time_interp, s_lg, t_lg, P0, Q, R, mu)
-
+function [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu)
 % Initalize EKF Parameters
 num_steps = length(t_lg);
+num_obs = size(observer_ICs, 1);
 x_est = s_lg(1,1:6)';
 P_est = P0;
+current_obs_states = observer_ICs;
 
 % initialize history
 s_ekf= zeros(num_steps, 6);
@@ -35,18 +36,16 @@ for k=2:num_steps
     P_pred = Phi_k * P_est * Phi_k' + Q;
     P_upd = P_pred;
     x_upd = s_final(1:6); % Initialize updated state estimate
+    next_obs_states = zeros(num_obs, 6);
+    for i = 1:num_obs
+        s0_obs = current_obs_states(i, :)';
+        [~, s_prop_obs] = ode45(@(t,s) cr3bp_dynamics(t,s,mu), [0 dt], s0_obs, options);
+        next_obs_states(i, :) = s_prop_obs(end, :);
+    end
+    current_obs_states = next_obs_states;
     % --- UPDATE --- %
-    for i = 1:length(observer_indices)
-
-        % get observer state through interpolation
-        obs_idx = observer_indices(i);
-        t_ref = time_interp{obs_idx};
-        period = t_ref(end);           
-        t_local = mod(t, period);
-        
-        s_ref = state_interp{obs_idx}; %
-        r_obs_full = interp1(t_ref, s_ref, t_local, 'linear', 'extrap');
-        r_obs = r_obs_full(1:3)';
+    for i = 1:length(num_obs)
+        r_obs = current_obs_states(i, 1:3)';
 
         % generate noisy measurements
         r_target_truth = s_lg(k,1:3)';

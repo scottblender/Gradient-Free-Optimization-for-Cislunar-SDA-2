@@ -1,4 +1,4 @@
-function J_out = compute_cost(s_act, s_ekf, cov, opt_flag, norm_refs, solverName)
+function J_total = compute_cost(s_act, s_ekf, cov, opt_flag, solverName, dq)
     % COMPUTE_COST - Computes cost and logs components in parallel-safe way
     %
     % Inputs:
@@ -14,40 +14,31 @@ function J_out = compute_cost(s_act, s_ekf, cov, opt_flag, norm_refs, solverName
     
     % --- Defaults --- %
     if nargin < 5
-        norm_refs = [1,1,1];
-    end
-    if nargin < 6
         solverName = "unknown";
     end
     
-    weights = [1, 1, 1];  % component weights
-    
-    % --- Setup parallel-safe logging --- %
-    persistent dq iterCounter
-    if isempty(dq)
-        dq = parallel.pool.DataQueue;
-        afterEach(dq, @logCallback);
-        assignin('base','costComponentLog', []); % initialize log
-        iterCounter = 0;
-    end
-    
-    % --- Increment iteration --- %
-    iterCounter = iterCounter + 1;
-    
+    weights = [1, 1, 0.1];  % component weights
+
     % --- State RMSE --- %
     err = s_act - s_ekf;
     rmse = sqrt(mean(sum(err.^2,2)));
-    J_1 = (weights(1)/norm_refs(1))*rmse;
+    J_1 = weights(1)*log(rmse);
     
     % --- Covariance Trace and Determinant Terms --- %
-    cov_perm = permute(cov,[2 3 1]);
-    tr_term = mean(squeeze(trace(cov_perm)));
-    J_2 = (weights(2)/norm_refs(2))*tr_term;
-    
-    det_vals = squeeze(det(cov_perm));
-    det_vals(det_vals <= 0) = eps;
+   % Sum diagonal elements (k,1,1) + (k,2,2) ... for all k
+    tr_vals = cov(:,1,1) + cov(:,2,2) + cov(:,3,3) + ...
+              cov(:,4,4) + cov(:,5,5) + cov(:,6,6);
+    tr_term = mean(tr_vals);
+    J_2 = weights(2)*log(tr_term);
+    N = size(cov, 1);
+    det_vals = zeros(N, 1);
+    for k = 1:N
+        % Extract the 6x6 matrix for time step k
+        P_k = squeeze(cov(k, :, :));
+        det_vals(k) = det(P_k);
+    end
     det_term = mean(log(det_vals));
-    J_3 = (weights(3)/norm_refs(3))*det_term;
+    J_3 = weights(3)*det_term;
     
     % --- Scalar or vectorized total cost --- %
     switch upper(opt_flag)
@@ -59,17 +50,10 @@ function J_out = compute_cost(s_act, s_ekf, cov, opt_flag, norm_refs, solverName
             error('opt_flag must be either "SOO" or "MOO"');
     end
     
-    % --- Send to DataQueue for logging --- %
-    logRow = [iterCounter, string(solverName), J_1, J_2, J_3, J_total(:)'];
-    send(dq, logRow);
-    
-    % --- Return total cost --- %
-    J_out = J_total;
-    
-    % --- Nested callback --- %
-    function logCallback(data)
-        log = evalin('base','costComponentLog');
-        log = [log; data];
-        assignin('base','costComponentLog', log);
+    % log data
+    if nargin >= 6 && ~isempty(dq)
+        % Create the data row: [Iter(placeholder), Solver, J1, J2, J3, Total]
+        logRow = [string(solverName), J_1, J_2, J_3, J_total(:)'];
+        send(dq, logRow);
     end
 end

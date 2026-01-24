@@ -1,2 +1,7 @@
 *.asv
 /JPL_Data/
+/resources/
+
+/Gradient-Free-Optimization-for-Cislunar-.prj
+
+/JPL_CR3BP_OrbitCatalog.mat
