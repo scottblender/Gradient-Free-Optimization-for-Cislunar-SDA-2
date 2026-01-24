@@ -6,14 +6,14 @@ S = load('JPL_CR3BP_OrbitCatalog.mat');
 T1 = S.T;
 
 % User-specified Inputs
-% Options: 'GA', 'PSO', 'BAYESIAN'
-OPTIMIZER_MODE = 'GA';
+% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ'
+OPTIMIZER_MODE = 'GAMULTIOBJ';
 
 % Number of observers to optimize
 nvars = 3;
 
 % Stopping Criteria
-N_STALL = 25;
+N_STALL = 10;
 
 % JPL Constants
 mu = 1.215058560962404E-2;
@@ -85,9 +85,10 @@ function append_log(new_row)
 end
 
 % set flag for single or multi-objective
-opt_flag = 'SOO'; 
+opt_flag = 'MOO'; 
 ObjFcn = @(x) objective_wrapper(x, orbit_database, ...
                                           s_lg, t_lg, P_0_base, Q_k, R_k_base, mu, opt_flag, upper(OPTIMIZER_MODE), dq);
+RunTimer = tic;
 % swtich between optimizers
 switch upper(OPTIMIZER_MODE)
     
@@ -101,7 +102,7 @@ switch upper(OPTIMIZER_MODE)
         UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
         IntCon = 1:nVars; % All variables are integers
         
-        options = optimoptions('ga', 'MaxGenerations', 30, 'UseParallel', true, ...
+        options = optimoptions('ga', 'UseParallel', true, ...
                                'Display', 'iter');
                            
         [x_best, min_cost] = ga(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
@@ -113,7 +114,7 @@ switch upper(OPTIMIZER_MODE)
         LB = [1, 1, 1, 1, 1, 1];
         UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
         
-        options = optimoptions('particleswarm', 'MaxIterations', 30, 'UseParallel', true, ...
+        options = optimoptions('particleswarm', 'UseParallel', true, ...
                                'Display', 'iter');
                            
         [x_best, min_cost] = particleswarm(ObjFcn, nVars, LB, UB, options);
@@ -127,16 +128,44 @@ switch upper(OPTIMIZER_MODE)
         vars = [];
         for i = 1:3 % For 3 observers
             vars = [vars, ...
-                optimizableVariable(['Orb',num2str(i)], [1, num_orbits], 'Type','integer'), ...
-                optimizableVariable(['Slt',num2str(i)], [1, slots_per_orbit], 'Type','integer')];
+                optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
+                optimizableVariable(['Slot',num2str(i)], [1, slots_per_orbit], 'Type','integer')];
         end
         
-        results = bayesopt(ObjFcn, vars, 'MaxObjectiveEvaluations', 30, ...
+        results = bayesopt(ObjFcn, vars, ...
                            'UseParallel', true, 'IsObjectiveDeterministic', false);
                        
         x_best = table2array(results.XAtMinObjective);
         min_cost = results.MinObjective;
+     case 'GAMULTIOBJ'
+        fprintf('Starting Multi-Objective Genetic Algorithm (NSGA-II)...\n');
+        
+        % Setup Bounds & Integers
+        nVars = 6;
+        LB = double([1, 1, 1, 1, 1, 1]);
+        UB = double([num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit]);
+        IntCon = 1:nVars; 
+
+        % Options
+        %    'ParetoFraction': How many individuals to keep on the front (0.3 = 30%)
+        options = optimoptions('gamultiobj', ...
+            'PopulationSize', 60, ...
+            'ParetoFraction', 0.5, ... 
+            'UseParallel', true, ...
+            'Display', 'iter', ...
+            'PlotFcn', @gaplotpareto); % Built-in 2D/3D Plotter
+
+        % 4. Run Optimizer
+        [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
+        
+        % x_best is now a Matrix (N_solutions x 6)
+        % fval is a Matrix (N_solutions x 3)
+        min_cost = min(fval(:,1)); % Just for logging 
 end
+
+% runtime
+TotalRuntime = toc(RunTimer);
+fprintf('Total Runtime: %.2f seconds\n', TotalRuntime);
 
 fprintf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
 fprintf('Orbits: %s\n', mat2str(x_best(1:2:end)));

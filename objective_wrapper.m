@@ -31,8 +31,11 @@ function J = objective_wrapper(inputs, orbit_database, s_lg, t_lg, P0, Q, R, mu,
     
         J = compute_cost(s_lg, s_est, cov_hist, opt_flag, solverName, dq);
     catch ME
-        % if EKF diverges
-        J = 1e6;
+       if strcmp(opt_mode, 'MOO')
+            J = [1e6, 1e6, 1e6]; % Penalty for all 3 objectives
+       else
+            J = 1e6;
+       end
     end
 
 end
