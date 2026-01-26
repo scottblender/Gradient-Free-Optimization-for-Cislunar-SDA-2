@@ -1,5 +1,11 @@
-function J = objective_wrapper(inputs, orbit_database, s_lg, t_lg, P0, Q, R, mu, opt_flag, solverName, dq)
+function J = objective_wrapper(inputs, orbit_database_in, s_lg, t_lg, P0, Q, R, mu, opt_flag, solverName, dq)
     try
+        if isa(orbit_database_in, 'parallel.pool.Constant')
+            orbit_database = orbit_database_in.Value;
+        else
+            orbit_database = orbit_database_in;
+        end
+
         if istable(inputs)
             x = table2array(inputs);
         else 
@@ -31,7 +37,7 @@ function J = objective_wrapper(inputs, orbit_database, s_lg, t_lg, P0, Q, R, mu,
     
         J = compute_cost(s_lg, s_est, cov_hist, opt_flag, solverName, dq);
     catch ME
-       if strcmp(opt_mode, 'MOO')
+       if strcmp(opt_flag, 'MOO')
             J = [1e6, 1e6, 1e6]; % Penalty for all 3 objectives
        else
             J = 1e6;

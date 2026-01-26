@@ -6,8 +6,8 @@ S = load('JPL_CR3BP_OrbitCatalog.mat');
 T1 = S.T;
 
 % User-specified Inputs
-% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ'
-OPTIMIZER_MODE = 'GAMULTIOBJ';
+% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO'
+OPTIMIZER_MODE = 'DMOPSO';
 
 % Number of observers to optimize
 nvars = 3;
@@ -86,7 +86,8 @@ end
 
 % set flag for single or multi-objective
 opt_flag = 'MOO'; 
-ObjFcn = @(x) objective_wrapper(x, orbit_database, ...
+const_orbit_db = parallel.pool.Constant(orbit_database);
+ObjFcn = @(x) objective_wrapper(x, const_orbit_db, ...
                                           s_lg, t_lg, P_0_base, Q_k, R_k_base, mu, opt_flag, upper(OPTIMIZER_MODE), dq);
 RunTimer = tic;
 % swtich between optimizers
@@ -128,7 +129,7 @@ switch upper(OPTIMIZER_MODE)
         vars = [];
         for i = 1:3 % For 3 observers
             vars = [vars, ...
-                optimizableVariable(['Orbiz',num2str(i)], [1, num_orbits], 'Type','integer'), ...
+                optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
                 optimizableVariable(['Slot',num2str(i)], [1, slots_per_orbit], 'Type','integer')];
         end
         
@@ -157,17 +158,49 @@ switch upper(OPTIMIZER_MODE)
 
         % Run Optimizer
         [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
+      case 'DMOPSO'
+        nVars = 6;
+        LB = double([1, 1, 1, 1, 1, 1]);
+        UB = double([num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit]);
+        fprintf('Starting Custom Multi-Objective PSO...\n');
+        [archive_X, archive_F] = dmopso(ObjFcn, nVars, LB, UB, 100, 100, N_STALL);
         
-        % x_best is now a Matrix (N_solutions x 6)
-        % fval is a Matrix (N_solutions x 3)
-        min_cost = min(fval(:,1)); % Just for logging 
+        % find best solution
+        fval = archive_F;
+        x_best = archive_X;
+
 end
 
 % runtime
 TotalRuntime = toc(RunTimer);
 fprintf('Total Runtime: %.2f seconds\n', TotalRuntime);
 
-fprintf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
-fprintf('Orbits: %s\n', mat2str(x_best(1:2:end)));
-fprintf('Slots:  %s\n', mat2str(x_best(2:2:end)));
-fprintf('Cost:   %.4f\n', min_cost);
+if strcmp(opt_flag, 'SOO')
+    fprintf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
+    fprintf('Orbits: %s\n', mat2str(x_best(1:2:end)));
+    fprintf('Slots:  %s\n', mat2str(x_best(2:2:end)));
+    fprintf('Cost:   %.4f\n', min_cost);
+else
+    f_min = min(fval);
+    f_max = max(fval);
+    f_norm = (fval - f_min) ./ (f_max - f_min);
+    
+    % Calculate distance to Utopia point (0,0,0) in normalized space
+    dist_to_utopia = sqrt(sum(f_norm.^2, 2));
+    
+    % Find the index of the "Knee" solution
+    [~, idx_knee] = min(dist_to_utopia);
+    
+    % Extract the Actual (Raw) Costs for that solution
+    knee_costs = fval(idx_knee, :);
+    knee_vars  = x_best(idx_knee, :);
+    
+    % Print Results
+    fprintf('\n--- KNEE POINT (Balanced Solution) ---\n');
+    fprintf('Selected Row: %d\n', idx_knee);
+    fprintf('RMSE (Log):   %.4f\n', knee_costs(1));
+    fprintf('Trace (Log):  %.4f\n', knee_costs(2));
+    fprintf('Det (Log):    %.4f\n', knee_costs(3));
+    fprintf('Orbits:       %s\n', mat2str(knee_vars(1:2:end)));
+    fprintf('Slots:        %s\n', mat2str(knee_vars(2:2:end)));
+end
