@@ -1,5 +1,6 @@
 function [x_best, fval] = dmopso(obj_fnc, nvars, LB, UB, pop_size, max_itr, max_stall)
-% --- initialize variables --- %
+
+% --- Initialize variables --- %
 pos = LB + (UB - LB) .* rand(pop_size, nvars); % Continuous positions
 vel = zeros(pop_size, nvars);
 pbest_x = zeros(pop_size, nvars); % Will store rounded bests
@@ -7,12 +8,12 @@ pbest_f = zeros(pop_size, 3);
 stall_counter = 0;
 max_archive = 200;
 best_knee = inf;
-ftol = 1e-6;
+ftol = 1e-4;
 
 archive.X = []; 
 archive.F = [];
 
-% --- 1. Initial Evaluation ---
+% --- Initial Evaluation ---
 fprintf('Initializing Population with %d particles...\n', pop_size);
 
 % Create rounded version for the physics lookup
@@ -32,18 +33,18 @@ for itr = 1:max_itr
     leader_idx = randi(narch, pop_size, 1);
     leaders = archive.X(leader_idx, :);
     
-    w = 0.4 + 0.9*rand(pop_size, 1); 
+    w = 0.4 + 0.5*rand(pop_size, 1); 
     c1 = 1.5; c2 = 1.5;
     r1 = rand(pop_size, nvars);
     r2 = rand(pop_size, nvars);
     
-    % --- 2. Continuous Swarm Update ---
+    % --- Continuous Swarm Update ---
     % Use decimals to maintain search "direction"
     vel = w .* vel + c1 .* r1 .* (pbest_x - pos) + c2 .* r2 .* (leaders - pos);
     pos = pos + vel;
     pos = max(LB, min(UB, pos)); % Keep within database bounds
     
-    % --- 3. Discrete Evaluation ---
+    % --- Discrete Evaluation ---
     % Round decimals to integers for the EKF
     pos_eval = round(pos); 
     
@@ -52,7 +53,7 @@ for itr = 1:max_itr
         new_fval(i,:) = obj_fnc(pos_eval(i,:));
     end
     
-    % --- 4. Personal Best & Archive Update ---
+    % --- Personal Best & Archive Update ---
     for i = 1:pop_size
         if is_dominant(new_fval(i,:), pbest_f(i,:))
             % Save the rounded integer configuration
@@ -79,20 +80,6 @@ for itr = 1:max_itr
         stall_counter = stall_counter + 1;
     end
     
-    if stall_counter == round(max_stall * 0.5)
-        fprintf('<<< STALL DETECTED: Re-randomizing 30%% of swarm >>>\n');
-        
-        % Re-randomize 30% of the worst particles
-        shaken_idx = randperm(pop_size, round(pop_size * 0.3));
-        
-        % Give them completely new random positions
-        pos(shaken_idx, :) = LB + (UB - LB) .* rand(length(shaken_idx), nvars);
-        vel(shaken_idx, :) = 0; 
-        
-        % GRACE PERIOD: Reduce stall counter to give the swarm time to use the new info
-        stall_counter = max(0, stall_counter - 5); 
-    end
-
     fprintf('Iter %d/%d | Archive: %d | Best Knee Dist: %.4f | Stall: %d/%d\n', ...
         itr, max_itr, size(archive.F, 1), best_knee, stall_counter, max_stall);
         

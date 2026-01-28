@@ -163,7 +163,7 @@ switch upper(OPTIMIZER_MODE)
         LB = double([1, 1, 1, 1, 1, 1]);
         UB = double([num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit]);
         fprintf('Starting Custom Multi-Objective PSO...\n');
-        [archive_X, archive_F] = dmopso(ObjFcn, nVars, LB, UB, 100, 100, N_STALL);
+        [archive_X, archive_F] = dmopso(ObjFcn, nVars, LB, UB, 60, 100, N_STALL);
         
         % find best solution
         fval = archive_F;
