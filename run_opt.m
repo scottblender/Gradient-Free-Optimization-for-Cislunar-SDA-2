@@ -7,7 +7,7 @@ T1 = S.T;
 
 % User-specified Inputs
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO'
-OPTIMIZER_MODE = 'DMOPSO';
+OPTIMIZER_MODE = 'PSO';
 
 % Number of observers to optimize
 nvars = 3;
@@ -41,6 +41,8 @@ slots_per_orbit = 500;          % number of discrete slots per orbit
 tf    = T1.("Period (TU) ");
 states = T1.("state");
 times  = T1.("time");
+stabilities = T1.("Stability index  ");
+
 
 orbit_database = cell(num_orbits, 1);
 
@@ -85,9 +87,10 @@ function append_log(new_row)
 end
 
 % set flag for single or multi-objective
-opt_flag = 'MOO'; 
+opt_flag = 'SOO'; 
+const_stabilities = parallel.pool.Constant(stabilities);
 const_orbit_db = parallel.pool.Constant(orbit_database);
-ObjFcn = @(x) objective_wrapper(x, const_orbit_db, ...
+ObjFcn = @(x) objective_wrapper(x, const_orbit_db, const_stabilities, ...
                                           s_lg, t_lg, P_0_base, Q_k, R_k_base, mu, opt_flag, upper(OPTIMIZER_MODE), dq);
 RunTimer = tic;
 % swtich between optimizers
@@ -199,8 +202,8 @@ else
     fprintf('\n--- KNEE POINT (Balanced Solution) ---\n');
     fprintf('Selected Row: %d\n', idx_knee);
     fprintf('RMSE (Log):   %.4f\n', knee_costs(1));
-    fprintf('Trace (Log):  %.4f\n', knee_costs(2));
-    fprintf('Det (Log):    %.4f\n', knee_costs(3));
+    fprintf('Det (Log):  %.4f\n', knee_costs(2));
+    fprintf('Stability:    %.4f\n', knee_costs(3));
     fprintf('Orbits:       %s\n', mat2str(knee_vars(1:2:end)));
     fprintf('Slots:        %s\n', mat2str(knee_vars(2:2:end)));
 end

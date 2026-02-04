@@ -1,4 +1,4 @@
-function J_total = compute_cost(s_act, s_ekf, cov, opt_flag, solverName, dq)
+function J_total = compute_cost(s_act, s_ekf, cov, stabilities_vec, opt_flag, solverName, dq)
     % COMPUTE_COST - Computes cost and logs components in parallel-safe way
     %
     % Inputs:
@@ -13,23 +13,18 @@ function J_total = compute_cost(s_act, s_ekf, cov, opt_flag, solverName, dq)
     %   J_out - scalar (SOO) or vector (MOO)
     
     % --- Defaults --- %
-    if nargin < 5
+    if nargin < 6
         solverName = "unknown";
     end
     
-    weights = [1, 1, 0.1];  % component weights
+    weights = [1, 0.1, 10];  % component weights
 
     % --- State RMSE --- %
     err = s_act - s_ekf;
     rmse = sqrt(mean(sum(err.^2,2)));
     J_1 = weights(1)*log(rmse);
     
-    % --- Covariance Trace and Determinant Terms --- %
-   % Sum diagonal elements (k,1,1) + (k,2,2) ... for all k
-    tr_vals = cov(:,1,1) + cov(:,2,2) + cov(:,3,3) + ...
-              cov(:,4,4) + cov(:,5,5) + cov(:,6,6);
-    tr_term = mean(tr_vals);
-    J_2 = weights(2)*log(tr_term);
+    % --- Covariance Determinant Terms --- %
     N = size(cov, 1);
     det_vals = zeros(N, 1);
     for k = 1:N
@@ -38,7 +33,11 @@ function J_total = compute_cost(s_act, s_ekf, cov, opt_flag, solverName, dq)
         det_vals(k) = det(P_k);
     end
     det_term = mean(log(det_vals));
-    J_3 = weights(3)*det_term;
+    J_2 = weights(2)*det_term;
+
+    % --- Stability/Station-Keeping Term --- %
+    stability_term = stabilities_vec;
+    J_3 = weights(3)*mean(stability_term);
     
     % --- Scalar or vectorized total cost --- %
     switch upper(opt_flag)
@@ -51,7 +50,7 @@ function J_total = compute_cost(s_act, s_ekf, cov, opt_flag, solverName, dq)
     end
     
     % log data
-    if nargin >= 6 && ~isempty(dq)
+    if ~isempty(dq)
         % Create the data row: [Iter(placeholder), Solver, J1, J2, J3, Total]
         logRow = [string(solverName), J_1, J_2, J_3, J_total(:)'];
         send(dq, logRow);
