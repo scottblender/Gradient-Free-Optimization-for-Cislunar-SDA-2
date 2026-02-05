@@ -211,11 +211,6 @@ switch upper(OPTIMIZER_MODE)
         aco_opts.Q          = 1.0;   % deposit scale
         aco_opts.StallIters = N_STALL;
 
-        % scalability knobs
-        aco_opts.TopKOrbit  = 150;   % sample only from top-K orbit values (per orbit var)
-        aco_opts.TopKSlot   = 60;    % optional, slot candidate list
-        aco_opts.UseParallelAnts = false; % keep false unless you restructure logging
-
         [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
 
 end
