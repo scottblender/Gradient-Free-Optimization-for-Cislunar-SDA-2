@@ -7,7 +7,7 @@ T1 = S.T;
 
 % User-specified Inputs
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO'
-OPTIMIZER_MODE = 'PSO';
+OPTIMIZER_MODE = 'GA';
 
 % Number of observers to optimize
 nvars = 3;
