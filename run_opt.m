@@ -6,8 +6,8 @@ S = load('JPL_CR3BP_OrbitCatalog.mat');
 T1 = S.T;
 
 % User-specified Inputs
-% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO'
-OPTIMIZER_MODE = 'GA';
+% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
+OPTIMIZER_MODE = 'ACO';
 
 % Number of observers to optimize
 nvars = 3;
@@ -141,7 +141,9 @@ switch upper(OPTIMIZER_MODE)
                        
         x_best = table2array(results.XAtMinObjective);
         min_cost = results.MinObjective;
-     case 'GAMULTIOBJ'
+
+    % --------------------------------------------------------------------- 
+    case 'GAMULTIOBJ'
         fprintf('Starting Multi-Objective Genetic Algorithm (NSGA-II)...\n');
         
         % Setup Bounds & Integers
@@ -161,7 +163,9 @@ switch upper(OPTIMIZER_MODE)
 
         % Run Optimizer
         [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
-      case 'DMOPSO'
+    
+    % ---------------------------------------------------------------------  
+    case 'DMOPSO'
         nVars = 6;
         LB = double([1, 1, 1, 1, 1, 1]);
         UB = double([num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit]);
@@ -171,6 +175,43 @@ switch upper(OPTIMIZER_MODE)
         % find best solution
         fval = archive_F;
         x_best = archive_X;
+      
+    % ---------------------------------------------------------------------
+    case 'ABC'
+        fprintf('Starting Artificial Bee Colony Optimization...\n');
+        nVars = 6;
+
+        % Integers: [Orb1, Slt1, Orb2, Slt2, Orb3, Slt3]
+        LB = [1, 1, 1, 1, 1, 1];
+        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+
+        % --- ABC options --- %
+        abc_opts.ColonySize      = 60;
+        abc_opts.MaxIters        = 80;
+        abc_opts.Limit           = 20;   % scout trigger
+        abc_opts.StallIters      = N_STALL;
+        abc_opts.SlotsPerOrbit   = slots_per_orbit;
+        abc_opts.UseParallelInit = true; % only parallelize initial evaluation
+
+        [x_best, min_cost] = abc_discrete(ObjFcn, LB, UB, abc_opts);
+
+    % ---------------------------------------------------------------------
+    case 'ACO'
+        fprintf('Starting Ant Colony Optimization...\n');
+
+        LB = [1, 1, 1, 1, 1, 1];
+        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+
+        % --- ACO options --- %
+        aco_opts.nAnts      = 30;
+        aco_opts.MaxIters   = 60;
+        aco_opts.alpha      = 1.0;   % pheromone influence
+        aco_opts.beta       = 1.0;   % heuristic influence (keep 1 if no heuristic)
+        aco_opts.rho        = 0.2;   % evaporation rate
+        aco_opts.Q          = 1.0;   % deposit scale
+        aco_opts.StallIters = N_STALL;
+
+        [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
 
 end
 
