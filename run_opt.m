@@ -6,8 +6,8 @@ S = load('JPL_CR3BP_OrbitCatalog.mat');
 T1 = S.T;
 
 % User-specified Inputs
-% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC'
-OPTIMIZER_MODE = 'ABC';
+% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
+OPTIMIZER_MODE = 'ACO';
 
 % Number of observers to optimize
 nvars = 3;
@@ -194,7 +194,30 @@ switch upper(OPTIMIZER_MODE)
         abc_opts.UseParallelInit = true; % only parallelize initial evaluation
 
         [x_best, min_cost] = abc_discrete(ObjFcn, LB, UB, abc_opts);
-  
+
+    % ---------------------------------------------------------------------
+    case 'ACO'
+        fprintf('Starting Ant Colony Optimization...\n');
+
+        LB = [1, 1, 1, 1, 1, 1];
+        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+
+        % --- ACO options --- %
+        aco_opts.nAnts      = 30;
+        aco_opts.MaxIters   = 60;
+        aco_opts.alpha      = 1.0;   % pheromone influence
+        aco_opts.beta       = 1.0;   % heuristic influence (keep 1 if no heuristic)
+        aco_opts.rho        = 0.2;   % evaporation rate
+        aco_opts.Q          = 1.0;   % deposit scale
+        aco_opts.StallIters = N_STALL;
+
+        % scalability knobs
+        aco_opts.TopKOrbit  = 150;   % sample only from top-K orbit values (per orbit var)
+        aco_opts.TopKSlot   = 60;    % optional, slot candidate list
+        aco_opts.UseParallelAnts = false; % keep false unless you restructure logging
+
+        [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
+
 end
 
 % runtime
