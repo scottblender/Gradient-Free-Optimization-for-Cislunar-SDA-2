@@ -294,11 +294,14 @@ else
 end
 
 % ---- Save MAT (everything) ----
-matName = sprintf("results_%s_%s.mat", mode, ts);
-save(matName, "results", "logCell");
+ts = char(datetime("now","Format","yyyyMMdd_HHmmss"));
+mode = char(OPTIMIZER_MODE);
+matName = sprintf('results_%s_%s.mat', mode, ts);
+
+save(matName, 'results', 'logCell', '-v7.3');
 
 % ---- Save summary.txt (clean final) ----
-fid = fopen("summary.txt","w");
+fid = fopen('summary.txt',"w");
 fprintf(fid, "Optimizer: %s\n", mode);
 fprintf(fid, "Timestamp: %s\n", ts);
 fprintf(fid, "Runtime (sec): %.3f\n", TotalRuntime);
@@ -315,7 +318,7 @@ end
 fclose(fid);
 
 % ---- Save OptimizationLog.csv ----
-csvName = "OptimizationLog.csv";
+csvName = 'OptimizationLog.csv';
 
 if isempty(logCell)
     fid = fopen(csvName,"w");
