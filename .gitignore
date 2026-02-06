@@ -5,3 +5,7 @@
 /Gradient-Free-Optimization-for-Cislunar-.prj
 
 /JPL_CR3BP_OrbitCatalog.mat
+
+# ignore all run output folders
+runs_*/
+/run_all_soo.ps1

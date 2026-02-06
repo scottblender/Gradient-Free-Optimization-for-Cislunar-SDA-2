@@ -7,13 +7,20 @@ T1 = S.T;
 
 % User-specified Inputs
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
-OPTIMIZER_MODE = 'ACO';
+OPTIMIZER_MODE = 'ACO'; % default
+
+envMode = getenv("OPTIMIZER_MODE");
+if ~isempty(envMode)
+    OPTIMIZER_MODE = envMode;
+end
+
+OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
 % Number of observers to optimize
 nvars = 3;
 
 % Stopping Criteria
-N_STALL = 10;
+MAX_EVALS = 500; 
 
 % JPL Constants
 mu = 1.215058560962404E-2;
@@ -81,9 +88,10 @@ assignin('base', 'OptimizationLog', []);
 afterEach(dq, @(data) append_log(data));
 
 % Helper function to update the variable in the Command Window Workspace
-function append_log(new_row)
-    current_log = evalin('base', 'OptimizationLog');
-    assignin('base', 'OptimizationLog', [current_log; new_row]);
+function append_log(data)
+    logCell = evalin('base', 'OptimizationLog');
+    logCell{end+1,1} = data; 
+    assignin('base', 'OptimizationLog', logCell);
 end
 
 % set flag for single or multi-objective
@@ -105,10 +113,16 @@ switch upper(OPTIMIZER_MODE)
         LB = [1, 1, 1, 1, 1, 1];
         UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
         IntCon = 1:nVars; % All variables are integers
+
+        pop = 60;  % keep consistent across runs
+        maxGen = max(1, ceil(MAX_EVALS / pop));
         
-        options = optimoptions('ga', 'UseParallel', true, ...
-                               'Display', 'iter');
-                           
+        options = optimoptions('ga', ...
+            'UseParallel', true, ...
+            'Display', 'iter', ...
+            'PopulationSize', pop, ...
+            'MaxGenerations', maxGen);
+
         [x_best, min_cost] = ga(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
 
     % ---------------------------------------------------------------------
@@ -118,9 +132,15 @@ switch upper(OPTIMIZER_MODE)
         LB = [1, 1, 1, 1, 1, 1];
         UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
         
-        options = optimoptions('particleswarm', 'UseParallel', true, ...
-                               'Display', 'iter');
-                           
+        swarm = 60;
+        maxIter = max(1, ceil(MAX_EVALS / swarm));
+        
+        options = optimoptions('particleswarm', ...
+            'UseParallel', true, ...
+            'Display', 'iter', ...
+            'SwarmSize', swarm, ...
+            'MaxIterations', maxIter);
+        
         [x_best, min_cost] = particleswarm(ObjFcn, nVars, LB, UB, options);
         x_best = round(x_best);
 
@@ -137,7 +157,9 @@ switch upper(OPTIMIZER_MODE)
         end
         
         results = bayesopt(ObjFcn, vars, ...
-                           'UseParallel', true, 'IsObjectiveDeterministic', false);
+            'UseParallel', true, ...
+            'IsObjectiveDeterministic', false, ...
+            'MaxObjectiveEvaluations', MAX_EVALS);
                        
         x_best = table2array(results.XAtMinObjective);
         min_cost = results.MinObjective;
@@ -187,9 +209,9 @@ switch upper(OPTIMIZER_MODE)
 
         % --- ABC options --- %
         abc_opts.ColonySize      = 60;
-        abc_opts.MaxIters        = 80;
+        abc_opts.MaxIters   = max(1, ceil(MAX_EVALS / abc_opts.ColonySize));
         abc_opts.Limit           = 20;   % scout trigger
-        abc_opts.StallIters      = N_STALL;
+        abc_opts.StallIters      = inf;
         abc_opts.SlotsPerOrbit   = slots_per_orbit;
         abc_opts.UseParallelInit = true; % only parallelize initial evaluation
 
@@ -204,12 +226,12 @@ switch upper(OPTIMIZER_MODE)
 
         % --- ACO options --- %
         aco_opts.nAnts      = 30;
-        aco_opts.MaxIters   = 60;
+        aco_opts.MaxIters = max(1, ceil(MAX_EVALS / aco_opts.nAnts));
         aco_opts.alpha      = 1.0;   % pheromone influence
         aco_opts.beta       = 1.0;   % heuristic influence (keep 1 if no heuristic)
         aco_opts.rho        = 0.2;   % evaporation rate
         aco_opts.Q          = 1.0;   % deposit scale
-        aco_opts.StallIters = N_STALL;
+        aco_opts.StallIters = inf;
 
         [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
 
@@ -248,3 +270,71 @@ else
     fprintf('Orbits:       %s\n', mat2str(knee_vars(1:2:end)));
     fprintf('Slots:        %s\n', mat2str(knee_vars(2:2:end)));
 end
+
+% ==================== SAVE ARTIFACTS ====================
+ts = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
+mode = char(OPTIMIZER_MODE);
+
+% Pull OptimizationLog from base workspace
+logCell = evalin('base', 'OptimizationLog');
+
+% ---- results struct ----
+results = struct();
+results.optimizer   = mode;
+results.timestamp   = ts;
+results.runtime_sec = TotalRuntime;
+results.opt_flag    = opt_flag;
+
+if strcmpi(opt_flag,'SOO')
+    results.x_best   = x_best;
+    results.min_cost = min_cost;
+else
+    results.x_best = x_best;
+    results.fval   = fval;
+end
+
+% ---- Save MAT (everything) ----
+matName = sprintf("results_%s_%s.mat", mode, ts);
+save(matName, "results", "logCell");
+
+% ---- Save summary.txt (clean final) ----
+fid = fopen("summary.txt","w");
+fprintf(fid, "Optimizer: %s\n", mode);
+fprintf(fid, "Timestamp: %s\n", ts);
+fprintf(fid, "Runtime (sec): %.3f\n", TotalRuntime);
+fprintf(fid, "opt_flag: %s\n\n", opt_flag);
+
+if strcmpi(opt_flag,'SOO')
+    fprintf(fid, "x_best: %s\n", mat2str(x_best));
+    fprintf(fid, "Orbits: %s\n", mat2str(x_best(1:2:end)));
+    fprintf(fid, "Slots : %s\n", mat2str(x_best(2:2:end)));
+    fprintf(fid, "min_cost: %.12f\n", min_cost);
+else
+    fprintf(fid, "Multi-objective run.\n");
+end
+fclose(fid);
+
+% ---- Save OptimizationLog.csv ----
+csvName = "OptimizationLog.csv";
+
+if isempty(logCell)
+    fid = fopen(csvName,"w");
+    fprintf(fid,"No OptimizationLog entries were recorded.\n");
+    fclose(fid);
+else
+    try
+        Tlog = struct2table([logCell{:}]);
+        writetable(Tlog, csvName);
+    catch ME
+        warning("Failed to write CSV: %s", ME.message);
+        fid = fopen(csvName,"w");
+        fprintf(fid,"Failed to convert log to table. Dumping entries.\n\n");
+        for i = 1:numel(logCell)
+            fprintf(fid,"%s\n", evalc("disp(logCell{i})"));
+        end
+        fclose(fid);
+    end
+end
+
+fprintf("\nSaved artifacts: %s, summary.txt, %s\n", matName, csvName);
+% =========================================================

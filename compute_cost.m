@@ -50,9 +50,31 @@ function J_total = compute_cost(s_act, s_ekf, cov, stabilities_vec, opt_flag, so
     end
     
     % log data
-    if ~isempty(dq)
-        % Create the data row: [Iter(placeholder), Solver, J1, J2, J3, Total]
-        logRow = [string(solverName), J_1, J_2, J_3, J_total(:)'];
-        send(dq, logRow);
+    if nargin >= 7 && ~isempty(dq)
+        entry = struct();
+        entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
+        entry.solver = char(solverName);
+        entry.opt_flag = char(opt_flag);
+    
+        % Components
+        entry.J1_rmse = J_1;
+        entry.J2_det  = J_2;
+        entry.J3_stab = J_3;
+    
+        % Total: store scalar for SOO, and 3 cols for MOO
+        if strcmpi(opt_flag,"SOO")
+            entry.J_total = J_total;
+        else
+            entry.J_total1 = J_total(1);
+            entry.J_total2 = J_total(2);
+            entry.J_total3 = J_total(3);
+        end
+    
+        % Helpful diagnostics (optional)
+        entry.rmse_raw = rmse;
+        entry.det_mean_log = det_term;
+        entry.stab_mean = mean(stability_term);
+    
+        send(dq, entry);
     end
 end
