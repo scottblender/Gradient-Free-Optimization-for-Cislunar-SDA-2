@@ -8,7 +8,7 @@
 
 # ignore all run output folders
 runs_*/
-/run_all_soo.ps1
+
 
 # optimization run outputs
 OptimizationLog.csv
