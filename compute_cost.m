@@ -75,6 +75,8 @@ function J_total = compute_cost(s_act, s_ekf, cov, stabilities_vec, opt_flag, so
         entry.det_mean_log = det_term;
         entry.stab_mean = mean(stability_term);
     
-        send(dq, entry);
+        if ~isempty(dq)
+            send(dq, entry);
+        end
     end
 end
