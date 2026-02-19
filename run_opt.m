@@ -107,10 +107,14 @@ i_sun  = deg2rad(0);    % keep planar for now
 
 sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, theta0, i_sun);
 
+% choose whether or not to include occlusion/exclusion
+useScreening = True;
+
 ObjFcn = @(x) objective_wrapper(x, const_orbit_db, const_stabilities, ...
                                s_lg, t_lg, P_0_base, Q_k, R_k_base, ...
                                mu, LU, sunFcn, sun_min, moon_min, ...
-                               opt_flag, upper(OPTIMIZER_MODE), dq);
+                               opt_flag, upper(OPTIMIZER_MODE), dq, ... 
+                               useScreening);
 RunTimer = tic;
 
 switch upper(OPTIMIZER_MODE)
@@ -212,24 +216,28 @@ switch upper(OPTIMIZER_MODE)
     % ---------------------------------------------------------------------
     case 'ABC'
         fprintf('Starting Artificial Bee Colony Optimization...\n');
-
+    
         LB = [1, 1, 1, 1, 1, 1];
         UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
-
-        abc_opts.ColonySize  = 60;
-        abc_opts.MaxIters    = MAX_ITERS;
-        abc_opts.Limit       = 20;
-        abc_opts.UseParallel = true;
-
+    
+        abc_opts.ColonySize      = 60;
+        abc_opts.MaxIters        = MAX_ITERS;
+        abc_opts.Limit           = 20;
+        abc_opts.StallIters      = inf;        % or a number like 25
+        abc_opts.SlotsPerOrbit   = slots_per_orbit;
+        abc_opts.UseParallel     = true;       % <- now used for ALL phases
+        abc_opts.UseParallelInit = true;
+    
         [x_best, min_cost] = abc_discrete(ObjFcn, LB, UB, abc_opts);
+
 
     % ---------------------------------------------------------------------
     case 'ACO'
         fprintf('Starting Ant Colony Optimization...\n');
-
+    
         LB = [1, 1, 1, 1, 1, 1];
         UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
-
+    
         aco_opts.nAnts       = 60;
         aco_opts.MaxIters    = MAX_ITERS;
         aco_opts.alpha       = 1.0;
@@ -237,7 +245,13 @@ switch upper(OPTIMIZER_MODE)
         aco_opts.rho         = 0.2;
         aco_opts.Q           = 1.0;
         aco_opts.UseParallel = true;
-
+    
+        % optional (recommended) extras supported by the updated script:
+        aco_opts.TauMin              = 1e-12;
+        aco_opts.UseIterBestDeposit  = true;
+        aco_opts.IterBestWeight      = 1.0;   % try 0.5–2.0
+        aco_opts.StallIters          = inf;   % or e.g., 25
+    
         [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
 
     otherwise
