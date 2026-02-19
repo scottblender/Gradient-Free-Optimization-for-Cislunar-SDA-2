@@ -1,4 +1,4 @@
-function [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu)
+function [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min)
 % Initalize EKF Parameters
 num_steps = length(t_lg);
 num_obs = size(observer_ICs, 1);
@@ -15,6 +15,8 @@ cov(1,:,:) = P_est;
 
 % ode45 options
 options = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
+
+I6 = eye(6);
 
 % filter loop
 for k=2:num_steps
@@ -44,7 +46,7 @@ for k=2:num_steps
     end
     current_obs_states = next_obs_states;
     % --- UPDATE --- %
-    for i = 1:length(num_obs)
+    for i = 1:num_obs
         r_obs = current_obs_states(i, 1:3)';
 
         % generate noisy measurements
@@ -53,16 +55,46 @@ for k=2:num_steps
         noise = mvnrnd([0;0], R)';
         z_meas = z_clean + noise;
 
+        % sun position
+        r_sun = sunFcn(t_lg(k));
+
+        
+        % occlusion check
+        [occE, occM] = calc_occlusion(r_obs, r_target_truth, mu, LU);
+
+        [ok_excl, ~, ~] = calc_exclusion(r_target_truth, r_obs, r_sun, mu, sun_min, moon_min);
+        
+        ok = ok_excl && ~occE && ~occM;
+
+        if ~ok
+            continue; % skip measurement from this observer
+        end 
+
         % update state estimate
         z_pred = measurement_model(x_upd(1:3), r_obs);
         y_tilde = z_meas - z_pred; % measurement residual
         y_tilde(1) = atan2(sin(y_tilde(1)),cos(y_tilde(1))); % wrap right ascension
         H = measurement_jacobian(x_upd(1:3), r_obs); % measurement jacobian
-        S = H * P_upd * H' + R; % innovation covariance
-        K = P_upd * H' / S; % Kalman gain
-        x_upd = x_upd + K * y_tilde; % updated state estimate
-        P_upd = (eye(6) - K * H) * P_upd; % updated covariance
-        P_upd = (P_upd + P_upd')/2; % symmetrize 
+        S = H * P_upd * H' + R;
+        S = (S + S')/2;
+        if rcond(S) < 1e-12
+            S = S + 1e-12 * eye(size(S));
+        end
+        
+        [Rchol,p] = chol(S);
+        PHt = P_upd * H';
+        
+        if p == 0
+            K = (PHt / Rchol) / Rchol';   % cholesky solve
+        else
+            K = PHt / S;                  % stable fallback 
+        end
+        
+        x_upd = x_upd + K * y_tilde;
+        
+        P_upd = (I6 - K*H) * P_upd * (I6 - K*H)' + K*R*K';
+        P_upd = (P_upd + P_upd')/2;
+
     end
     % update state and covariance estimates
     x_est = x_upd; 

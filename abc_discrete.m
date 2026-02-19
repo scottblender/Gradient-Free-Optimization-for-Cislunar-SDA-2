@@ -8,7 +8,7 @@ if nargin < 4, opts = struct(); end
 if ~isfield(opts,'ColonySize'),      opts.ColonySize = 60; end
 if ~isfield(opts,'MaxIters'),        opts.MaxIters = 80; end
 if ~isfield(opts,'Limit'),           opts.Limit = 20; end
-if ~isfield(opts,'StallIters'),      opts.StallIters = 10; end
+if ~isfield(opts,'StallIters'),      opts.StallIters = 1000; end
 if ~isfield(opts,'SlotsPerOrbit'),   opts.SlotsPerOrbit = UB(2); end
 if ~isfield(opts,'UseParallelInit'), opts.UseParallelInit = true; end
 

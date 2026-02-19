@@ -1,4 +1,4 @@
-function J = objective_wrapper(inputs, orbit_database_in, stabilities_in, s_lg, t_lg, P0, Q, R, mu, opt_flag, solverName, dq)
+function J = objective_wrapper(inputs, orbit_database_in, stabilities_in, s_lg, t_lg, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, opt_flag, solverName, dq)
     try
         if isa(orbit_database_in, 'parallel.pool.Constant')
             orbit_database = orbit_database_in.Value;
@@ -42,11 +42,13 @@ function J = objective_wrapper(inputs, orbit_database_in, stabilities_in, s_lg, 
         end
     
         % run EKF
-        [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu);
+        [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min);
     
         J = compute_cost(s_lg, s_ekf, cov, stabilities_vec, opt_flag, solverName, dq);
     
     catch ME
+       % msg = getReport(ME, 'extended', 'hyperlinks', 'off');
+       % disp(msg)
        if strcmp(opt_flag, 'MOO')
             J = [1e6; 1e6; 1e6]; % Penalty for all 3 objectives
        else

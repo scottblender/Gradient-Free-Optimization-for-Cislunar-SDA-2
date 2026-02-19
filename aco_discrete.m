@@ -10,7 +10,7 @@ if ~isfield(opts,'alpha'),      opts.alpha = 1.0; end
 if ~isfield(opts,'beta'),       opts.beta = 2.0; end
 if ~isfield(opts,'rho'),        opts.rho = 0.2; end
 if ~isfield(opts,'Q'),          opts.Q = 1.0; end
-if ~isfield(opts,'StallIters'), opts.StallIters = 10; end
+if ~isfield(opts,'StallIters'), opts.StallIters = 1000; end
 
 nVars = numel(LB);
 
