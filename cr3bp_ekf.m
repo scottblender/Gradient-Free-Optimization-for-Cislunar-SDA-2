@@ -1,4 +1,4 @@
-function [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
+function [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
                                  sunFcn, sun_min, moon_min, useScreening)
 
 if nargin < 13 || isempty(useScreening)
@@ -19,6 +19,7 @@ cov(1,:,:) = P_est;
 
 options = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
 I6 = eye(6);
+screeningCount = 0;
 
 for k=2:num_steps
     dt = t_lg(k) - t_lg(k-1);
@@ -61,6 +62,7 @@ for k=2:num_steps
 
             ok = ok_excl && ~occE && ~occM;
             if ~ok
+                screeningCount = screeningCount +1;
                 continue;
             end
         end

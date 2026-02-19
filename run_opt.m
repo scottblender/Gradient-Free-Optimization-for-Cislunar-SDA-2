@@ -108,7 +108,7 @@ i_sun  = deg2rad(0);    % keep planar for now
 sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, theta0, i_sun);
 
 % choose whether or not to include occlusion/exclusion
-useScreening = True;
+useScreening = true;
 
 ObjFcn = @(x) objective_wrapper(x, const_orbit_db, const_stabilities, ...
                                s_lg, t_lg, P_0_base, Q_k, R_k_base, ...

@@ -1,6 +1,6 @@
-function J = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
+function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
     s_lg, t_lg, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, ...
-    opt_flag, solverName, dq, useScreening)   % <-- add flag
+    opt_flag, solverName, dq, useScreening)  
 
     try
         if nargin < 18 || isempty(useScreening)   % <-- default ON if not provided
@@ -46,16 +46,42 @@ function J = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
         end
 
         % run EKF (pass flag)
-        [s_ekf, cov] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
+        [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
                                  sunFcn, sun_min, moon_min, useScreening);
 
-        J = compute_cost(s_lg, s_ekf, cov, stabilities_vec, opt_flag, solverName, dq);
+        [J_total, J_1, J_2, J_3] = compute_cost(s_lg, s_ekf, cov, stabilities_vec, opt_flag);
 
     catch ME
         if strcmp(opt_flag, 'MOO')
-            J = [1e6; 1e6; 1e6];
+            J_total = [1e6; 1e6; 1e6];
         else
-            J = 1e6;
+            J_total = 1e6;
         end
+    end
+
+    % log data
+    if nargin >= 15 && ~isempty(dq)
+        entry = struct();
+        entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
+        entry.solver = char(solverName);
+        entry.opt_flag = char(opt_flag);
+    
+        % Components
+        entry.J1_rmse = J_1;
+        entry.J2_det  = J_2;
+        entry.J3_stab = J_3;
+    
+        % Total: store scalar for SOO, and 3 cols for MOO
+        if strcmpi(opt_flag,"SOO")
+            entry.J_total = J_total;
+        else
+            entry.J_total1 = J_total(1);
+            entry.J_total2 = J_total(2);
+            entry.J_total3 = J_total(3);
+        end
+
+        entry.screeningCount = screeningCount;
+
+        send(dq, entry);
     end
 end
