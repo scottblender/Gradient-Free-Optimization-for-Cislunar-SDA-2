@@ -21,8 +21,8 @@ function [occE, occM] = calc_occlusion(r_target, r_observer, mu, LU, pad_km)
     r_moon = [1-mu; 0; 0];
 
     % radii (LU)
-    Re_LU = (6378.1363 + pad_km) / LU;
-    Rm_LU = (1737.4    + pad_km) / LU;
+    Re_LU = (6378.1366 + pad_km) / LU;
+    Rm_LU = (1737.1    + pad_km) / LU;
 
     % determine occlusion
     occE = segment_intersects_sphere(r_observer, r_target, r_earth, Re_LU);

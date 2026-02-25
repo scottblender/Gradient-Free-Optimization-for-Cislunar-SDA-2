@@ -14,3 +14,7 @@ runs_*/
 OptimizationLog.csv
 summary.txt
 results_*.mat
+
+*.pdf
+
+*.png

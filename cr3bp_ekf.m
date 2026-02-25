@@ -51,18 +51,22 @@ for k=2:num_steps
 
         r_target_truth = s_lg(k,1:3)';
         z_clean = measurement_model(r_target_truth, r_obs);
-        noise   = mvnrnd([0;0], R)';     % (assuming R is 2x2 covariance)
+        noise   = mvnrnd([0;0], R,1).';     % (assuming R is 2x2 covariance)
         z_meas  = z_clean + noise;
 
-        if useScreening
-            r_sun = sunFcn(t_lg(k));
+        r_sun = sunFcn(t);
 
-            [occE, occM] = calc_occlusion(r_obs, r_target_truth, mu, LU);
-            [ok_excl, ~, ~] = calc_exclusion(r_target_truth, r_obs, r_sun, mu, sun_min, moon_min);
-
-            ok = ok_excl && ~occE && ~occM;
-            if ~ok
-                screeningCount = screeningCount +1;
+        [occE, occM] = calc_occlusion(r_obs, r_target_truth, mu, LU);
+        [ok_excl, ~, ~] = calc_exclusion(r_target_truth, r_obs, r_sun, mu, sun_min, moon_min);
+    
+        ok = ok_excl && ~occE && ~occM;
+    
+        % always count fails, regardless of useScreening
+        if ~ok
+            screeningCount = screeningCount + 1;
+    
+            % only skip the update if screening is enabled
+            if useScreening
                 continue;
             end
         end

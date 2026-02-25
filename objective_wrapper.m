@@ -1,12 +1,26 @@
 function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
     s_lg, t_lg, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, ...
-    opt_flag, solverName, dq, useScreening)  
+    opt_flag, solverName, dq, useScreening, costFlags)
+
+    % ---------------- defaults ----------------
+    if nargin < 18 || isempty(useScreening)
+        useScreening = true;
+    end
+
+    % Cost component toggles (default: all ON)
+    if nargin < 19 || isempty(costFlags)
+        costFlags = struct('J1', true, 'J2', true, 'J3', true);
+    end
+    % Make robust to missing fields
+    if ~isfield(costFlags,'J1'), costFlags.J1 = true; end
+    if ~isfield(costFlags,'J2'), costFlags.J2 = true; end
+    if ~isfield(costFlags,'J3'), costFlags.J3 = true; end
+
+    % Predefine for logging even if we hit catch
+    J_1 = NaN; J_2 = NaN; J_3 = NaN;
+    screeningCount = NaN;
 
     try
-        if nargin < 18 || isempty(useScreening)   % <-- default ON if not provided
-            useScreening = true;
-        end
-
         if isa(orbit_database_in, 'parallel.pool.Constant')
             orbit_database = orbit_database_in.Value;
         else
@@ -45,33 +59,38 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
             observer_ICs(k, :) = orbit_database{o_idx}(s_idx, :);
         end
 
-        % run EKF (pass flag)
-        [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
-                                 sunFcn, sun_min, moon_min, useScreening);
+        % run EKF (pass screening flag)
+        [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, ...
+            P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, useScreening);
 
-        [J_total, J_1, J_2, J_3] = compute_cost(s_lg, s_ekf, cov, stabilities_vec, opt_flag);
+        % compute cost with component toggles
+        [J_total, J_1, J_2, J_3] = compute_cost(s_lg, s_ekf, cov, stabilities_vec, opt_flag, costFlags);
 
-    catch ME
-        if strcmp(opt_flag, 'MOO')
+    catch ME 
+        if strcmpi(opt_flag, 'MOO')
             J_total = [1e6; 1e6; 1e6];
         else
             J_total = 1e6;
         end
     end
 
-    % log data
+    % ---------------- logging ----------------
     if nargin >= 15 && ~isempty(dq)
         entry = struct();
         entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
         entry.solver = char(solverName);
         entry.opt_flag = char(opt_flag);
-    
-        % Components
+
+        % Components (these are post-toggle values: inactive -> 0)
         entry.J1_rmse = J_1;
         entry.J2_det  = J_2;
         entry.J3_stab = J_3;
-    
-        % Total: store scalar for SOO, and 3 cols for MOO
+
+        % Store flags too
+        entry.useJ1 = logical(costFlags.J1);
+        entry.useJ2 = logical(costFlags.J2);
+        entry.useJ3 = logical(costFlags.J3);
+
         if strcmpi(opt_flag,"SOO")
             entry.J_total = J_total;
         else

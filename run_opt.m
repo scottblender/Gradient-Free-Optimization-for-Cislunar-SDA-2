@@ -22,7 +22,7 @@ OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 nvars = 3;
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 100;
+MAX_ITERS = 20;
 MAX_EVALS = 100;  % Bayesian only (objective evaluation budget)
 
 % JPL Constants
@@ -46,7 +46,7 @@ tspan_lg_ic = [0, 1.51110546287394];
 
 % MILP-Implementation
 num_orbits      = height(T1); % number of candidate orbits
-slots_per_orbit = 100;        % number of discrete slots per orbit
+slots_per_orbit = 50;        % number of discrete slots per orbit
 
 tf          = T1.("Period (TU) ");
 states      = T1.("state");
@@ -108,13 +108,14 @@ i_sun  = deg2rad(0);    % keep planar for now
 sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, theta0, i_sun);
 
 % choose whether or not to include occlusion/exclusion
-useScreening = true;
+useScreening = false;
 
-ObjFcn = @(x) objective_wrapper(x, const_orbit_db, const_stabilities, ...
-                               s_lg, t_lg, P_0_base, Q_k, R_k_base, ...
-                               mu, LU, sunFcn, sun_min, moon_min, ...
-                               opt_flag, upper(OPTIMIZER_MODE), dq, ... 
-                               useScreening);
+% struct to include or exclude cost components
+costFlags = struct('J1', true, 'J2', true, 'J3', true);  % default - all true
+
+ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_lg, t_lg, P_0_base, Q_k, R_k_base, mu, LU, ...
+    sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags);
+
 RunTimer = tic;
 
 switch upper(OPTIMIZER_MODE)
@@ -268,6 +269,7 @@ if strcmpi(opt_flag, 'SOO')
     fprintf('Orbits: %s\n', mat2str(x_best(1:2:end)));
     fprintf('Slots:  %s\n', mat2str(x_best(2:2:end)));
     fprintf('Cost:   %.4f\n', min_cost);
+    x_plot = x_best; % used for plotting
 else
     f_min  = min(fval);
     f_max  = max(fval);
@@ -286,6 +288,7 @@ else
     fprintf('Stability:    %.4f\n', knee_costs(3));
     fprintf('Orbits:       %s\n', mat2str(knee_vars(1:2:end)));
     fprintf('Slots:        %s\n', mat2str(knee_vars(2:2:end)));
+    x_plot = knee_vars; % used for plotting
 end
 
 fprintf('RUN END: %s\n', string(datetime('now')));
@@ -303,3 +306,83 @@ end
 
 drawnow;
 pause(0.2);
+
+% ---------------- Recompile results to plot  ----------------
+x_plot = round(x_plot);
+
+orbit_indices = x_plot(1:2:end);
+slot_indices  = x_plot(2:2:end);
+num_obs = numel(orbit_indices);
+
+% quick safety clamps
+for k = 1:num_obs
+    orbit_indices(k) = max(1, min(orbit_indices(k), numel(orbit_database)));
+    slot_indices(k)  = max(1, min(slot_indices(k), size(orbit_database{1},1)));
+end
+
+% ---------- build observer ICs from database (selected orbit/slot) ----------
+observer_ICs = zeros(num_obs,6);
+for k = 1:num_obs
+    observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
+end
+
+% ---------- 3D figure: plot each orbit (full period) from database ----------
+fig = figure('Color','w','Units','inches','Position',[1 1 7 5]);
+ax = axes(fig); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+% ---------- run EKF to print out final screening count ------ %
+[s_ekf, cov, screeningCount_final] = cr3bp_ekf(observer_ICs, s_lg, t_lg, ...
+    P_0_base, Q_k, R_k_base, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+
+fprintf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
+
+% truth + EKF first
+hEKF   = plot3(ax, s_ekf(:,1), s_ekf(:,2), s_ekf(:,3), '--', 'LineWidth', 2.0);
+
+% observers from FULL catalog
+cmap  = lines(max(1,num_obs));
+hObs  = gobjects(num_obs,1);
+hSlot = gobjects(num_obs,1);
+
+for k = 1:num_obs
+    iOrb   = orbit_indices(k);
+    t_raw  = times{iOrb}(:);       % raw time samples (length Nr)
+    s_raw  = states{iOrb};         % raw states (Nr x 6)
+    Tper   = tf(iOrb);             % period (TU)
+
+    % plot the raw orbit shape (full period as given)
+    hObs(k) = plot3(ax, s_raw(:,1), s_raw(:,2), s_raw(:,3), ...
+        'LineWidth', 1.4, 'Color', cmap(k,:));
+
+    % mark selected slot on the RAW orbit by mapping slot -> phase time
+    % (slot index is defined over slots_per_orbit)
+    t_phase = (slot_indices(k)-1) / (slots_per_orbit-1) * Tper;
+
+    % find closest raw time index (works even if t_raw isn't uniform)
+    [~, j] = min(abs(t_raw - t_phase));
+
+    hSlot(k) = plot3(ax, s_raw(j,1), s_raw(j,2), s_raw(j,3), ...
+        'o', 'MarkerSize', 6, 'MarkerFaceColor', cmap(k,:), 'MarkerEdgeColor','k');
+end
+
+% primaries
+rM = [1-mu, 0, 0];
+hM = plot3(ax, rM(1), rM(2), rM(3), 'ko', 'MarkerSize',7,'MarkerFaceColor','#B0B0B0');
+text(rM(1), rM(2), rM(3), '  Moon',  'Interpreter','latex');
+
+% formatting
+axis(ax,'equal'); view(ax,3);
+xlabel(ax,'$x$ (LU)','Interpreter','latex');
+ylabel(ax,'$y$ (LU)','Interpreter','latex');
+zlabel(ax,'$z$ (LU)','Interpreter','latex');
+set(ax,'FontName','Times New Roman','FontSize',11,'TickLabelInterpreter','latex','LineWidth',1);
+axis equal
+
+% legend (keep it clean)
+legend([hEKF, hObs(1), hSlot(1), hM], ...
+    {'EKF estimate','Observer orbit (raw S)','Selected slot','Moon'}, ...
+    'Interpreter','latex','Location','bestoutside');
+
+% export
+exportgraphics(fig,'fig_traj3d_rawS.pdf','ContentType','image');
+exportgraphics(fig,'fig_traj3d_rawS.png','Resolution',600);
