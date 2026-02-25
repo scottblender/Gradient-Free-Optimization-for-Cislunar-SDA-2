@@ -7,6 +7,8 @@ drawnow;
 % load in filtered and sorted JPL data
 S  = load('JPL_CR3BP_OrbitCatalog.mat');
 T1 = S.T;
+t_lg = S.t_lg;
+s_lg = S.s_lg;
 
 % User-specified Inputs
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
@@ -22,7 +24,7 @@ OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 nvars = 3;
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 20;
+MAX_ITERS = 100;
 MAX_EVALS = 100;  % Bayesian only (objective evaluation budget)
 
 % JPL Constants
@@ -70,14 +72,6 @@ parfor i = 1:num_orbits
     orbit_database{i} = s_slots;
 end
 
-% define EKF timestep
-dt        = 0.01; % TU ~ 1.04 hours
-N_periods = 1;
-
-% propagate truth trajectory (Lunar Gateway)
-tspan_lg     = tspan_lg_ic(1):dt:N_periods*tspan_lg_ic(2);
-[t_lg, s_lg] = ode45(@(t,s) cr3bp_dynamics(t,s,mu), tspan_lg, s_lg_ic, ode_opts);
-
 % set up data logging (in-memory only)
 dq = parallel.pool.DataQueue;
 assignin('base', 'OptimizationLog', {});
@@ -108,7 +102,7 @@ i_sun  = deg2rad(0);    % keep planar for now
 sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, theta0, i_sun);
 
 % choose whether or not to include occlusion/exclusion
-useScreening = false;
+useScreening = true;
 
 % struct to include or exclude cost components
 costFlags = struct('J1', true, 'J2', true, 'J3', true);  % default - all true
@@ -317,7 +311,7 @@ num_obs = numel(orbit_indices);
 % quick safety clamps
 for k = 1:num_obs
     orbit_indices(k) = max(1, min(orbit_indices(k), numel(orbit_database)));
-    slot_indices(k)  = max(1, min(slot_indices(k), size(orbit_database{1},1)));
+    slot_indices(k)  = max(1, min(slot_indices(k), size(orbit_database{orbit_indices(k)},1)));
 end
 
 % ---------- build observer ICs from database (selected orbit/slot) ----------
@@ -327,8 +321,16 @@ for k = 1:num_obs
 end
 
 % ---------- 3D figure: plot each orbit (full period) from database ----------
-fig = figure('Color','w','Units','inches','Position',[1 1 7 5]);
+figW = 3.5;     % inches (single-column)
+figH = 3.0;     % inches
+fig = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
+             'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
+
 ax = axes(fig); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+% tighten the axes box inside the figure to reduce whitespace
+ax.Units = 'normalized';
+ax.Position = [0.12 0.12 0.84 0.84];   % [left bottom width height]
 
 % ---------- run EKF to print out final screening count ------ %
 [s_ekf, cov, screeningCount_final] = cr3bp_ekf(observer_ICs, s_lg, t_lg, ...
@@ -375,14 +377,142 @@ axis(ax,'equal'); view(ax,3);
 xlabel(ax,'$x$ (LU)','Interpreter','latex');
 ylabel(ax,'$y$ (LU)','Interpreter','latex');
 zlabel(ax,'$z$ (LU)','Interpreter','latex');
-set(ax,'FontName','Times New Roman','FontSize',11,'TickLabelInterpreter','latex','LineWidth',1);
+set(ax,'FontName','Times New Roman','FontSize',15, ...
+    'TickLabelInterpreter','latex','LineWidth',1.0);
+
+ax.GridAlpha = 0.15;
+ax.MinorGridAlpha = 0.10;
+ax.XMinorGrid = 'on'; ax.YMinorGrid = 'on'; ax.ZMinorGrid = 'on';
 axis equal
 
-% legend (keep it clean)
-legend([hEKF, hObs(1), hSlot(1), hM], ...
-    {'EKF estimate','Observer orbit (raw S)','Selected slot','Moon'}, ...
-    'Interpreter','latex','Location','bestoutside');
+% legend
+lgd = legend(ax, [hEKF, hObs(1), hSlot(1), hM], ...
+    {'EKF estimate','Observer orbit','Selected slot','Moon'}, ...
+    'Interpreter','latex', ...
+    'Location','northeast');
+lgd.Box = 'on';
+lgd.FontSize = 15;
+lgd.ItemTokenSize = [16 12];
 
 % export
 exportgraphics(fig,'fig_traj3d_rawS.pdf','ContentType','image');
 exportgraphics(fig,'fig_traj3d_rawS.png','Resolution',600);
+
+% ---------- 3-sigma position and velocity bounds ----------
+Nf = size(cov,1);
+sig = zeros(Nf,6);
+for k = 1:Nf
+    Pk = squeeze(cov(k,:,:));
+    sig(k,:) = sqrt(max(diag(Pk),0));  % guard numerical negatives
+end
+sig3 = 3*sig;
+
+% time vector for plotting (TU)
+t = t_lg(:);
+
+% EKF error (truth - estimate) in LU and LU/TU
+err = s_ekf(:,1:6) - s_lg(:,1:6);
+
+% convert errors to km and km/s
+err_pos_km  = err(:,1:3) * LU;
+err_vel_kms = err(:,4:6) * VU;
+
+% convert 3-sigma bounds to km and km/s
+sig3_pos_km  = sig3(:,1:3) * LU;
+sig3_vel_kms = sig3(:,4:6) * VU;
+
+% position 3-sigma (x)
+figSigX = figure('Color','w','Units','inches','Position',[1 1 3.5 2.6], ...
+                 'PaperUnits','inches','PaperPosition',[0 0 3.5 2.6]);
+axx = axes(figSigX); hold(axx,'on'); grid(axx,'on'); box(axx,'on');
+plot(axx, t,  sig3_pos_km(:,1), 'r-', 'LineWidth',1.8);
+plot(axx, t, -sig3_pos_km(:,1), 'r-', 'LineWidth',1.8);
+plot(axx, t,  err_pos_km(:,1),  'LineWidth',1.6);
+xlabel(axx,'$t$ (TU)','Interpreter','latex');
+ylabel(axx,'$e_x$ (km)','Interpreter','latex');
+set(axx,'FontName','Times New Roman','FontSize',15,'TickLabelInterpreter','latex','LineWidth',1.0);
+exportgraphics(figSigX,'fig_3sig_x.pdf','ContentType','image');
+
+% position 3-sigma (y)
+figSigY = figure('Color','w','Units','inches','Position',[1 1 3.5 2.6], ...
+                 'PaperUnits','inches','PaperPosition',[0 0 3.5 2.6]);
+axy = axes(figSigY); hold(axy,'on'); grid(axy,'on'); box(axy,'on');
+plot(axy, t,  sig3_pos_km(:,2), 'r-', 'LineWidth',1.8);
+plot(axy, t, -sig3_pos_km(:,2), 'r-', 'LineWidth',1.8);
+plot(axy, t,  err_pos_km(:,2),  'LineWidth',1.6);
+xlabel(axy,'$t$ (TU)','Interpreter','latex');
+ylabel(axy,'$e_y$ (km)','Interpreter','latex');
+set(axy,'FontName','Times New Roman','FontSize',15,'TickLabelInterpreter','latex','LineWidth',1.0);
+exportgraphics(figSigY,'fig_3sig_y.pdf','ContentType','image');
+
+% position 3-sigma (z)
+figSigZ = figure('Color','w','Units','inches','Position',[1 1 3.5 2.6], ...
+                 'PaperUnits','inches','PaperPosition',[0 0 3.5 2.6]);
+axz = axes(figSigZ); hold(axz,'on'); grid(axz,'on'); box(axz,'on');
+plot(axz, t,  sig3_pos_km(:,3), 'r-', 'LineWidth',1.8);
+plot(axz, t, -sig3_pos_km(:,3), 'r-', 'LineWidth',1.8);
+plot(axz, t,  err_pos_km(:,3),  'LineWidth',1.6);
+xlabel(axz,'$t$ (TU)','Interpreter','latex');
+ylabel(axz,'$e_z$ (km)','Interpreter','latex');
+set(axz,'FontName','Times New Roman','FontSize',15,'TickLabelInterpreter','latex','LineWidth',1.0);
+exportgraphics(figSigZ,'fig_3sig_z.pdf','ContentType','image');
+
+% velocity 3-sigma (vx)
+figSigVx = figure('Color','w','Units','inches','Position',[1 1 3.5 2.6], ...
+                  'PaperUnits','inches','PaperPosition',[0 0 3.5 2.6]);
+axvx = axes(figSigVx); hold(axvx,'on'); grid(axvx,'on'); box(axvx,'on');
+plot(axvx, t,  sig3_vel_kms(:,1), 'r-', 'LineWidth',1.8);
+plot(axvx, t, -sig3_vel_kms(:,1), 'r-', 'LineWidth',1.8);
+plot(axvx, t,  err_vel_kms(:,1),  'LineWidth',1.6);
+xlabel(axvx,'$t$ (TU)','Interpreter','latex');
+ylabel(axvx,'$e_{v_x}$ (km/s)','Interpreter','latex');
+set(axvx,'FontName','Times New Roman','FontSize',15,'TickLabelInterpreter','latex','LineWidth',1.0);
+exportgraphics(figSigVx,'fig_3sig_vx.pdf','ContentType','image');
+
+% velocity 3-sigma (vy)
+figSigVy = figure('Color','w','Units','inches','Position',[1 1 3.5 2.6], ...
+                  'PaperUnits','inches','PaperPosition',[0 0 3.5 2.6]);
+axvy = axes(figSigVy); hold(axvy,'on'); grid(axvy,'on'); box(axvy,'on');
+plot(axvy, t,  sig3_vel_kms(:,2), 'r-', 'LineWidth',1.8);
+plot(axvy, t, -sig3_vel_kms(:,2), 'r-', 'LineWidth',1.8);
+plot(axvy, t,  err_vel_kms(:,2),  'LineWidth',1.6);
+xlabel(axvy,'$t$ (TU)','Interpreter','latex');
+ylabel(axvy,'$e_{v_y}$ (km/s)','Interpreter','latex');
+set(axvy,'FontName','Times New Roman','FontSize',15,'TickLabelInterpreter','latex','LineWidth',1.0);
+exportgraphics(figSigVy,'fig_3sig_vy.pdf','ContentType','image');
+
+% velocity 3-sigma (vz)
+figSigVz = figure('Color','w','Units','inches','Position',[1 1 3.5 2.6], ...
+                  'PaperUnits','inches','PaperPosition',[0 0 3.5 2.6]);
+axvz = axes(figSigVz); hold(axvz,'on'); grid(axvz,'on'); box(axvz,'on');
+plot(axvz, t,  sig3_vel_kms(:,3), 'r-', 'LineWidth',1.8);
+plot(axvz, t, -sig3_vel_kms(:,3), 'r-', 'LineWidth',1.8);
+plot(axvz, t,  err_vel_kms(:,3),  'LineWidth',1.6);
+xlabel(axvz,'$t$ (TU)','Interpreter','latex');
+ylabel(axvz,'$e_{v_z}$ (km/s)','Interpreter','latex');
+set(axvz,'FontName','Times New Roman','FontSize',15,'TickLabelInterpreter','latex','LineWidth',1.0);
+exportgraphics(figSigVz,'fig_3sig_vz.pdf','ContentType','image');
+
+% ---------- RMSE + covariance summaries ----------
+rmse_pos = sqrt(mean(sum((s_ekf(:,1:3) - s_lg(:,1:3)).^2,2)));
+rmse_vel = sqrt(mean(sum((s_ekf(:,4:6) - s_lg(:,4:6)).^2,2)));
+
+% convert RMSE to km and km/s
+rmse_pos_km  = rmse_pos * LU;
+rmse_vel_kms = rmse_vel * VU;
+
+% position covariance metrics
+detPpos = zeros(Nf,1);
+for k = 1:Nf
+    Pk = squeeze(cov(k,:,:));
+    Ppos = Pk(1:3,1:3);
+    detPpos(k) = det(Ppos);
+end
+
+% convert det(P_pos) from LU^6 to km^6
+detPpos_km6 = detPpos * (LU^6);
+
+fprintf('\n--- EKF PERFORMANCE ---\n');
+fprintf('RMSE position (km):     %.6e\n', rmse_pos_km);
+fprintf('RMSE velocity (km/s):   %.6e\n', rmse_vel_kms);
+fprintf('Mean det(P_pos) (km^6): %.6e\n', mean(detPpos_km6));

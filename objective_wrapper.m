@@ -54,7 +54,7 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
             s_idx = slot_indices(k);
 
             o_idx = max(1, min(o_idx, length(orbit_database)));
-            s_idx = max(1, min(s_idx, size(orbit_database{1}, 1)));
+            s_idx = max(1, min(s_idx, size(orbit_database{o_idx}, 1)));
 
             observer_ICs(k, :) = orbit_database{o_idx}(s_idx, :);
         end
