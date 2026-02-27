@@ -3,20 +3,21 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
     opt_flag, solverName, dq, useScreening, costFlags)
 
     % ---------------- defaults ----------------
-    if nargin < 18 || isempty(useScreening)
+    if nargin < 17 || isempty(useScreening)
         useScreening = true;
     end
 
     % Cost component toggles (default: all ON)
-    if nargin < 19 || isempty(costFlags)
+    if nargin < 18 || isempty(costFlags)
         costFlags = struct('J1', true, 'J2', true, 'J3', true);
     end
+
     % Make robust to missing fields
     if ~isfield(costFlags,'J1'), costFlags.J1 = true; end
     if ~isfield(costFlags,'J2'), costFlags.J2 = true; end
     if ~isfield(costFlags,'J3'), costFlags.J3 = true; end
 
-    % Predefine for logging even if we hit catch
+    % Predefine for logging
     J_1 = NaN; J_2 = NaN; J_3 = NaN;
     screeningCount = NaN;
 
@@ -100,7 +101,9 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         end
 
         entry.screeningCount = screeningCount;
-
+        entry.x = x(:).';
+        entry.orbit_indices = orbit_indices(:).';
+        entry.slot_indices  = slot_indices(:).';
         send(dq, entry);
     end
 end

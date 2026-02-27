@@ -18,3 +18,5 @@ results_*.mat
 *.pdf
 
 *.png
+
+/artifacts/

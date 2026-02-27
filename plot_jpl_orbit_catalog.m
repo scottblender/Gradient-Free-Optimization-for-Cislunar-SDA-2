@@ -87,7 +87,7 @@ for i = 1:4
     
     % 4. Save File
     outName = sprintf('%s.eps', filenames(i));
-    exportgraphics(fig, outName, 'ContentType', 'vector');
+    exportgraphics(fig, outName, 'ContentType', 'image');
     fprintf('Saved %s\n', outName);
     
     close(fig); 

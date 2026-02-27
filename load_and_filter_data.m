@@ -8,8 +8,10 @@ tic
 path = "C:\Users\scott\Documents\MATLAB\Gradient-Free-Optimization-for-Cislunar-SDA-2\JPL_Data";
 files = dir(fullfile(path,'*.csv'));
 data = cell(length(files),1); % preallocate cell based on size of each file
-parfor i = 1:length(files) % loop through each file and store each file in a table within the cell
-    data{i} = readtable(fullfile(path, files(i).name), "VariableNamingRule", "preserve");
+parfor i = 1:length(files)
+    Ti = readtable(fullfile(path, files(i).name), "VariableNamingRule", "preserve");
+    Ti.sourceFile = repmat(string(files(i).name), height(Ti), 1);  % <-- add this
+    data{i} = Ti;
 end
 T = vertcat(data{:}); % concatenate all data into one table
 
@@ -83,7 +85,13 @@ T = T(~T.collides, :);
 N = height(T);
 states_local_fam = T.state; % cell array
 orbitFamilies = strings(N, 1);
+sourceFiles_local = T.sourceFile;
 parfor k=1:N
+     % --- override family if this row is a DRO file row ---
+    if contains(sourceFiles_local(k), "distant_retrograde", "IgnoreCase", true)
+        orbitFamilies(k) = "DRO";
+        continue
+    end
     s = states_local_fam{k}; % extract state for each orbit
     x_bar = mean(s(:,1)); % determine mean x-pos
     if x_bar < 1 - mu % filter into L1/L2 based on mean x_pos
