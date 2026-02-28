@@ -4,15 +4,15 @@ clear; close all; clc;
 fprintf('RUN START: %s\n', string(datetime('now')));
 drawnow;
 
-% defaults for figures (16 pt everywhere, bold)
+% defaults for figures (bold)
 set(groot, ...
     'defaultAxesFontSize',16, ...
     'defaultAxesFontWeight','bold', ...
     'defaultAxesFontName','Times New Roman', ...
-    'defaultTextFontSize',16, ...
+    'defaultTextFontSize',12, ...
     'defaultTextFontWeight','bold', ...
     'defaultTextFontName','Times New Roman', ...
-    'defaultLegendFontSize',16, ...
+    'defaultLegendFontSize',12, ...
     'defaultLegendFontWeight','bold', ...
     'defaultAxesLabelFontSizeMultiplier',1.0, ...
     'defaultAxesTitleFontSizeMultiplier',1.0, ...
@@ -129,23 +129,23 @@ vj1 = getenv("USE_J1"); if ~isempty(vj1), costFlags.J1 = (str2double(vj1) ~= 0);
 vj2 = getenv("USE_J2"); if ~isempty(vj2), costFlags.J2 = (str2double(vj2) ~= 0); end
 vj3 = getenv("USE_J3"); if ~isempty(vj3), costFlags.J3 = (str2double(vj3) ~= 0); end
 
-% --- MINIMAL ADD: run tag + per-run folders + one excel file ---
+% --- run tag + per-run folders + one excel file ---
 vseed = getenv("SEED"); if isempty(vseed), vseed = "0"; end
 seedVal = str2double(vseed); if isnan(seedVal), seedVal = 0; end
 
 RUN_TAG = sprintf('%s_scr%d_J%d%d%d_seed%03d', char(OPTIMIZER_MODE), ...
     double(useScreening), double(costFlags.J1), double(costFlags.J2), double(costFlags.J3), seedVal);
 
-EXCEL_FILE = fullfile(ArtDir, "ExperimentSummary.xlsx");
-
 RunArtDir  = fullfile(ArtDir, RUN_TAG);          % <-- per-run root (under abc_J1111/artifacts/RUN_TAG)
 FigDir     = fullfile(RunArtDir, "figs");
-DataDir    = fullfile(RunArtDir, "data");        % <-- FIX: per-run data goes here
-LogDir     = fullfile(RunArtDir, "logs");        % <-- FIX: per-run logs go here
+DataDir    = fullfile(RunArtDir, "data");        % <-- per-run data goes here
+LogDir     = fullfile(RunArtDir, "logs");        % <-- per-run logs go here
 if ~exist(RunArtDir,'dir'), mkdir(RunArtDir); end
 if ~exist(FigDir,'dir'),    mkdir(FigDir);    end
 if ~exist(DataDir,'dir'),   mkdir(DataDir);   end
 if ~exist(LogDir,'dir'),    mkdir(LogDir);    end
+
+EXCEL_FILE = fullfile(DataDir, "ExperimentSummary.xlsx");
 
 % make diary filename unique so it doesn't overwrite (and keep it IN the per-run folder)
 try
@@ -425,54 +425,46 @@ obsTbl = table( ...
     'VariableNames', {'observer_id','orbit_index','slot_index','orbit_family','period_TU','stability_index'} );
 
 % ---------------- trajectory plot ----------------
-figW = 8;
-figH = 8;
+figW = 8; 
+figH = 6; 
 fig = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
              'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-
 ax = axes(fig); hold(ax,'on');  box(ax,'on');
-ax.Units = 'normalized';
-ax.Position = [0.12 0.12 0.84 0.84];
-
-% minimal: do not override font defaults; keep styling only
-set(ax, 'TickLabelInterpreter','tex', 'LineWidth',1.0, 'Layer','top');
-
+set(ax, 'TickLabelInterpreter','tex', 'Layer','top');
 ax.Projection = 'orthographic';
 view(ax, 32, 24);
 
 cEKF = 'red';
-hEKF = plot3(ax, s_ekf(:,1), s_ekf(:,2), s_ekf(:,3), '-', ...
-    'LineWidth', 2.4, 'Color', cEKF);
 
+% slight emphasis on the main trajectory
+hEKF = plot3(ax, s_ekf(:,1), s_ekf(:,2), s_ekf(:,3), '-', ...
+    'LineWidth', 2.4, 'Color', cEKF); 
 cmap = lines(max(1,num_obs));
 hObs = gobjects(num_obs,1);
-
 for k = 1:num_obs
     iOrb   = orbit_indices(k);
     s_raw  = states{iOrb};
     hObs(k) = plot3(ax, s_raw(:,1), s_raw(:,2), s_raw(:,3), ...
-        'LineWidth', 1.9, 'Color', cmap(k,:));
+        'Color', cmap(k,:)); % relies on default LineWidth 1.8
 end
 
 % Moon location
 rM = [1-mu, 0, 0];
 hM = plot3(ax, rM(1), rM(2), rM(3), 'ko', ...
-    'MarkerSize',9, 'MarkerFaceColor',[0.70 0.70 0.70], 'LineWidth',1.0);
+    'MarkerSize',8, 'MarkerFaceColor',[0.70 0.70 0.70], 'LineWidth',1.0);
 
 % L1/L2 points (collinear) + plot
 [xL1, xL2] = cr3bp_L1L2(mu);
-hL1 = plot3(ax, xL1, 0, 0, 'kd', 'MarkerSize',8, 'MarkerFaceColor',[0.85 0.85 0.85], 'LineWidth',1.0);
-hL2 = plot3(ax, xL2, 0, 0, 'ks', 'MarkerSize',8, 'MarkerFaceColor',[0.85 0.85 0.85], 'LineWidth',1.0);
+hL1 = plot3(ax, xL1, 0, 0, 'k^', 'MarkerSize',8, 'MarkerFaceColor',[0.85 0.85 0.85], 'LineWidth',1.0);
+hL2 = plot3(ax, xL2, 0, 0, 'kv', 'MarkerSize',8, 'MarkerFaceColor',[0.85 0.85 0.85], 'LineWidth',1.0);
 
 for k = 1:num_obs
     iOrb   = orbit_indices(k);
     t_raw  = times{iOrb}(:);
     s_raw  = states{iOrb};
     Tper   = tf(iOrb);
-
     t_phase = (slot_indices(k)-1) / (slots_per_orbit-1) * Tper;
     [~, j] = min(abs(t_raw - t_phase));
-
     plot3(ax, s_raw(j,1), s_raw(j,2), s_raw(j,3), 'o', ...
         'MarkerSize',8, 'MarkerFaceColor', cmap(k,:), 'MarkerEdgeColor','k');
 end
@@ -484,17 +476,11 @@ xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
 zlabel(ax,'z (LU)');
 
-axis(ax,'equal');
-axis(ax,'tight');
-ax.DataAspectRatio = [1 1 1];
-
 % --- enforce equal tick spacing on x/y/z  ---
 xl = xlim(ax); yl = ylim(ax); zl = zlim(ax);
 xr = xl(2)-xl(1); yr = yl(2)-yl(1); zr = zl(2)-zl(1);
-tickStep = max([xr, yr, zr]) / 8;          % slightly denser than before
-tickStep = max(tickStep, eps);             % guard
-
-% make tick step a "nice" decimal
+tickStep = max([xr, yr, zr]) / 5;          
+tickStep = max(tickStep, eps);             
 pow10 = 10^floor(log10(tickStep));
 nice = tickStep / pow10;
 if     nice <= 1,   nice = 1;
@@ -504,11 +490,9 @@ elseif nice <= 5,   nice = 5;
 else                nice = 10;
 end
 tickStep = nice * pow10;
-
 xTick0 = ceil(xl(1)/tickStep)*tickStep;
 yTick0 = ceil(yl(1)/tickStep)*tickStep;
 zTick0 = ceil(zl(1)/tickStep)*tickStep;
-
 ax.XTick = xTick0:tickStep:xl(2);
 ax.YTick = yTick0:tickStep:yl(2);
 ax.ZTick = zTick0:tickStep:zl(2);
@@ -522,7 +506,6 @@ end
 legLabels{end-2} = 'Moon';
 legLabels{end-1} = 'L1';
 legLabels{end}   = 'L2';
-
 lgd = legend(ax, legHandles, legLabels, 'Location','northeast');
 lgd.Box = 'on';
 lgd.ItemTokenSize = [18 12];
@@ -530,7 +513,17 @@ if num_obs > 3
     lgd.NumColumns = 2;
 end
 
-exportgraphics(fig, fullfile(FigDir,'fig_traj3d.pdf'), 'ContentType','image');
+axis(ax,'equal');
+axis(ax,'tight'); 
+ax.Units = 'normalized';
+ax.PositionConstraint = 'innerposition';
+
+pad = 0.1;   % ~0.6 in padding for 8x6 figure
+ax.Position = [pad pad 1-2*pad 1-2*pad];
+
+ax.LooseInset = ax.TightInset + [0.02 0.02 0.02 0.02];
+axis(ax,'vis3d')
+exportgraphics(fig, fullfile(FigDir,'fig_traj3d.pdf'), 'ContentType','image'); 
 
 % ---------------- 3-sigma plots ----------------
 Nf = size(cov,1);
@@ -540,108 +533,27 @@ for k = 1:Nf
     sig(k,:) = sqrt(max(diag(Pk),0));
 end
 sig3 = 3*sig;
-
 t = t_lg(:);
 err = s_ekf(:,1:6) - s_lg(:,1:6);
-
 err_pos_km  = err(:,1:3) * LU;
 err_vel_kms = err(:,4:6) * VU;
-
 sig3_pos_km  = sig3(:,1:3) * LU;
 sig3_vel_kms = sig3(:,4:6) * VU;
-
 cBound = [0.85 0.10 0.10];
 cErr   = [0.00 0.45 0.74];
 
-figSigX = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-                 'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-axx = axes(figSigX); hold(axx,'on'); box(axx,'on');
-set(axx,'TickLabelInterpreter','tex','LineWidth',1.0,'Layer','top');
-hBxP = plot(axx, t,  sig3_pos_km(:,1), '-', 'LineWidth',1.9, 'Color', cBound);
-plot(axx, t, -sig3_pos_km(:,1), '-', 'LineWidth',1.9, 'Color', cBound);
-hEx  = plot(axx, t,  err_pos_km(:,1),  '-',  'LineWidth',1.7, 'Color', cErr);
-xlabel(axx,'t (TU)');
-ylabel(axx,'e_x (km)');
-xlim(axx,[t(1) t(end)]);
-format_sig_axes(axx);
-lgd = legend(axx, [hEx, hBxP], {'EKF error','\pm 3\sigma bound'}, 'Location','northeast');
-lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
-exportgraphics(figSigX, fullfile(FigDir,'fig_3sig_x.pdf'), 'ContentType','image');
+% Sub-function wrapper
+plotSigFig = @(fName, xData, errData, sigData, yLbl) ...
+    create_sig_fig(fName, xData, errData, sigData, yLbl, figW, figH, cBound, cErr, FigDir);
 
-figSigY = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-                 'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-axy = axes(figSigY); hold(axy,'on'); box(axy,'on');
-set(axy,'TickLabelInterpreter','tex','LineWidth',1.0,'Layer','top');
-hByP = plot(axy, t,  sig3_pos_km(:,2), '-', 'LineWidth',1.9, 'Color', cBound);
-plot(axy, t, -sig3_pos_km(:,2), '-', 'LineWidth',1.9, 'Color', cBound);
-hEy  = plot(axy, t,  err_pos_km(:,2),  '-',  'LineWidth',1.7, 'Color', cErr);
-xlabel(axy,'t (TU)');
-ylabel(axy,'e_y (km)');
-xlim(axy,[t(1) t(end)]);
-format_sig_axes(axy);
-lgd = legend(axy, [hEy, hByP], {'EKF error','\pm 3\sigma bound'}, 'Location','northeast');
-lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
-exportgraphics(figSigY, fullfile(FigDir,'fig_3sig_y.pdf'), 'ContentType','image');
+% Generate the 6 plots
+plotSigFig('fig_3sig_x.pdf', t, err_pos_km(:,1), sig3_pos_km(:,1), 'e_x (km)');
+plotSigFig('fig_3sig_y.pdf', t, err_pos_km(:,2), sig3_pos_km(:,2), 'e_y (km)');
+plotSigFig('fig_3sig_z.pdf', t, err_pos_km(:,3), sig3_pos_km(:,3), 'e_z (km)');
+plotSigFig('fig_3sig_vx.pdf', t, err_vel_kms(:,1), sig3_vel_kms(:,1), 'e_{v_x} (km/s)');
+plotSigFig('fig_3sig_vy.pdf', t, err_vel_kms(:,2), sig3_vel_kms(:,2), 'e_{v_y} (km/s)');
+plotSigFig('fig_3sig_vz.pdf', t, err_vel_kms(:,3), sig3_vel_kms(:,3), 'e_{v_z} (km/s)');
 
-figSigZ = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-                 'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-axz = axes(figSigZ); hold(axz,'on'); box(axz,'on');
-set(axz,'TickLabelInterpreter','tex','LineWidth',1.0,'Layer','top');
-hBzP = plot(axz, t,  sig3_pos_km(:,3), '-', 'LineWidth',1.9, 'Color', cBound);
-plot(axz, t, -sig3_pos_km(:,3), '-', 'LineWidth',1.9, 'Color', cBound);
-hEz  = plot(axz, t,  err_pos_km(:,3),  '-',  'LineWidth',1.7, 'Color', cErr);
-xlabel(axz,'t (TU)');
-ylabel(axz,'e_z (km)');
-xlim(axz,[t(1) t(end)]);
-format_sig_axes(axz);
-lgd = legend(axz, [hEz, hBzP], {'EKF error','\pm 3\sigma bound'}, 'Location','northeast');
-lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
-exportgraphics(figSigZ, fullfile(FigDir,'fig_3sig_z.pdf'), 'ContentType','image');
-
-figSigVx = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-                 'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-axvx = axes(figSigVx); hold(axvx,'on'); box(axvx,'on');
-set(axvx,'TickLabelInterpreter','tex','LineWidth',1.0,'Layer','top');
-hBVxP = plot(axvx, t,  sig3_vel_kms(:,1), '-', 'LineWidth',1.9, 'Color', cBound);
-plot(axvx, t, -sig3_vel_kms(:,1), '-', 'LineWidth',1.9, 'Color', cBound);
-hEVx  = plot(axvx, t,  err_vel_kms(:,1),  '-',  'LineWidth',1.7, 'Color', cErr);
-xlabel(axvx,'t (TU)');
-ylabel(axvx,'e_{v_x} (km/s)');
-xlim(axvx,[t(1) t(end)]);
-format_sig_axes(axvx);
-lgd = legend(axvx, [hEVx, hBVxP], {'EKF error','\pm 3\sigma bound'}, 'Location','northeast');
-lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
-exportgraphics(figSigVx, fullfile(FigDir,'fig_3sig_vx.pdf'), 'ContentType','image');
-
-figSigVy = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-                 'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-axvy = axes(figSigVy); hold(axvy,'on');  box(axvy,'on');
-set(axvy,'TickLabelInterpreter','tex','LineWidth',1.0,'Layer','top');
-hBVyP = plot(axvy, t,  sig3_vel_kms(:,2), '-', 'LineWidth',1.9, 'Color', cBound);
-plot(axvy, t, -sig3_vel_kms(:,2), '-', 'LineWidth',1.9, 'Color', cBound);
-hEVy  = plot(axvy, t,  err_vel_kms(:,2),  '-',  'LineWidth',1.7, 'Color', cErr);
-xlabel(axvy,'t (TU)');
-ylabel(axvy,'e_{v_y} (km/s)');
-xlim(axvy,[t(1) t(end)]);
-format_sig_axes(axvy);
-lgd = legend(axvy, [hEVy, hBVyP], {'EKF error','\pm 3\sigma bound'}, 'Location','northeast');
-lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
-exportgraphics(figSigVy, fullfile(FigDir,'fig_3sig_vy.pdf'), 'ContentType','image');
-
-figSigVz = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-                 'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-axvz = axes(figSigVz); hold(axvz,'on');  box(axvz,'on');
-set(axvz,'TickLabelInterpreter','tex','LineWidth',1.0,'Layer','top');
-hBVzP = plot(axvz, t,  sig3_vel_kms(:,3), '-', 'LineWidth',1.9, 'Color', cBound);
-plot(axvz, t, -sig3_vel_kms(:,3), '-', 'LineWidth',1.9, 'Color', cBound);
-hEVz  = plot(axvz, t,  err_vel_kms(:,3),  '-',  'LineWidth',1.7, 'Color', cErr);
-xlabel(axvz,'t (TU)');
-ylabel(axvz,'e_{v_z} (km/s)');
-xlim(axvz,[t(1) t(end)]);
-format_sig_axes(axvz);
-lgd = legend(axvz, [hEVz, hBVzP], {'EKF error','\pm 3\sigma bound'}, 'Location','northeast');
-lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
-exportgraphics(figSigVz, fullfile(FigDir,'fig_3sig_vz.pdf'), 'ContentType','image');
 
 % ---------------- print statements ----------------
 rmse_pos = sqrt(mean(sum((s_ekf(:,1:3) - s_lg(:,1:3)).^2,2)));
@@ -720,11 +632,29 @@ end
 
 diary off
 
-function format_sig_axes(axh)
-% Keep layout + interpreter, do not override global font defaults
-set(axh, 'TickLabelInterpreter','tex', 'LineWidth',1.0, 'Layer','top');
-axh.Units = 'normalized';
-axh.Position = [0.14 0.16 0.82 0.78];
+% ---------------- Helper Function ----------------
+function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir)
+    f = figure('Color','w','Units','inches','Position',[1 1 w h], ...
+               'PaperUnits','inches','PaperPosition',[0 0 w h]);
+    ax = axes(f); hold(ax,'on'); box(ax,'on');
+
+    set(ax,'TickLabelInterpreter','tex', 'Layer','top');
+    
+    % Relying on your 1.8 default line width, or bumping slightly if you prefer
+    hB = plot(ax, t,  sig3, '-', 'Color', cBnd);
+         plot(ax, t, -sig3, '-', 'Color', cBnd);
+    hE = plot(ax, t,  err,  '-', 'Color', cErr);
+    
+    xlabel(ax, 't (TU)');
+    ylabel(ax, yLbl);
+    xlim(ax, [t(1) t(end)]);
+    
+    lgd = legend(ax, [hE, hB], {'EKF error', '\pm 3\sigma bound'}, ...
+        'Location', 'northeast');
+    lgd.Box = 'on'; lgd.ItemTokenSize = [18 12];
+    
+    exportgraphics(f, fullfile(outDir, fName), 'ContentType', 'image');
+    close(f); % Prevents screen clutter
 end
 
 function [xL1, xL2] = cr3bp_L1L2(mu)

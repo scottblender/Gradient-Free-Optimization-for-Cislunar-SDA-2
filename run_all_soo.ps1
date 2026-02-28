@@ -1,7 +1,7 @@
 # ---------------- run_all_soo.ps1 ----------------
 $ErrorActionPreference = "Stop"
 
-# Optimizers to run (normal sweep)
+# Optimizers to run for the 5-case sweep
 $Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
 
 # Folder where this PS script lives (project root)
@@ -39,7 +39,7 @@ function Invoke-MatlabRun {
     $env:USE_J2 = $(if ($UseJ2) { "1" } else { "0" })
     $env:USE_J3 = $(if ($UseJ3) { "1" } else { "0" })
 
-    # NEW: tell MATLAB exactly where to write artifacts
+    # tell MATLAB exactly where to write artifacts
     $env:RUN_DIR = $RunDir
 
     Push-Location $RunDir
@@ -62,43 +62,43 @@ exit(0);
     Write-Host "Saved -> $RunDir"
 }
 
-# ---------------- Normal sweep (uses your default MAX_ITERS in run_opt unless you override it here) ----------------
-foreach ($alg in $Algs) {
-    $RunDir = Join-Path $OutDir ("SOO_" + $alg)
-    Write-Host "`n============================="
-    Write-Host "Running optimizer: $alg"
-    Write-Host "============================="
+# ---------------- (A) Baseline GA: 600 generations, ALL ON ----------------
+$gaBaselineIters = 600
+$caseName = "BASELINE_GA_${gaBaselineIters}_screenON_J123"
+$RunDir = Join-Path $OutDir $caseName
 
-    Invoke-MatlabRun -RunDir $RunDir -Alg $alg -MaxIters 100 -UseScreening $true -UseJ1 $true -UseJ2 $true -UseJ3 $true
-}
+Write-Host "`n============================="
+Write-Host "Baseline GA: $caseName"
+Write-Host "============================="
 
-# ---------------- Baseline GA grid (1000 iters) ----------------
-# Cases:
-# - screening ON/OFF
-# - cost component toggles: {all on} + {J1 only} + {J2 only} + {J3 only}
-$gaIters = 1000
-$screeningCases = @($false, $true)
+Invoke-MatlabRun -RunDir $RunDir -Alg "GA" -MaxIters $gaBaselineIters `
+    -UseScreening $true -UseJ1 $true -UseJ2 $true -UseJ3 $true
 
-$costCases = @(
-    @{ name="J123"; J1=$true;  J2=$true;  J3=$true  },
-    @{ name="J1";   J1=$true;  J2=$false; J3=$false },
-    @{ name="J2";   J1=$false; J2=$true;  J3=$false },
-    @{ name="J3";   J1=$false; J2=$false; J3=$true  }
+
+# ---------------- (B) 5-case sweep for EACH optimizer: 100 iterations ----------------
+$itersSweep = 100
+
+# 5 cases
+$Cases = @(
+    @{ name="screenON_J123";  screening=$true;  J1=$true;  J2=$true;  J3=$true  },
+    @{ name="screenOFF_J123"; screening=$false; J1=$true;  J2=$true;  J3=$true  },
+    @{ name="screenON_J1";    screening=$true;  J1=$true;  J2=$false; J3=$false },
+    @{ name="screenON_J2";    screening=$true;  J1=$false; J2=$true;  J3=$false },
+    @{ name="screenON_J3";    screening=$true;  J1=$false; J2=$false; J3=$true  }
 )
 
-foreach ($sc in $screeningCases) {
-    $scName = $(if ($sc) { "screenON" } else { "screenOFF" })
+foreach ($alg in $Algs) {
+    foreach ($cc in $Cases) {
 
-    foreach ($cc in $costCases) {
-        $caseName = "GA_${gaIters}_" + $scName + "_" + $cc.name
-        $RunDir = Join-Path $OutDir $caseName
+        $runName = "SOO_${alg}_${itersSweep}_" + $cc.name
+        $RunDir = Join-Path $OutDir $runName
 
         Write-Host "`n============================="
-        Write-Host "Baseline GA: $caseName"
+        Write-Host "Running: $runName"
         Write-Host "============================="
 
-        Invoke-MatlabRun -RunDir $RunDir -Alg "GA" -MaxIters $gaIters -UseScreening $sc `
-            -UseJ1 $cc.J1 -UseJ2 $cc.J2 -UseJ3 $cc.J3
+        Invoke-MatlabRun -RunDir $RunDir -Alg $alg -MaxIters $itersSweep `
+            -UseScreening $cc.screening -UseJ1 $cc.J1 -UseJ2 $cc.J2 -UseJ3 $cc.J3
     }
 }
 
