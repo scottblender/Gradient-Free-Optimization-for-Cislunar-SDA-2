@@ -395,25 +395,12 @@ fprintf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
 
 % ---------------- observer metadata (family, etc.) ----------------
 % (saved into the Excel file as an additional sheet)
-familyColName = "";
-vars = string(T1.Properties.VariableNames);
-cand = ["Family","family","Orbit family","OrbitFamily","Family  ","FamilyName"];
-for c = cand
-    if any(vars == c)
-        familyColName = c;
-        break;
-    end
-end
-
+familyColName = "orbitFamily";
 obs_family = strings(num_obs,1);
 if strlength(familyColName) > 0
     try
         famCol = T1.(familyColName);
-        if iscell(famCol)
-            obs_family = string(famCol(orbit_indices));
-        else
-            obs_family = string(famCol(orbit_indices));
-        end
+        obs_family = string(famCol(orbit_indices));
     catch
         obs_family = strings(num_obs,1);
     end
