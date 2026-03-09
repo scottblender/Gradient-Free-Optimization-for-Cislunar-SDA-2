@@ -1,5 +1,5 @@
 function [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
-                                 sunFcn, sun_min, moon_min, useScreening)
+                                 sunFcn, sun_min, moon_min, useScreening, meas_noise)
 
 if nargin < 13 || isempty(useScreening)
     useScreening = true;   % default ON
@@ -51,7 +51,7 @@ for k=2:num_steps
 
         r_target_truth = s_lg(k,1:3)';
         z_clean = measurement_model(r_target_truth, r_obs);
-        noise   = mvnrnd([0;0], R,1).';     % (assuming R is 2x2 covariance)
+        noise = squeeze(meas_noise(k,i,:));     % (assuming R is 2x2 covariance)
         z_meas  = z_clean + noise;
 
         r_sun = sunFcn(t);
