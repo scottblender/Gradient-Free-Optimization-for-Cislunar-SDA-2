@@ -26,7 +26,7 @@ s_lg = S.s_lg;
 
 % User-specified Inputs
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
-OPTIMIZER_MODE = 'GA'; % default
+OPTIMIZER_MODE = 'ABC'; % default
 
 envMode = getenv("OPTIMIZER_MODE");
 if ~isempty(envMode)
@@ -173,14 +173,8 @@ opt_flag          = 'SOO';
 const_stabilities = parallel.pool.Constant(stabilities);
 const_orbit_db    = parallel.pool.Constant(orbit_database);
 
-% --- fixed measurement noise for deterministic optimization ---
-num_steps = length(t_lg);
-num_obs   = 3;   % number of observers being optimized
-
-meas_noise = generate_measurement_noise(num_steps, num_obs, R_k_base, seedVal);
-
 ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_lg, t_lg, P_0_base, Q_k, R_k_base, mu, LU, ...
-    sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags, meas_noise);
+    sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags);
 
 RunTimer = tic;
 
@@ -395,7 +389,7 @@ for k = 1:num_obs
 end
 
 [s_ekf, cov, screeningCount_final] = cr3bp_ekf(observer_ICs, s_lg, t_lg, ...
-    P_0_base, Q_k, R_k_base, mu, LU, sunFcn, sun_min, moon_min, useScreening, meas_noise);
+    P_0_base, Q_k, R_k_base, mu, LU, sunFcn, sun_min, moon_min, useScreening);
 
 fprintf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
 
