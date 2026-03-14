@@ -1,13 +1,13 @@
-function [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, P0, Q, R, mu, LU, ...
+function [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
                                  sunFcn, sun_min, moon_min, useScreening)
 
 if nargin < 13 || isempty(useScreening)
     useScreening = true;   % default ON
 end
 
-num_steps = length(t_lg);
+num_steps = length(t_target);
 num_obs   = size(observer_ICs, 1);
-x_est     = s_lg(1,1:6)';
+x_est     = s_target(1,1:6)';
 P_est     = P0;
 current_obs_states = observer_ICs;
 
@@ -22,8 +22,8 @@ I6 = eye(6);
 screeningCount = 0;
 
 for k=2:num_steps
-    dt = t_lg(k) - t_lg(k-1);
-    t  = t_lg(k);
+    dt = t_target(k) - t_target(k-1);
+    t  = t_target(k);
 
     % --- PREDICT ---
     Phi_0 = eye(6);
@@ -49,7 +49,7 @@ for k=2:num_steps
     for i = 1:num_obs
         r_obs = current_obs_states(i, 1:3)';
 
-        r_target_truth = s_lg(k,1:3)';
+        r_target_truth = s_target(k,1:3)';
         z_clean = measurement_model(r_target_truth, r_obs);
         noise   = mvnrnd([0;0], R,1).';     % (assuming R is 2x2 covariance)
         z_meas  = z_clean + noise;

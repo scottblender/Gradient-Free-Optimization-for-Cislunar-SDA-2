@@ -1,5 +1,5 @@
 function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
-    s_lg, t_lg, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, ...
+    s_target, t_target, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, ...
     opt_flag, solverName, dq, useScreening, costFlags)
 
     % ---------------- defaults ----------------
@@ -61,11 +61,11 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         end
 
         % run EKF (pass screening flag)
-        [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_lg, t_lg, ...
+        [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_target, t_target, ...
             P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, useScreening);
 
         % compute cost with component toggles
-        [J_total, J_1, J_2, J_3] = compute_cost(s_lg, s_ekf, cov, stabilities_vec, opt_flag, costFlags);
+        [J_total, J_1, J_2, J_3] = compute_cost(s_target, s_ekf, cov, stabilities_vec, opt_flag, costFlags);
 
     catch ME 
         if strcmpi(opt_flag, 'MOO')
