@@ -61,7 +61,7 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         end
 
         % run EKF (pass screening flag)
-        [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_target, t_target, ...
+        [s_ekf, cov, screeningCount, ~] = cr3bp_ekf(observer_ICs, s_target, t_target, ...
             P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, useScreening);
 
         % compute cost with component toggles

@@ -1,5 +1,6 @@
-function [s_ekf, cov, screeningCount] = cr3bp_ekf(observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
-                                 sunFcn, sun_min, moon_min, useScreening)
+function [s_ekf, cov, screeningCount, availableObsCount] = cr3bp_ekf( ...
+    observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
+    sunFcn, sun_min, moon_min, useScreening)
 
 if nargin < 13 || isempty(useScreening)
     useScreening = true;   % default ON
@@ -14,14 +15,20 @@ current_obs_states = observer_ICs;
 s_ekf = zeros(num_steps, 6);
 cov   = zeros(num_steps, 6, 6);
 
+% NEW
+availableObsCount = zeros(num_steps, 1);
+
 s_ekf(1,:) = x_est';
 cov(1,:,:) = P_est;
+
+% At initial step, treat all observers as available by default
+availableObsCount(1) = num_obs;
 
 options = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
 I6 = eye(6);
 screeningCount = 0;
 
-for k=2:num_steps
+for k = 2:num_steps
     dt = t_target(k) - t_target(k-1);
     t  = t_target(k);
 
@@ -45,26 +52,34 @@ for k=2:num_steps
     end
     current_obs_states = next_obs_states;
 
+    % count available observers this step
+    nAvailThisStep = 0;
+
     % --- UPDATE ---
     for i = 1:num_obs
         r_obs = current_obs_states(i, 1:3)';
 
         r_target_truth = s_target(k,1:3)';
         z_clean = measurement_model(r_target_truth, r_obs);
-        noise   = mvnrnd([0;0], R,1).';     % (assuming R is 2x2 covariance)
+        noise   = mvnrnd([0;0], R, 1).';     % assumes R is 2x2 covariance
         z_meas  = z_clean + noise;
 
         r_sun = sunFcn(t);
 
         [occE, occM] = calc_occlusion(r_obs, r_target_truth, mu, LU);
         [ok_excl, ~, ~] = calc_exclusion(r_target_truth, r_obs, r_sun, mu, sun_min, moon_min);
-    
+
         ok = ok_excl && ~occE && ~occM;
-    
+
+        % count valid observers for plotting
+        if ok
+            nAvailThisStep = nAvailThisStep + 1;
+        end
+
         % always count fails, regardless of useScreening
         if ~ok
             screeningCount = screeningCount + 1;
-    
+
             % only skip the update if screening is enabled
             if useScreening
                 continue;
@@ -83,7 +98,7 @@ for k=2:num_steps
             S = S + 1e-12 * eye(size(S));
         end
 
-        [Rchol,p] = chol(S);
+        [Rchol, p] = chol(S);
         PHt = P_upd * H';
 
         if p == 0
@@ -96,6 +111,9 @@ for k=2:num_steps
         P_upd = (I6 - K*H) * P_upd * (I6 - K*H)' + K*R*K';
         P_upd = (P_upd + P_upd')/2;
     end
+
+    % count the number of available observers
+    availableObsCount(k) = nAvailThisStep;
 
     x_est = x_upd;
     P_est = P_upd;

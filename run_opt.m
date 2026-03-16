@@ -36,7 +36,7 @@ end
 OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 10;
+MAX_ITERS = 5;
 MAX_EVALS = 100;  % Bayesian only (objective evaluation budget)
 
 % JPL Constants
@@ -129,9 +129,9 @@ end
 runDirEnv = getenv("RUN_DIR");
 if ~isempty(runDirEnv)
     if ~exist(runDirEnv,'dir')
-        mkdir(runDirEnv); % <-- ensure the folder exists
+        mkdir(runDirEnv);
     end
-    cd(runDirEnv);        % <-- everything should stay inside this folder
+    cd(runDirEnv);
 end
 
 RunDir = pwd;
@@ -160,7 +160,7 @@ sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, theta0, i_sun);
 useScreening = true;
 
 % struct to include or exclude cost components
-costFlags = struct('J1', true, 'J2', true, 'J3', true);  % default - all true
+costFlags = struct('J1', true, 'J2', true, 'J3', true);
 
 % if using powershell script
 v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
@@ -190,21 +190,18 @@ if ~exist(LogDir,'dir'),    mkdir(LogDir);    end
 
 EXCEL_FILE = fullfile(DataDir, "ExperimentSummary.xlsx");
 
-% make diary filename unique so it doesn't overwrite
 try
     diaryFile = fullfile(LogDir, "matlab_diary_" + string(datetime("now","Format","yyyyMMdd_HHmmss")) + ".txt");
     diary(diaryFile);
     diary on
 catch
 end
-% ---------------------------------------------------------------
 
 % set up data logging (in-memory only)
 dq = parallel.pool.DataQueue;
 assignin('base', 'OptimizationLog', {});
 afterEach(dq, @(data) append_log(data));
 
-% --- helper function ---
 function append_log(data)
     logCell = evalin('base', 'OptimizationLog');
     logCell{end+1,1} = data;
@@ -214,16 +211,10 @@ end
 % set flag for single or multi-objective
 opt_flag          = 'SOO';
 const_stabilities = parallel.pool.Constant(stabilities);
-const_orbit_db    = parallel.pool.Constant(orbit_database);
+const_orbit_db    = parallel.pool.Constant(orbit_database); %#ok<NASGU>
 
 % ---------------- Mission type ----------------
-% Options:
-% 'LUNAR_GATEWAY'
-% 'PERIODIC_ORBIT'
-% 'BALLISTIC_TRANSFER'
-% 'TIME_OPT_TRANSFER'
-% 'FUEL_OPT_TRANSFER'
-MISSION_TYPE = 'TIME_OPT_TRANSFER';
+MISSION_TYPE = 'LOW_THRUST_TRANSFER';
 
 envMission = getenv("MISSION_TYPE");
 if ~isempty(envMission)
@@ -233,6 +224,17 @@ end
 % ---------------- Mission config ----------------
 missionCfg = struct();
 missionCfg.type = upper(string(MISSION_TYPE));
+
+% NEW: set observer count once here; all optimizers use it
+missionCfg.optimization.numObservers = 3;
+v = getenv("NUM_OBSERVERS");
+if ~isempty(v)
+    missionCfg.optimization.numObservers = str2double(v);
+end
+if isnan(missionCfg.optimization.numObservers) || missionCfg.optimization.numObservers < 1
+    missionCfg.optimization.numObservers = 3;
+end
+missionCfg.optimization.numObservers = round(missionCfg.optimization.numObservers);
 
 switch missionCfg.type
 
@@ -254,7 +256,7 @@ switch missionCfg.type
         missionCfg.transfer.arrOrbitIndex = 400;
         missionCfg.transfer.dt            = 0.001;
         missionCfg.transfer.solverMode    = "BALLISTIC";
-        
+
         missionCfg.transfer.ballistic.dv_guess    = [0;0;0];
         missionCfg.transfer.ballistic.tf_guess    = 2.0;
         missionCfg.transfer.ballistic.phase_guess = 0.5 * T1.("Period (TU) ")(missionCfg.transfer.arrOrbitIndex);
@@ -262,34 +264,38 @@ switch missionCfg.type
         missionCfg.transfer.ballistic.tf_lb       = 0.1;
         missionCfg.transfer.ballistic.tf_ub       = 10.0;
 
-    case "TIME_OPT_TRANSFER"
+    case "LOW_THRUST_TRANSFER"
         missionCfg.transfer.depOrbitIndex = 52;
         missionCfg.transfer.depSlot       = 10;
         missionCfg.transfer.arrOrbitIndex = 400;
         missionCfg.transfer.dt            = 0.001;
-        missionCfg.transfer.solverMode    = "TIME_OPT";
-        
-        missionCfg.transfer.pmp.m0             = 1.0;
-        missionCfg.transfer.pmp.Tmax           = 1e-4;
-        missionCfg.transfer.pmp.ve             = 10.0;
-        missionCfg.transfer.pmp.tf_lb          = 0.1;
-        missionCfg.transfer.pmp.tf_ub          = 8.0;
-        missionCfg.transfer.pmp.tf_guess       = 2.0;
-        missionCfg.transfer.pmp.tau_arr_guess  = 0.4;
-        missionCfg.transfer.pmp.lambda0_guess  = 1e-2*ones(7,1);
+        missionCfg.transfer.solverMode    = "LOW_THRUST";
 
-    case "FUEL_OPT_TRANSFER"
-        missionCfg.transfer.depOrbitIndex = 52;
-        missionCfg.transfer.depSlot       = 10;
-        missionCfg.transfer.arrOrbitIndex = 400;
-        missionCfg.transfer.arrSlot       = 20;
-        missionCfg.transfer.dt            = 0.001;
-        missionCfg.transfer.arrivalPhaseMode = "DISCRETE";
-        missionCfg.transfer.solverMode    = "FUEL_OPT";
+        missionCfg.transfer.lowthrust.Nseg        = 40;
+        missionCfg.transfer.lowthrust.m0          = 1.0;
+        missionCfg.transfer.lowthrust.Tmax        = 0.3672;
+        missionCfg.transfer.lowthrust.ve          = 10.0;
+        missionCfg.transfer.lowthrust.tf_guess    = 2.0;
+        missionCfg.transfer.lowthrust.tf_lb       = 0.1;
+        missionCfg.transfer.lowthrust.tf_ub       = 12.0;
+        missionCfg.transfer.lowthrust.phase_guess = 0.4;
+
+        missionCfg.transfer.lowthrust.w_pos       = 1e4;
+        missionCfg.transfer.lowthrust.w_vel       = 1e3;
+        missionCfg.transfer.lowthrust.w_tf        = 1e-2;
+        missionCfg.transfer.lowthrust.w_smooth    = 1e-2;
+        missionCfg.transfer.lowthrust.w_smooth2   = 1e-1;
+        missionCfg.transfer.lowthrust.w_ctrl      = 1e-4;
 
     otherwise
         error("Unknown MISSION_TYPE: %s", missionCfg.type);
 end
+
+% NEW: dynamic optimizer sizing
+num_obs_cfg = missionCfg.optimization.numObservers;
+nVars_common = 2 * num_obs_cfg;
+LB_common = repmat([1, 1], 1, num_obs_cfg);
+UB_common = repmat([num_orbits, slots_per_orbit], 1, num_obs_cfg);
 
 % ---------------- Build/load target truth ----------------
 useTransferCache = true;
@@ -355,7 +361,7 @@ s_unique_truth = s_truth(idx_u_truth, :);
 F_truth = griddedInterpolant(t_unique_truth, s_unique_truth, 'spline');
 s_target_ekf = F_truth(t_target_ekf);
 
-% Objective Function Wrapper 
+% Objective Function Wrapper
 ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_target_ekf, t_target_ekf, P_0_base, Q_k, R_k_base, mu, LU, ...
     sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags);
 
@@ -365,10 +371,9 @@ switch upper(OPTIMIZER_MODE)
 
     case 'GA'
         fprintf('Starting Genetic Algorithm...\n');
-        nVars = 6;
-
-        LB = [1, 1, 1, 1, 1, 1];
-        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+        nVars = nVars_common;
+        LB = LB_common;
+        UB = UB_common;
         IntCon = 1:nVars;
 
         pop = 60;
@@ -388,7 +393,7 @@ switch upper(OPTIMIZER_MODE)
 
         fprintf('ga returned min_cost = %.12f\n', min_cost);
         fprintf('reevaluated J(x_best) = %.12f\n', J_check);
-        
+
         [bestFinalScore, idxBestFinal] = min(scores);
         fprintf('best score in final population = %.12f\n', bestFinalScore);
         disp('x_best returned by ga:');
@@ -398,10 +403,9 @@ switch upper(OPTIMIZER_MODE)
 
     case 'PSO'
         fprintf('Starting Particle Swarm Optimization...\n');
-        nVars = 6;
-
-        LB = [1, 1, 1, 1, 1, 1];
-        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+        nVars = nVars_common;
+        LB = LB_common;
+        UB = UB_common;
 
         swarm = 60;
 
@@ -418,10 +422,10 @@ switch upper(OPTIMIZER_MODE)
         fprintf('Starting Bayesian Optimization...\n');
 
         vars = [];
-        for i = 1:3
+        for i = 1:num_obs_cfg
             vars = [vars, ...
                 optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
-                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')];
+                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')]; %#ok<AGROW>
         end
 
         results = bayesopt(ObjFcn, vars, ...
@@ -435,9 +439,9 @@ switch upper(OPTIMIZER_MODE)
     case 'GAMULTIOBJ'
         fprintf('Starting Multi-Objective Genetic Algorithm (NSGA-II)...\n');
 
-        nVars = 6;
-        LB = double([1, 1, 1, 1, 1, 1]);
-        UB = double([num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit]);
+        nVars = nVars_common;
+        LB = double(LB_common);
+        UB = double(UB_common);
         IntCon = 1:nVars;
 
         pop = 60;
@@ -455,9 +459,9 @@ switch upper(OPTIMIZER_MODE)
     case 'DMOPSO'
         fprintf('Starting Custom Multi-Objective PSO...\n');
 
-        nVars = 6;
-        LB = double([1, 1, 1, 1, 1, 1]);
-        UB = double([num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit]);
+        nVars = nVars_common;
+        LB = double(LB_common);
+        UB = double(UB_common);
 
         swarmSize  = 60;
         maxIter    = MAX_ITERS;
@@ -470,8 +474,8 @@ switch upper(OPTIMIZER_MODE)
     case 'ABC'
         fprintf('Starting Artificial Bee Colony Optimization...\n');
 
-        LB = [1, 1, 1, 1, 1, 1];
-        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+        LB = LB_common;
+        UB = UB_common;
 
         abc_opts.ColonySize      = 60;
         abc_opts.MaxIters        = MAX_ITERS;
@@ -486,8 +490,8 @@ switch upper(OPTIMIZER_MODE)
     case 'ACO'
         fprintf('Starting Ant Colony Optimization...\n');
 
-        LB = [1, 1, 1, 1, 1, 1];
-        UB = [num_orbits, slots_per_orbit, num_orbits, slots_per_orbit, num_orbits, slots_per_orbit];
+        LB = LB_common;
+        UB = UB_common;
 
         aco_opts.nAnts       = 60;
         aco_opts.MaxIters    = MAX_ITERS;
@@ -571,10 +575,19 @@ for k = 1:num_obs
     observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
 end
 
-[s_ekf, cov, screeningCount_final] = cr3bp_ekf(observer_ICs, s_target_ekf, t_target_ekf, ...
-    P_0_base, Q_k, R_k_base, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+% NEW: try to get per-step available observer counts from EKF if supported
+availableObsCount = [];
+try
+    [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf(observer_ICs, s_target_ekf, t_target_ekf, ...
+        P_0_base, Q_k, R_k_base, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+catch
+    [s_ekf, cov, screeningCount_final] = cr3bp_ekf(observer_ICs, s_target_ekf, t_target_ekf, ...
+        P_0_base, Q_k, R_k_base, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+end
 
 fprintf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
+
+availableObsCount = sanitize_obs_count_vector(availableObsCount, numel(t_target_ekf), num_obs);
 
 % ---------------- observer metadata ----------------
 familyColName = "orbitFamily";
@@ -749,6 +762,12 @@ if numel(legLabels) > 6
     lgd.NumColumns = 2;
 end
 
+lgd.Units = 'normalized';
+pos = lgd.Position;
+pos(1) = pos(1) + 0.075;
+pos(2) = pos(2) + 0.04;
+lgd.Position = pos;
+
 axis(ax,'equal');
 axis(ax,'tight');
 ax.Units = 'normalized';
@@ -761,6 +780,7 @@ ax.LooseInset = ax.TightInset + [0.02 0.02 0.02 0.02];
 axis(ax,'vis3d');
 
 exportgraphics(fig, fullfile(FigDir,'fig_traj3d.pdf'), 'ContentType','image');
+savefig(fig, fullfile(FigDir,'fig_traj3d.fig'));   % NEW
 
 % ---------------- 3-sigma plots ----------------
 Nf = size(cov,1);
@@ -780,7 +800,8 @@ cBound = [0.85 0.10 0.10];
 cErr   = [0.00 0.45 0.74];
 
 plotSigFig = @(fName, xData, errData, sigData, yLbl) ...
-    create_sig_fig(fName, xData, errData, sigData, yLbl, figW, figH, cBound, cErr, FigDir);
+    create_sig_fig(fName, xData, errData, sigData, yLbl, figW, figH, ...
+                   cBound, cErr, FigDir, availableObsCount, num_obs);
 
 plotSigFig('fig_3sig_x.pdf', t, err_pos_km(:,1), sig3_pos_km(:,1), 'e_x (km)');
 plotSigFig('fig_3sig_y.pdf', t, err_pos_km(:,2), sig3_pos_km(:,2), 'e_y (km)');
@@ -931,42 +952,109 @@ function s = local_vec_str(v)
     s = strjoin(c, "_");
 end
 
-function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir)
+function obsCount = sanitize_obs_count_vector(obsCount, N, num_obs)
+    if isempty(obsCount)
+        obsCount = NaN(N,1);
+        return;
+    end
+
+    obsCount = obsCount(:);
+    if numel(obsCount) ~= N
+        obsCount = NaN(N,1);
+        return;
+    end
+
+    obsCount = round(obsCount);
+    obsCount = max(0, min(num_obs, obsCount));
+end
+
+function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obsCount, maxObs)
     f = figure('Color','w','Units','inches','Position',[1 1 w h], ...
                'PaperUnits','inches','PaperPosition',[0 0 w h]);
-    ax = axes(f); hold(ax,'on'); box(ax,'on');
-
+    ax = axes(f);
+    hold(ax,'on');
+    box(ax,'on');
     set(ax,'TickLabelInterpreter','tex', 'Layer','top');
-    
+
+    % --- determine y-limits first ---
+    yMax = max(abs([err(:); sig3(:)]));
+    if ~isfinite(yMax) || yMax <= 0
+        yMax = 1;
+    end
+    yPad = 0.08 * yMax;
+    yLims = [-yMax-yPad, yMax+yPad];
+
+    % --- grayscale background showing available observers ---
+    if ~isempty(obsCount) && ~all(isnan(obsCount))
+        obsCount = obsCount(:).';
+        bg = repmat(obsCount, 2, 1);   % 2 rows so it fills the axes vertically
+
+        imagesc(ax, t(:).', yLims, bg);
+        set(ax, 'YDir', 'normal');
+
+        colormap(ax, gray(max(2, maxObs+1)));
+        clim(ax, [0 maxObs]);
+        
+        % make the background subtle
+        bgHandle = findobj(ax, 'Type', 'Image');
+        if ~isempty(bgHandle)
+            bgHandle.AlphaData = 0.18;
+        end
+    end
+
+    % --- main curves on top ---
     hB = plot(ax, t,  sig3, '-', 'Color', cBnd);
          plot(ax, t, -sig3, '-', 'Color', cBnd);
     hE = plot(ax, t,  err,  '-', 'Color', cErr);
-    
+
     xlabel(ax, 't (TU)');
     ylabel(ax, yLbl);
     xlim(ax, [t(1) t(end)]);
-    
+    ylim(ax, yLims);
+
+    % --- legend --- 
     lgd = legend(ax, [hE, hB], {'EKF error', '\pm 3\sigma bound'}, ...
         'Location', 'northeast');
     lgd.Box = 'on';
     lgd.ItemTokenSize = [18 12];
+
+    % -- colorbar legend --- 
+    cb = colorbar(ax);
+    cb.Location = 'eastoutside';
     
-    exportgraphics(f, fullfile(outDir, fName), 'ContentType', 'image');
+    cb.Label.String = 'Available observers';
+    cb.Ticks = 0:maxObs;
+    cb.TickDirection = 'out';
+    
+    % ---- lock axes size ----
+    ax.Units = 'normalized';
+    ax.Position = [0.12 0.14 0.68 0.80];   % [left bottom width height]
+    
+    % ---- move colorbar further right ----
+    cb.Units = 'normalized';
+    cb.Position = [0.84 0.14 0.03 0.80];
+    pos = cb.Position;
+    pos(1) = pos(1) + 0.01;
+    cb.Position = pos;
+
+    % --- save figures ---
+    exportgraphics(f, fullfile(outDir, fName), 'ContentType','image');
+    savefig(f, fullfile(outDir, replace(fName, '.pdf', '.fig')));
     close(f);
 end
 
 function [xL1, xL2] = cr3bp_L1L2(mu)
-f = @(x) x ...
-    - (1-mu)*(x + mu)./abs(x + mu).^3 ...
-    - mu*(x - (1-mu))./abs(x - (1-mu)).^3;
+    f = @(x) x ...
+        - (1-mu)*(x + mu)./abs(x + mu).^3 ...
+        - mu*(x - (1-mu))./abs(x - (1-mu)).^3;
 
-delta = (mu/3)^(1/3);
-x2 = 1 - mu;
+    delta = (mu/3)^(1/3);
+    x2 = 1 - mu;
 
-x0_L1 = x2 - delta;
-x0_L2 = x2 + delta;
+    x0_L1 = x2 - delta;
+    x0_L2 = x2 + delta;
 
-opts = optimset('Display','off');
-xL1 = fzero(f, x0_L1, opts);
-xL2 = fzero(f, x0_L2, opts);
+    opts = optimset('Display','off');
+    xL1 = fzero(f, x0_L1, opts);
+    xL2 = fzero(f, x0_L2, opts);
 end

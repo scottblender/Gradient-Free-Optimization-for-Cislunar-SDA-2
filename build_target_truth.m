@@ -16,17 +16,15 @@ switch missionType
         solver = BallisticTransferSolver( ...
             missionCfg.transfer, T1, orbit_database, times, states, mu, ode_opts);
         [t_target, s_target, info] = solver.solve();
+    
+    case "LOW_THRUST_TRANSFER"
 
-    case "TIME_OPT_TRANSFER"
-        solver = TimeOptimalTransferSolver( ...
-            missionCfg.transfer, T1, orbit_database, times, states, mu, ode_opts);
+        solver = LowThrustTransferSolver( ...
+            missionCfg.transfer, ...
+            T1, orbit_database, times, states, mu, ode_opts);
+
         [t_target, s_target, info] = solver.solve();
-
-    case "FUEL_OPT_TRANSFER"
-        solver = FuelOptimalTransferSolver( ...
-            missionCfg.transfer, T1, orbit_database, times, states, mu, ode_opts);
-        [t_target, s_target, info] = solver.solve();
-
+    
     otherwise
         error("Unknown mission type: %s", missionType);
 end
