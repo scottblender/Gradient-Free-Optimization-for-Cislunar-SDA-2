@@ -211,7 +211,7 @@ end
 % set flag for single or multi-objective
 opt_flag          = 'SOO';
 const_stabilities = parallel.pool.Constant(stabilities);
-const_orbit_db    = parallel.pool.Constant(orbit_database); %#ok<NASGU>
+const_orbit_db    = parallel.pool.Constant(orbit_database);
 
 % ---------------- Mission type ----------------
 MISSION_TYPE = 'LOW_THRUST_TRANSFER';
@@ -992,14 +992,17 @@ function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obs
         imagesc(ax, t(:).', yLims, bg);
         set(ax, 'YDir', 'normal');
 
-        colormap(ax, gray(max(2, maxObs+1)));
-        clim(ax, [0 maxObs]);
-        
-        % make the background subtle
-        bgHandle = findobj(ax, 'Type', 'Image');
-        if ~isempty(bgHandle)
-            bgHandle.AlphaData = 0.18;
-        end
+        % lightened grayscale colormap so plot and colorbar match exactly
+        cmap = [
+            0.40 0.40 0.40   % 0 observers (dark gray)
+            0.60 0.60 0.60   % 1 observer
+            0.80 0.80 0.80   % 2 observers
+            1.00 1.00 1.00   % 3 observers (white)
+        ];
+                
+        cmap = cmap(1:maxObs+1,:);  % in case maxObs < 3
+        colormap(ax, cmap);
+        clim(ax, [-0.5 maxObs+0.5]);
     end
 
     % --- main curves on top ---
@@ -1012,30 +1015,32 @@ function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obs
     xlim(ax, [t(1) t(end)]);
     ylim(ax, yLims);
 
-    % --- legend --- 
+    % --- legend ---
     lgd = legend(ax, [hE, hB], {'EKF error', '\pm 3\sigma bound'}, ...
         'Location', 'northeast');
     lgd.Box = 'on';
     lgd.ItemTokenSize = [18 12];
 
-    % -- colorbar legend --- 
-    cb = colorbar(ax);
-    cb.Location = 'eastoutside';
-    
-    cb.Label.String = 'Available observers';
-    cb.Ticks = 0:maxObs;
-    cb.TickDirection = 'out';
-    
-    % ---- lock axes size ----
-    ax.Units = 'normalized';
-    ax.Position = [0.12 0.14 0.68 0.80];   % [left bottom width height]
-    
-    % ---- move colorbar further right ----
-    cb.Units = 'normalized';
-    cb.Position = [0.84 0.14 0.03 0.80];
-    pos = cb.Position;
-    pos(1) = pos(1) + 0.01;
-    cb.Position = pos;
+    % -- colorbar legend ---
+    if ~isempty(obsCount) && ~all(isnan(obsCount))
+        cb = colorbar(ax);
+        cb.Location = 'eastoutside';
+        cb.Label.String = 'Available observers';
+        cb.Ticks = 0:maxObs;
+        cb.TickLabels = string(0:maxObs);
+        cb.TickDirection = 'out';
+
+        % ---- lock axes size ----
+        ax.Units = 'normalized';
+        ax.Position = [0.12 0.14 0.68 0.80];
+
+        % ---- move colorbar further right ----
+        cb.Units = 'normalized';
+        cb.Position = [0.84 0.14 0.03 0.80];
+        pos = cb.Position;
+        pos(1) = pos(1) + 0.01;
+        cb.Position = pos;
+    end
 
     % --- save figures ---
     exportgraphics(f, fullfile(outDir, fName), 'ContentType','image');
