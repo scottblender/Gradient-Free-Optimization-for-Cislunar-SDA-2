@@ -51,7 +51,7 @@ ode_opts = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
 pos_var  = (1 / LU)^2;
 vel_var  = (10 / (VU * 1000))^2;
 P_0_base = diag([pos_var, pos_var, pos_var, vel_var, vel_var, vel_var]);
-Q_k      = diag(repmat(1e-8, 6, 1));
+Q_k      = diag([1e-8 1e-8 1e-8 5e-6 5e-6 5e-6]);
 R_k_base = diag([1e-8, 1e-8]);
 
 % --- Lunar Gateway ICs ---
@@ -225,7 +225,7 @@ end
 missionCfg = struct();
 missionCfg.type = upper(string(MISSION_TYPE));
 
-% NEW: set observer count once here; all optimizers use it
+% set observer count once here; all optimizers use it
 missionCfg.optimization.numObservers = 3;
 v = getenv("NUM_OBSERVERS");
 if ~isempty(v)
@@ -250,20 +250,6 @@ switch missionCfg.type
         missionCfg.periodic.dt         = 0.001;
         missionCfg.periodic.Nperiods   = 1;
 
-    case "BALLISTIC_TRANSFER"
-        missionCfg.transfer.depOrbitIndex = 52;
-        missionCfg.transfer.depSlot       = 10;
-        missionCfg.transfer.arrOrbitIndex = 400;
-        missionCfg.transfer.dt            = 0.001;
-        missionCfg.transfer.solverMode    = "BALLISTIC";
-
-        missionCfg.transfer.ballistic.dv_guess    = [0;0;0];
-        missionCfg.transfer.ballistic.tf_guess    = 2.0;
-        missionCfg.transfer.ballistic.phase_guess = 0.5 * T1.("Period (TU) ")(missionCfg.transfer.arrOrbitIndex);
-        missionCfg.transfer.ballistic.dv_max      = 0.05;
-        missionCfg.transfer.ballistic.tf_lb       = 0.1;
-        missionCfg.transfer.ballistic.tf_ub       = 10.0;
-
     case "LOW_THRUST_TRANSFER"
         missionCfg.transfer.depOrbitIndex = 52;
         missionCfg.transfer.depSlot       = 10;
@@ -271,27 +257,41 @@ switch missionCfg.type
         missionCfg.transfer.dt            = 0.001;
         missionCfg.transfer.solverMode    = "LOW_THRUST";
 
-        missionCfg.transfer.lowthrust.Nseg        = 40;
-        missionCfg.transfer.lowthrust.m0          = 1.0;
-        missionCfg.transfer.lowthrust.Tmax        = 0.3672;
-        missionCfg.transfer.lowthrust.ve          = 10.0;
-        missionCfg.transfer.lowthrust.tf_guess    = 2.0;
-        missionCfg.transfer.lowthrust.tf_lb       = 0.1;
-        missionCfg.transfer.lowthrust.tf_ub       = 12.0;
-        missionCfg.transfer.lowthrust.phase_guess = 0.4;
+        missionCfg.transfer.lowthrust.sigma            = 1.0;
 
-        missionCfg.transfer.lowthrust.w_pos       = 1e4;
-        missionCfg.transfer.lowthrust.w_vel       = 1e3;
-        missionCfg.transfer.lowthrust.w_tf        = 1e-2;
-        missionCfg.transfer.lowthrust.w_smooth    = 1e-2;
-        missionCfg.transfer.lowthrust.w_smooth2   = 1e-1;
-        missionCfg.transfer.lowthrust.w_ctrl      = 1e-4;
+        missionCfg.transfer.lowthrust.m0               = 1.0;
+        missionCfg.transfer.lowthrust.Tmax             = 0.3672;
+        missionCfg.transfer.lowthrust.ve               = 39.8;
+
+        missionCfg.transfer.lowthrust.tf_guess         = 2.0;
+        missionCfg.transfer.lowthrust.tf_lb            = 0.1;
+        missionCfg.transfer.lowthrust.tf_ub            = 12.0;
+        missionCfg.transfer.lowthrust.phase_guess      = 0.4;
+
+        missionCfg.transfer.lowthrust.lambda_guess     = [
+           -0.25
+            0.75
+            0.35
+           -0.20
+            0.40
+            0.10
+            0.05
+        ];
+
+        missionCfg.transfer.lowthrust.lambda_lb        = -20 * ones(7,1);
+        missionCfg.transfer.lowthrust.lambda_ub        =  20 * ones(7,1);
+
+        missionCfg.transfer.lowthrust.w_pos_indirect   = 1e3;
+        missionCfg.transfer.lowthrust.w_vel_indirect   = 1e2;
+        missionCfg.transfer.lowthrust.w_mass_indirect  = 1;
+        missionCfg.transfer.lowthrust.w_phase_indirect = 10;
+        missionCfg.transfer.lowthrust.w_scale_indirect = 1;
 
     otherwise
         error("Unknown MISSION_TYPE: %s", missionCfg.type);
 end
 
-% NEW: dynamic optimizer sizing
+% dynamic optimizer sizing
 num_obs_cfg = missionCfg.optimization.numObservers;
 nVars_common = 2 * num_obs_cfg;
 LB_common = repmat([1, 1], 1, num_obs_cfg);
