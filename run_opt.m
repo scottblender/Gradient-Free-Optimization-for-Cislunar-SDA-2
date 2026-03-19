@@ -254,8 +254,9 @@ switch missionCfg.type
         missionCfg.transfer.depOrbitIndex = 52;
         missionCfg.transfer.depSlot       = 10;
         missionCfg.transfer.arrOrbitIndex = 400;
+        missionCfg.transfer.arrSlot       = 1;
         missionCfg.transfer.dt            = 0.001;
-        missionCfg.transfer.solverMode    = "LOW_THRUST";
+        missionCfg.transfer.solverMode    = "LOW_THRUST_CLASS";
 
         missionCfg.transfer.lowthrust.sigma            = 1.0;
 
@@ -266,7 +267,6 @@ switch missionCfg.type
         missionCfg.transfer.lowthrust.tf_guess         = 2.0;
         missionCfg.transfer.lowthrust.tf_lb            = 0.1;
         missionCfg.transfer.lowthrust.tf_ub            = 12.0;
-        missionCfg.transfer.lowthrust.phase_guess      = 0.4;
 
         missionCfg.transfer.lowthrust.lambda_guess     = [
            -0.25
@@ -281,11 +281,10 @@ switch missionCfg.type
         missionCfg.transfer.lowthrust.lambda_lb        = -20 * ones(7,1);
         missionCfg.transfer.lowthrust.lambda_ub        =  20 * ones(7,1);
 
-        missionCfg.transfer.lowthrust.w_pos_indirect   = 1e3;
-        missionCfg.transfer.lowthrust.w_vel_indirect   = 1e2;
+        missionCfg.transfer.lowthrust.w_pos_indirect   = 1;
+        missionCfg.transfer.lowthrust.w_vel_indirect   = 1;
+        missionCfg.transfer.lowthrust.w_norm_indirect  = 1;
         missionCfg.transfer.lowthrust.w_mass_indirect  = 1;
-        missionCfg.transfer.lowthrust.w_phase_indirect = 10;
-        missionCfg.transfer.lowthrust.w_scale_indirect = 1;
 
     otherwise
         error("Unknown MISSION_TYPE: %s", missionCfg.type);
@@ -675,6 +674,16 @@ if isTransferMission
             'MarkerSize', 9, 'MarkerFaceColor', depBase, ...
             'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
     end
+
+    if isfield(missionCfg.transfer, 'arrSlot') && ~isempty(missionCfg.transfer.arrSlot)
+        arrSlot = missionCfg.transfer.arrSlot;
+        arrSlot = max(1, min(arrSlot, size(orbit_database{arrIdx},1)));
+        arrState0 = orbit_database{arrIdx}(arrSlot,:);
+
+        plot3(ax, arrState0(1), arrState0(2), arrState0(3), 's', ...
+            'MarkerSize', 9, 'MarkerFaceColor', arrBase, ...
+            'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
+    end
 end
 
 rM = [1-mu, 0, 0];
@@ -902,27 +911,17 @@ function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
     end
 
     switch solverMode
-        case "BALLISTIC"
-            b = tr.ballistic;
-            parts(end+1) = "tfg_"   + local_num_str(b.tf_guess);
-            parts(end+1) = "dvmax_" + local_num_str(b.dv_max);
-            parts(end+1) = "tflb_"  + local_num_str(b.tf_lb);
-            parts(end+1) = "tfub_"  + local_num_str(b.tf_ub);
-            if isfield(b,'dv_guess') && ~isempty(b.dv_guess)
-                parts(end+1) = "dvg_" + local_vec_str(b.dv_guess);
-            end
-
-        case "TIME_OPT"
-            p = tr.pmp;
+        case "LOW_THRUST_CLASS"
+            p = tr.lowthrust;
             parts(end+1) = "m0_"    + local_num_str(p.m0);
             parts(end+1) = "Tmax_"  + local_num_str(p.Tmax);
             parts(end+1) = "ve_"    + local_num_str(p.ve);
-            parts(end+1) = "tflb_"  + local_num_str(p.tf_lb);
-            parts(end+1) = "tfub_"  + local_num_str(p.tf_ub);
+            parts(end+1) = "sigma_" + local_num_str(p.sigma);
             parts(end+1) = "tfg_"   + local_num_str(p.tf_guess);
 
-        case "FUEL_OPT"
-            % add fields here when implemented
+            if isfield(tr,'arrSlot') && ~isempty(tr.arrSlot)
+                parts(end+1) = "arrSlot_" + string(tr.arrSlot);
+            end
     end
 
     rawKey = strjoin(parts, "__");

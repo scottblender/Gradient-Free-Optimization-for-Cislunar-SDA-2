@@ -7,8 +7,6 @@ classdef LowThrustTransferSolver
         states
         mu
         ode_opts
-        arrInterp
-        arrPeriod
     end
 
     methods
@@ -20,8 +18,6 @@ classdef LowThrustTransferSolver
             obj.states = states;
             obj.mu = mu;
             obj.ode_opts = ode_opts;
-
-            [obj.arrInterp, obj.arrPeriod] = obj.buildArrivalInterpolant();
         end
 
         function [t_target, s_target, info] = solve(obj)
@@ -29,45 +25,52 @@ classdef LowThrustTransferSolver
             lt = tr.lowthrust;
 
             x_dep = obj.getDepartureState();
+            x_arr = obj.getArrivalTargetState();
 
             z0 = obj.initialGuess();
-            [lb, ub] = obj.bounds();
 
-            fun = @(z) obj.boundaryResidual(z, x_dep);
+            fun = @(z) obj.boundaryResidual(z, x_dep, x_arr);
 
-            opts = optimoptions('lsqnonlin', ...
+            opts = optimoptions(@fsolve, ...
+                'Algorithm', 'levenberg-marquardt', ...
                 'Display', 'iter', ...
-                'MaxIterations', 400, ...
-                'MaxFunctionEvaluations', 1e5, ...
-                'StepTolerance', 1e-12, ...
-                'FunctionTolerance', 1e-12, ...
-                'OptimalityTolerance', 1e-12);
+                'MaxIterations', 50000, ...
+                'MaxFunctionEvaluations', 1e6, ...
+                'StepTolerance', 1e-16, ...
+                'FunctionTolerance', 1e-16, ...
+                'OptimalityTolerance', 1e-16);
 
-            [z_sol, resnorm, residual, exitflag, output] = lsqnonlin( ...
-                fun, z0, lb, ub, opts);
+            [z_sol, residual, exitflag, output] = fsolve(fun, z0, opts);
 
-            [t_target, s_target, finalData] = obj.propagate(z_sol, x_dep);
+            % Optional post-check against user bounds
+            [lb, ub] = obj.bounds();
+            if any(z_sol < lb) || any(z_sol > ub)
+                warning('LowThrustTransferSolver:SolutionOutsideBounds', ...
+                    'fsolve solution lies outside configured bounds.');
+            end
+
+            [t_target, s_target, finalData] = obj.propagate(z_sol, x_dep, x_arr);
 
             info = struct();
             info.type              = "LOW_THRUST_TRANSFER";
             info.builder           = "LowThrustTransferSolver";
-            info.method            = "INDIRECT_SINGLE_SHOOTING_LSQNONLIN";
+            info.method            = "INDIRECT_SINGLE_SHOOTING_FIXED_ENDPOINT_FSOLVE";
             info.depOrbitIndex     = tr.depOrbitIndex;
             info.depSlot           = tr.depSlot;
             info.arrOrbitIndex     = tr.arrOrbitIndex;
+            info.arrSlot           = obj.getArrivalSlot();
             info.dt                = tr.dt;
             info.Tmax              = lt.Tmax;
             info.ve                = lt.ve;
             info.m0                = lt.m0;
             info.sigma             = obj.getSigma();
-            info.tf                = z_sol(end-1);
-            info.phase             = z_sol(end);
+            info.tf                = z_sol(end);
             info.lambda0           = z_sol(1:7);
             info.finalResidual     = finalData.residual;
             info.finalResidualNorm = norm(finalData.residual);
             info.exitflag          = exitflag;
             info.output            = output;
-            info.resnorm           = resnorm;
+            info.resnorm           = norm(residual)^2;
             info.residualVector    = residual;
             info.xf                = finalData.xf;
             info.x_arr             = finalData.x_arr;
@@ -75,7 +78,13 @@ classdef LowThrustTransferSolver
             info.mass_final        = finalData.mass_final;
             info.controls          = finalData.controls;
             info.switchingFunction = finalData.switchingFunction;
-            info.dxdphi            = finalData.dxarr_dphase;
+        end
+
+        function [t_out, s_out, data] = runInitialGuess(obj)
+            x_dep = obj.getDepartureState();
+            x_arr = obj.getArrivalTargetState();
+            z0 = obj.initialGuess();
+            [t_out, s_out, data] = obj.propagate(z0, x_dep, x_arr);
         end
     end
 
@@ -92,6 +101,41 @@ classdef LowThrustTransferSolver
             iDep = tr.depOrbitIndex;
             jDep = tr.depSlot;
             x_dep = obj.orbit_database{iDep}(jDep,:).';
+        end
+
+        function jArr = getArrivalSlot(obj)
+            tr = obj.getTransferCfg();
+
+            if isfield(tr, 'arrSlot') && ~isempty(tr.arrSlot)
+                jArr = tr.arrSlot;
+            else
+                jArr = 1;
+            end
+        end
+
+        function x_arr = getArrivalTargetState(obj)
+            tr = obj.getTransferCfg();
+
+            if isfield(tr, 'fixedTargetState') && ~isempty(tr.fixedTargetState)
+                x_arr = tr.fixedTargetState(:);
+                if numel(x_arr) ~= 6
+                    error('transfer.fixedTargetState must have 6 elements.');
+                end
+                return;
+            end
+
+            if isfield(tr, 'lowthrust') && isfield(tr.lowthrust, 'fixed_target_state') ...
+                    && ~isempty(tr.lowthrust.fixed_target_state)
+                x_arr = tr.lowthrust.fixed_target_state(:);
+                if numel(x_arr) ~= 6
+                    error('lowthrust.fixed_target_state must have 6 elements.');
+                end
+                return;
+            end
+
+            iArr = tr.arrOrbitIndex;
+            jArr = obj.getArrivalSlot();
+            x_arr = obj.orbit_database{iArr}(jArr,:).';
         end
 
         function sigma = getSigma(obj)
@@ -126,23 +170,14 @@ classdef LowThrustTransferSolver
                 ];
             end
 
-            % Normalize the initial costate guess to help scaling
-            nlam0 = norm(lam0);
+            % Normalize first 6 costates to match transversality convention
+            nlam0 = norm(lam0(1:6));
             if nlam0 > 0
-                lam0 = lam0 / nlam0;
-            else
-                lam0 = [1;0;0;0;0;0;0];
+                lam0(1:6) = lam0(1:6) / nlam0;
             end
 
             tf_guess = lt.tf_guess;
-
-            if isfield(lt,'phase_guess') && ~isempty(lt.phase_guess)
-                phase_guess = lt.phase_guess;
-            else
-                phase_guess = 0.5 * obj.arrPeriod;
-            end
-
-            z0 = [lam0; tf_guess; phase_guess];
+            z0 = [lam0; tf_guess];
         end
 
         function [lb, ub] = bounds(obj)
@@ -163,53 +198,57 @@ classdef LowThrustTransferSolver
                 lam_ub = lamBnd;
             end
 
-            lb = [lam_lb; lt.tf_lb; 0];
-            ub = [lam_ub; lt.tf_ub; obj.arrPeriod];
+            lb = [lam_lb; lt.tf_lb];
+            ub = [lam_ub; lt.tf_ub];
         end
 
-        function r = boundaryResidual(obj, z, x_dep)
+        function r = boundaryResidual(obj, z, x_dep, x_arr)
             try
-                [~, ~, data] = obj.propagate(z, x_dep);
+                [lb, ub] = obj.bounds();
+
+                % Soft guard since fsolve does not support bounds
+                if any(z < lb) || any(z > ub)
+                    r = 1e6 * ones(8,1);
+                    return;
+                end
+
+                [~, ~, data] = obj.propagate(z, x_dep, x_arr);
 
                 tr = obj.getTransferCfg();
                 lt = tr.lowthrust;
 
-                if isfield(lt,'w_pos_indirect'),   w_pos   = lt.w_pos_indirect;   else, w_pos   = 1e3; end
-                if isfield(lt,'w_vel_indirect'),   w_vel   = lt.w_vel_indirect;   else, w_vel   = 1e2; end
-                if isfield(lt,'w_mass_indirect'),  w_mass  = lt.w_mass_indirect;  else, w_mass  = 1;   end
-                if isfield(lt,'w_phase_indirect'), w_phase = lt.w_phase_indirect; else, w_phase = 10;  end
-                if isfield(lt,'w_scale_indirect'), w_scale = lt.w_scale_indirect; else, w_scale = 1;   end
+                if isfield(lt,'w_pos_indirect'),   w_pos   = lt.w_pos_indirect;   else, w_pos   = 1; end
+                if isfield(lt,'w_vel_indirect'),   w_vel   = lt.w_vel_indirect;   else, w_vel   = 1; end
+                if isfield(lt,'w_norm_indirect'),  w_norm  = lt.w_norm_indirect;  else, w_norm  = 1; end
+                if isfield(lt,'w_mass_indirect'),  w_mass  = lt.w_mass_indirect;  else, w_mass  = 1; end
 
-                pos_err = data.xf(1:3) - data.x_arr(1:3);
-                vel_err = data.xf(4:6) - data.x_arr(4:6);
+                pos_err = data.xf(1:3) - x_arr(1:3);
+                vel_err = data.xf(4:6) - x_arr(4:6);
+
+                % Match old solver structure:
+                % norm(lambda_rv(tf)) = 1
+                costate_norm_cond = norm(data.lambda_f(1:6)) - 1;
 
                 % Free final mass
                 mass_trans = data.lambda_f(7);
 
-                % Free phase along arrival orbit
-                phase_trans = data.lambda_f(1:6).' * data.dxarr_dphase;
-
-                % Costate scaling condition
-                scale_cond = norm(z(1:7)) - 1;
-
                 r = [
-                    sqrt(max(w_pos,0))   * pos_err
-                    sqrt(max(w_vel,0))   * vel_err
-                    sqrt(max(w_mass,0))  * mass_trans
-                    sqrt(max(w_phase,0)) * phase_trans
-                    sqrt(max(w_scale,0)) * scale_cond
+                    sqrt(max(w_pos,0))  * pos_err
+                    sqrt(max(w_vel,0))  * vel_err
+                    sqrt(max(w_norm,0)) * costate_norm_cond
+                    sqrt(max(w_mass,0)) * mass_trans
                 ];
 
                 if any(~isfinite(r))
-                    r = 1e6 * ones(9,1);
+                    r = 1e6 * ones(8,1);
                 end
             catch ME
                 fprintf(2, 'LowThrustTransferSolver.boundaryResidual failed: %s\n', ME.message);
-                r = 1e6 * ones(9,1);
+                r = 1e6 * ones(8,1);
             end
         end
 
-        function [t_out, s_out, data] = propagate(obj, z, x_dep)
+        function [t_out, s_out, data] = propagate(obj, z, x_dep, x_arr)
             tr = obj.getTransferCfg();
             lt = tr.lowthrust;
 
@@ -219,8 +258,7 @@ classdef LowThrustTransferSolver
             sigma = obj.getSigma();
 
             lam0  = z(1:7);
-            tf    = z(end-1);
-            phase = z(end);
+            tf    = z(end);
 
             if tf <= 0
                 error('LowThrustTransferSolver:InvalidTF', 'Time of flight must be positive.');
@@ -250,18 +288,13 @@ classdef LowThrustTransferSolver
             mf    = X_all(end,7);
             lam_f = X_all(end,8:14).';
 
-            x_arr = obj.evalArrivalState(phase);
-            dxarr = obj.evalArrivalTangent(phase);
-
             t_out = t_all;
             s_out = X_all(:,1:6);
 
             data = struct();
-            data.residual          = xf6 - x_arr;
-            data.phase             = phase;
+            data.residual          = [xf6 - x_arr; norm(lam_f(1:6)) - 1; lam_f(7)];
             data.xf                = xf6;
             data.x_arr             = x_arr;
-            data.dxarr_dphase      = dxarr;
             data.mass_final        = mf;
             data.lambda_f          = lam_f;
             data.controls          = obj.reconstructControls(X_all, sigma, Tmax);
@@ -310,8 +343,8 @@ classdef LowThrustTransferSolver
             nlv = norm(lv);
 
             if m <= 1e-12 || nlv <= 1e-14 || sigma <= 0 || Tmax <= 0
-                aT   = [0;0;0];
-                mdot = 0;
+                aT    = [0;0;0];
+                mdot  = 0;
                 lmdot = 0;
             else
                 uhat = -lv / nlv;
@@ -372,51 +405,6 @@ classdef LowThrustTransferSolver
                     S(k) = 1 - Tmax * (norm(lv)/m + lm/ve);
                 end
             end
-        end
-
-        function x_arr = evalArrivalState(obj, phase)
-            phaseWrapped = mod(phase, obj.arrPeriod);
-            x_arr = obj.arrInterp(phaseWrapped).';
-        end
-
-        function dx = evalArrivalTangent(obj, phase)
-            % Slightly larger step for a smoother numerical tangent
-            h = max(1e-5, 1e-4 * obj.arrPeriod);
-
-            p1 = mod(phase + h, obj.arrPeriod);
-            p0 = mod(phase - h, obj.arrPeriod);
-
-            x1 = obj.arrInterp(p1).';
-            x0 = obj.arrInterp(p0).';
-
-            dx = (x1 - x0) / (2*h);
-        end
-
-        function [F, period] = buildArrivalInterpolant(obj)
-            tr = obj.getTransferCfg();
-            iArr = tr.arrOrbitIndex;
-
-            t_raw = obj.times{iArr}(:);
-            s_raw = obj.states{iArr};
-
-            [t_unique, idx_u] = unique(t_raw);
-            s_unique = s_raw(idx_u, :);
-
-            period = obj.T1.("Period (TU) ")(iArr);
-
-            if abs(t_unique(1)) > 1e-12
-                error('Arrival orbit time history must start at t = 0.');
-            end
-
-            if abs(t_unique(end) - period) > 1e-10 || any(abs(s_unique(1,:) - s_unique(end,:)) > 1e-8)
-                t_aug = [t_unique; period];
-                s_aug = [s_unique; s_unique(1,:)];
-            else
-                t_aug = t_unique;
-                s_aug = s_unique;
-            end
-
-            F = griddedInterpolant(t_aug, s_aug, 'pchip');
         end
     end
 end

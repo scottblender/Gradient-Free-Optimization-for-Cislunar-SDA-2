@@ -11,11 +11,6 @@ switch missionType
     case "PERIODIC_ORBIT"
         [t_target, s_target, info] = build_truth_periodic_orbit( ...
             missionCfg.periodic, T1, times, states, mu, ode_opts);
-
-    case "BALLISTIC_TRANSFER"
-        solver = BallisticTransferSolver( ...
-            missionCfg.transfer, T1, orbit_database, times, states, mu, ode_opts);
-        [t_target, s_target, info] = solver.solve();
     
     case "LOW_THRUST_TRANSFER"
 
