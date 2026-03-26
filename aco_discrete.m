@@ -17,6 +17,9 @@ if ~isfield(opts,'TauMin'),       opts.TauMin = 1e-12; end
 if ~isfield(opts,'UseIterBestDeposit'), opts.UseIterBestDeposit = true; end
 if ~isfield(opts,'IterBestWeight'),     opts.IterBestWeight = 1.0; end
 if ~isfield(opts,'UseIterBestDepositSlots'), opts.UseIterBestDepositSlots = true; end
+if ~isfield(opts,'Logger') || isempty(opts.Logger)
+    opts.Logger = @(varargin) fprintf(varargin{:});
+end
 
 % ---------------- sizes / structure ----------------
 nVars = numel(LB);
@@ -138,11 +141,11 @@ for itr = 1:opts.MaxIters
         [tauOrb, tauSlot] = deposit_structured(tauOrb, tauSlot, iterBestX, LB, UB, dep_iter);
     end
 
-    fprintf('ACO iter %3d | bestJ = %.6g | iterBestJ = %.6g | stall = %d\n', ...
-        itr, fval, iterBestJ, stallCount);
+   opts.Logger('ACO iter %3d | bestJ = %.6g | iterBestJ = %.6g | stall = %d\n', ...
+    itr, fval, iterBestJ, stallCount);
 
     if stallCount >= opts.StallIters
-        fprintf('ACO stopping early (stall reached).\n');
+        opts.Logger('ACO stopping early (stall reached).\n');
         break;
     end
 end

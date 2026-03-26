@@ -11,6 +11,9 @@ if ~isfield(opts,'Limit'),           opts.Limit = 20; end
 if ~isfield(opts,'StallIters'),      opts.StallIters = 1000; end
 if ~isfield(opts,'UseParallel'),     opts.UseParallel = true; end
 if ~isfield(opts,'UseParallelInit'), opts.UseParallelInit = opts.UseParallel; end
+if ~isfield(opts,'Logger') || isempty(opts.Logger)
+    opts.Logger = @(varargin) fprintf(varargin{:});
+end
 
 % ---------------- sizes ----------------
 assert(mod(opts.ColonySize,2)==0, 'ColonySize must be even.');
@@ -161,10 +164,11 @@ for itr = 1:opts.MaxIters
         stallCount = stallCount + 1;
     end
 
-    fprintf('ABC iter %3d | bestJ = %.6g | stall = %d | scouts = %d\n', itr, fval, stallCount, nScout);
+    opts.Logger('ABC iter %3d | bestJ = %.6g | stall = %d | scouts = %d\n', ...
+    itr, fval, stallCount, nScout);
 
     if stallCount >= opts.StallIters
-        fprintf('ABC stopping early (stall reached).\n');
+        opts.Logger('ABC stopping early (stall reached).\n');
         break;
     end
 end
