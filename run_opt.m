@@ -16,15 +16,22 @@ set(groot, ...
     'defaultLineLineWidth',1.8);
 
 % ---------------- Load JPL data ----------------
-S  = load('JPL_CR3BP_OrbitCatalog.mat');
-CatalogDir = pwd;
+thisFile = mfilename('fullpath');
+thisDir  = fileparts(thisFile);
+
+% Ensure all project functions are on path (for local + batch runs)
+addpath(genpath(thisDir));
+
+catalogPath = fullfile(thisDir, 'JPL_CR3BP_OrbitCatalog.mat');
+S = load(catalogPath);
+CatalogDir = thisDir;
 T1 = S.T;
-t_lg = S.t_lg;
-s_lg = S.s_lg;
+t_lg = S.t_lg; 
+s_lg = S.s_lg; 
 
 % ---------------- Optimizer inputs ----------------
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
-OPTIMIZER_MODE = 'GA'; % default
+OPTIMIZER_MODE = 'GA';
 
 envMode = getenv("OPTIMIZER_MODE");
 if ~isempty(envMode)
@@ -36,9 +43,8 @@ OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 MAX_ITERS = 10;
 v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
 
-MAX_EVALS = 100;  % Bayesian only (objective evaluation budget)
-v = getenv("MAX_EVALS");
-if ~isempty(v), MAX_EVALS = str2double(v); end
+MAX_EVALS = 100;
+v = getenv("MAX_EVALS"); if ~isempty(v), MAX_EVALS = str2double(v); end
 
 % ---------------- JPL constants ----------------
 mu = 1.215058560962404E-2;
@@ -49,19 +55,18 @@ VU = LU / TU;    % km/s
 ode_opts = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
 
 % ---------------- Lunar Gateway ICs ----------------
-s_lg_ic     = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]';
-tspan_lg_ic = [0, 1.51110546287394];
+s_lg_ic     = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]'; 
+tspan_lg_ic = [0, 1.51110546287394]; 
 
 % ---------------- Catalog / orbit database ----------------
-num_orbits      = height(T1); % number of candidate orbits
-slots_per_orbit = 50;         % number of discrete slots per orbit
+num_orbits      = height(T1);
+slots_per_orbit = 50;
 
 tf          = T1.("Period (TU) ");
 states      = T1.("state");
 times       = T1.("time");
 stabilities = T1.("Stability index  ");
 
-% shared cache folder for orbit slot database
 OrbitCacheDir = fullfile(CatalogDir, "orbit_cache");
 if ~exist(OrbitCacheDir,'dir'), mkdir(OrbitCacheDir); end
 
@@ -119,41 +124,33 @@ if rebuildOrbitDb
     end
 end
 
-% ---------------- Run directory / artifacts ----------------
+% ---------------- Run directory / outputs ----------------
 runDirEnv = getenv("RUN_DIR");
+RunDir = "";
+
 if ~isempty(runDirEnv)
     if ~exist(runDirEnv,'dir')
         mkdir(runDirEnv);
     end
     cd(runDirEnv);
+    RunDir = pwd;
 end
 
-RunDir = pwd;
-
-% Shared transfer truth cache folder
-TransferCacheDir = fullfile(RunDir, "transfer_cache");
-if ~exist(TransferCacheDir,'dir'), mkdir(TransferCacheDir); end
-
 % ---------------- Visibility parameters ----------------
-sun_min_deg  = 20;   % Sun exclusion angle (deg)
-moon_min_deg = 10;   % Moon exclusion angle (deg)
+sun_min_deg  = 20;
+moon_min_deg = 10;
 
 sun_min  = deg2rad(sun_min_deg);
 moon_min = deg2rad(moon_min_deg);
 
-theta0 = 0;             % initial phase angle (rad)
-i_sun  = deg2rad(0);    % keep planar for now
+theta0 = 0;
+i_sun  = deg2rad(0);
 
 sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, theta0, i_sun);
 
-% choose whether or not to include occlusion/exclusion
 useScreening = true;
-
-% struct to include or exclude cost components
 costFlags = struct('J1', true, 'J2', true, 'J3', true);
 
-% if using powershell script, turn screening on or off and cost components
-% on or off
 v = getenv("USE_SCREENING");
 if ~isempty(v), useScreening = (str2double(v) ~= 0); end
 
@@ -172,9 +169,8 @@ function append_log(data)
     assignin('base', 'OptimizationLog', logCell);
 end
 
-% set flag for single or multi-objective
 opt_flag          = 'SOO';
-const_stabilities = parallel.pool.Constant(stabilities);
+const_stabilities = parallel.pool.Constant(stabilities); 
 const_orbit_db    = parallel.pool.Constant(orbit_database); 
 
 % ---------------- Mission type ----------------
@@ -189,7 +185,6 @@ end
 missionCfg = struct();
 missionCfg.type = upper(string(MISSION_TYPE));
 
-% set observer count once here; all optimizers use it
 missionCfg.optimization.numObservers = 3;
 v = getenv("NUM_OBSERVERS");
 if ~isempty(v)
@@ -223,11 +218,9 @@ switch missionCfg.type
         missionCfg.transfer.solverMode    = "LOW_THRUST_CLASS";
 
         missionCfg.transfer.lowthrust.sigma            = 1.0;
-
         missionCfg.transfer.lowthrust.m0               = 1.0;
         missionCfg.transfer.lowthrust.Tmax             = 0.3672;
         missionCfg.transfer.lowthrust.ve               = 39.8;
-
         missionCfg.transfer.lowthrust.tf_guess         = 2.0;
         missionCfg.transfer.lowthrust.tf_lb            = 0.1;
         missionCfg.transfer.lowthrust.tf_ub            = 12.0;
@@ -258,18 +251,13 @@ end
 v = getenv("NPERIODS");
 if ~isempty(v)
     nper = str2double(v);
-
     if ~isnan(nper) && nper > 0
         nper = round(nper);
-
         switch missionCfg.type
             case "LUNAR_GATEWAY"
                 missionCfg.gateway.Nperiods = nper;
-
             case "PERIODIC_ORBIT"
                 missionCfg.periodic.Nperiods = nper;
-
-            % LOW_THRUST_TRANSFER typically doesn't use Nperiods
         end
     end
 end
@@ -277,49 +265,97 @@ end
 % ---------------- Run tag / logging / outputs ----------------
 vseed = getenv("SEED"); if isempty(vseed), vseed = "0"; end
 seedVal = str2double(vseed); if isnan(seedVal), seedVal = 0; end
+rng(seedVal, 'twister');
 
 RUN_TAG = sprintf('%s_scr%d_J%d%d%d_seed%03d', char(OPTIMIZER_MODE), ...
     double(useScreening), double(costFlags.J1), double(costFlags.J2), double(costFlags.J3), seedVal);
 
-% ---------------- Artifacts / cache folders ----------------
-ArtDir = fullfile(RunDir, "artifacts");
-if ~exist(ArtDir,'dir'), mkdir(ArtDir); end
+if strlength(string(RunDir)) == 0
+    ts = string(datetime('now','Format','yyyyMMdd_HHmmss'));
 
-RunArtDir = fullfile(ArtDir, "run_" + string(RUN_TAG), char(missionCfg.type));
-FigDir    = fullfile(RunArtDir, "figs");
-DataDir   = fullfile(RunArtDir, "data");
-LogDir    = fullfile(RunArtDir, "logs");
+    switch upper(string(missionCfg.type))
+        case "LOW_THRUST_TRANSFER"
+            missionCode = "lt";
+        case "LUNAR_GATEWAY"
+            missionCode = "lg";
+        case "PERIODIC_ORBIT"
+            missionCode = "po";
+        otherwise
+            missionCode = lower(string(missionCfg.type));
+    end
 
-if ~exist(RunArtDir,'dir'), mkdir(RunArtDir); end
-if ~exist(FigDir,'dir'),    mkdir(FigDir);    end
-if ~exist(DataDir,'dir'),   mkdir(DataDir);   end
-if ~exist(LogDir,'dir'),    mkdir(LogDir);    end
+    num_obs_local = missionCfg.optimization.numObservers;
 
-TransferCacheDir = fullfile(RunDir, "transfer_cache");
+    if missionCfg.type == "LUNAR_GATEWAY"
+        nper_local = missionCfg.gateway.Nperiods;
+        caseName = sprintf('run_%s_o%d_p%d', char(RUN_TAG), num_obs_local, nper_local);
+    elseif missionCfg.type == "PERIODIC_ORBIT"
+        nper_local = missionCfg.periodic.Nperiods;
+        caseName = sprintf('run_%s_o%d_p%d', char(RUN_TAG), num_obs_local, nper_local);
+    else
+        caseName = sprintf('run_%s_o%d', char(RUN_TAG), num_obs_local);
+    end
+
+    RunsRoot   = fullfile(thisDir, "runs");
+    BatchDir   = fullfile(RunsRoot, ts);
+    MissionDir = fullfile(BatchDir, missionCode);
+    RunDir     = fullfile(MissionDir, caseName);
+
+    if ~exist(RunsRoot,'dir'), mkdir(RunsRoot); end
+    if ~exist(BatchDir,'dir'), mkdir(BatchDir); end
+    if ~exist(MissionDir,'dir'), mkdir(MissionDir); end
+    if ~exist(RunDir,'dir'), mkdir(RunDir); end
+
+    cd(RunDir);
+end
+
+FigDir = fullfile(RunDir, "figs");
+DataDir = fullfile(RunDir, "data");
+LogDir = fullfile(RunDir, "logs");
+
+CacheDir = fullfile(RunDir, "cache");
+TransferCacheDir = fullfile(CacheDir, "tr");
+
+if ~exist(FigDir,'dir'), mkdir(FigDir); end
+if ~exist(DataDir,'dir'), mkdir(DataDir); end
+if ~exist(LogDir,'dir'), mkdir(LogDir); end
+if ~exist(CacheDir,'dir'), mkdir(CacheDir); end
 if ~exist(TransferCacheDir,'dir'), mkdir(TransferCacheDir); end
 
-EXCEL_FILE = fullfile(DataDir, "ExperimentSummary.xlsx");
+switch upper(string(missionCfg.type))
+    case "LOW_THRUST_TRANSFER"
+        missionCodeShort = "lt";
+    case "LUNAR_GATEWAY"
+        missionCodeShort = "lg";
+    case "PERIODIC_ORBIT"
+        missionCodeShort = "po";
+    otherwise
+        missionCodeShort = lower(string(missionCfg.type));
+end
 
-setenv('SAFE_FALLBACK_FILE', fullfile(LogDir, 'safe_output_fallback.txt'));
+FILE_TAG = sprintf('%s_%s_o%d', char(RUN_TAG), char(missionCodeShort), missionCfg.optimization.numObservers);
+
+% ---------------- Output / log files ----------------
+EXCEL_FILE = fullfile(DataDir, sprintf('ExperimentSummary_%s.xlsx', FILE_TAG));
+setenv('SAFE_FALLBACK_FILE', fullfile(LogDir, sprintf('safe_output_fallback_%s.txt', FILE_TAG)));
 
 try
-    diaryFile = fullfile(LogDir, "matlab_diary_" + string(datetime("now","Format","yyyyMMdd_HHmmss")) + ".txt");
+    diaryFile = fullfile(LogDir, sprintf('matlab_diary_%s.txt', FILE_TAG));
     diary(diaryFile);
     diary on
 catch
 end
 
 safe_printf('RUN START: %s\n', string(datetime('now')));
+safe_printf('Run directory: %s\n', string(RunDir));
 drawnow;
 
 % ---------------- EKF parameters ----------------
 if strcmp(MISSION_TYPE, "LOW_THRUST_TRANSFER")
-    % --- State Covariance ---
     pos_var  = (1 / LU)^2;
     vel_var  = (10 / (VU * 1000))^2;
     P_0 = diag([pos_var, pos_var, pos_var, vel_var, vel_var, vel_var]);
 
-    % --- Process and Measurement Noise Covariance ---
     q_pos = 6.25e-4;
     q_vel = 6.25e-4;
     r_ang = 1e-8;
@@ -327,17 +363,49 @@ if strcmp(MISSION_TYPE, "LOW_THRUST_TRANSFER")
     R_k = diag([r_ang r_ang]);
 
 elseif strcmp(MISSION_TYPE, "LUNAR_GATEWAY") || strcmp(MISSION_TYPE, "PERIODIC_ORBIT")
-    % --- State Covariance ---
     pos_var  = (1 / LU)^2;
     vel_var  = (10 / (VU * 1000))^2;
     P_0 = diag([pos_var, pos_var, pos_var, vel_var, vel_var, vel_var]);
 
-    % --- Process and Measurement Noise Covariance ---
     q_pos = 1e-8;
     q_vel = 1e-8;
     r_ang = 1e-8;
     Q_k = diag([q_pos q_pos q_pos q_vel q_vel q_vel]);
     R_k = diag([r_ang r_ang]);
+end
+
+% ---------------- Cost thresholds ----------------
+costCfg = struct();
+costCfg.weights = [1, 1, 0.1];
+
+switch upper(string(missionCfg.type))
+    case "LOW_THRUST_TRANSFER"
+        costCfg.pos_rmse_acc = 10 / LU;
+        costCfg.vel_rmse_acc = 0.01 / VU;
+        costCfg.sigma_pos_acc = 10 / LU;
+        costCfg.sigma_vel_acc = 0.01 / VU;
+        costCfg.stability_acc = 1.0;
+
+    case "LUNAR_GATEWAY"
+        costCfg.pos_rmse_acc = 0.1 / LU;
+        costCfg.vel_rmse_acc = 1.0e-4 / VU;
+        costCfg.sigma_pos_acc = 0.1 / LU;
+        costCfg.sigma_vel_acc = 1.0e-4 / VU;
+        costCfg.stability_acc = 1.0;
+
+    case "PERIODIC_ORBIT"
+        costCfg.pos_rmse_acc = 0.1 / LU;
+        costCfg.vel_rmse_acc = 1.0e-4 / VU;
+        costCfg.sigma_pos_acc = 0.1 / LU;
+        costCfg.sigma_vel_acc = 1.0e-4 / VU;
+        costCfg.stability_acc = 1.0;
+
+    otherwise
+        costCfg.pos_rmse_acc = 1 / LU;
+        costCfg.vel_rmse_acc = 1.0e-3 / VU;
+        costCfg.sigma_pos_acc = 1 / LU;
+        costCfg.sigma_vel_acc = 1.0e-3 / VU;
+        costCfg.stability_acc = 1.0;
 end
 
 % ---------------- Dynamic optimizer sizing ----------------
@@ -353,18 +421,37 @@ if contains(string(missionCfg.type), "TRANSFER") && useTransferCache
     cacheKey  = make_transfer_cache_key(missionCfg, slots_per_orbit);
     cacheFile = fullfile(TransferCacheDir, cacheKey + ".mat");
 
-    if isfile(cacheFile)
-        safe_printf('Loading cached transfer truth from:\n  %s\n', cacheFile);
-        C = load(cacheFile, 't_target', 's_target', 'truthInfo', 'cacheMeta');
-        t_target  = C.t_target;
-        s_target  = C.s_target;
-        truthInfo = C.truthInfo;
+    loadedFromCache = false;
 
-        if isfield(C, 'cacheMeta')
-            safe_printf('Cached transfer key: %s\n', string(C.cacheMeta.cacheKey));
+    if isfile(cacheFile)
+        try
+            safe_printf('Loading cached transfer truth from:\n  %s\n', cacheFile);
+
+            C = load(cacheFile, 't_target', 's_target', 'truthInfo', 'cacheMeta');
+            t_target  = C.t_target;
+            s_target  = C.s_target;
+            truthInfo = C.truthInfo;
+
+            if isfield(C, 'cacheMeta')
+                safe_printf('Cached transfer key: %s\n', string(C.cacheMeta.cacheKey));
+            end
+
+            loadedFromCache = true;
+
+        catch ME
+            safe_printf(2, 'WARNING: failed to load transfer cache, rebuilding: %s\n', ME.message);
+
+            try
+                delete(cacheFile);
+                safe_printf('Deleted corrupt transfer cache:\n  %s\n', cacheFile);
+            catch MEdel
+                safe_printf(2, 'WARNING: failed to delete corrupt transfer cache: %s\n', MEdel.message);
+            end
         end
-    else
-        safe_printf('No cached transfer found. Computing transfer truth...\n');
+    end
+
+    if ~loadedFromCache
+        safe_printf('No valid cached transfer found. Computing transfer truth.\n');
 
         [t_target, s_target, truthInfo] = build_target_truth( ...
             missionCfg, T1, orbit_database, times, states, mu, ode_opts);
@@ -376,20 +463,37 @@ if contains(string(missionCfg.type), "TRANSFER") && useTransferCache
         cacheMeta.slots_per_orbit = slots_per_orbit;
         cacheMeta.mu              = mu;
 
+        tmpFile = fullfile(TransferCacheDir, cacheKey + "_t.mat");
+
         try
-            save(cacheFile, 't_target', 's_target', 'truthInfo', 'cacheMeta', '-v7.3');
+            if isfile(tmpFile)
+                delete(tmpFile);
+            end
+
+            if isfile(cacheFile)
+                delete(cacheFile);
+            end
+
+            save(tmpFile, 't_target', 's_target', 'truthInfo', 'cacheMeta', '-v7.3');
+            movefile(tmpFile, cacheFile, 'f');
+
             safe_printf('Saved transfer truth cache to:\n  %s\n', cacheFile);
+
         catch ME
             safe_printf(2, 'WARNING: failed to save transfer cache: %s\n', ME.message);
+
+            try
+                if isfile(tmpFile)
+                    delete(tmpFile);
+                end
+            catch
+            end
         end
     end
 else
     [t_target, s_target, truthInfo] = build_target_truth( ...
         missionCfg, T1, orbit_database, times, states, mu, ode_opts);
 end
-
-safe_disp('--- Truth Info ---');
-safe_disp(truthInfo);
 
 % ---------------- EKF cadence ----------------
 EKF_DT = 0.01;
@@ -412,7 +516,7 @@ s_target_ekf = F_truth(t_target_ekf);
 
 % Objective Function Wrapper
 ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_target_ekf, t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
-    sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags);
+    sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags, costCfg);
 
 RunTimer = tic;
 
@@ -477,7 +581,7 @@ switch upper(OPTIMIZER_MODE)
         for i = 1:num_obs_cfg
             vars = [vars, ...
                 optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
-                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')]; %#ok<AGROW>
+                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')]; 
         end
 
         if isappdata(0, 'BAYES_EVAL_COUNTER'), rmappdata(0, 'BAYES_EVAL_COUNTER'); end
@@ -638,7 +742,6 @@ for k = 1:num_obs
     observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
 end
 
-% NEW: try to get per-step available observer counts from EKF if supported
 availableObsCount = [];
 try
     [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf(observer_ICs, s_target_ekf, t_target_ekf, ...
@@ -651,6 +754,15 @@ end
 safe_printf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
 
 availableObsCount = sanitize_obs_count_vector(availableObsCount, numel(t_target_ekf), num_obs);
+
+% ---------------- Dense EKF replot grid ----------------
+t_plot = t_truth(:);
+
+[t_unique_ekf, idx_u_ekf] = unique(t_target_ekf(:));
+s_ekf_unique = s_ekf(idx_u_ekf,:);
+
+F_ekf_plot = griddedInterpolant(t_unique_ekf, s_ekf_unique, 'spline');
+s_ekf_plot = F_ekf_plot(t_plot);
 
 % ---------------- Observer metadata ----------------
 familyColName = "orbitFamily";
@@ -684,7 +796,7 @@ view(ax, 32, 24);
 
 cEKF = 'red';
 
-hEKF = plot3(ax, s_ekf(:,1), s_ekf(:,2), s_ekf(:,3), '-', ...
+hEKF = plot3(ax, s_ekf_plot(:,1), s_ekf_plot(:,2), s_ekf_plot(:,3), '-', ...
     'LineWidth', 2.4, 'Color', cEKF);
 
 cmap = lines(max(1,num_obs));
@@ -721,11 +833,11 @@ if isTransferMission
     hArrOrb = plot3(ax, s_arr_orb(:,1), s_arr_orb(:,2), s_arr_orb(:,3), '-', ...
         'Color', arrLight, 'LineWidth', 1.5);
 
-    hStart = plot3(ax, s_target_ekf(1,1), s_target_ekf(1,2), s_target_ekf(1,3), 'o', ...
+    hStart = plot3(ax, s_truth(1,1), s_truth(1,2), s_truth(1,3), 'o', ...
         'MarkerSize', 9, 'MarkerFaceColor', depBase, ...
         'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
 
-    hEnd = plot3(ax, s_target_ekf(end,1), s_target_ekf(end,2), s_target_ekf(end,3), 's', ...
+    hEnd = plot3(ax, s_truth(end,1), s_truth(end,2), s_truth(end,3), 's', ...
         'MarkerSize', 9, 'MarkerFaceColor', arrBase, ...
         'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
 
@@ -772,7 +884,7 @@ for k = 1:num_obs
         'MarkerSize',8, 'MarkerFaceColor', cmap(k,:), 'MarkerEdgeColor','k');
 end
 
-plot3(ax, s_target_ekf(1,1), s_target_ekf(1,2), s_target_ekf(1,3), 'o', ...
+plot3(ax, s_truth(1,1), s_truth(1,2), s_truth(1,3), 'o', ...
     'MarkerSize',8, 'MarkerFaceColor', 'red', 'MarkerEdgeColor','k');
 
 xlabel(ax,'x (LU)');
@@ -852,8 +964,8 @@ ax.Position = [pad pad 1-2*pad 1-2*pad];
 ax.LooseInset = ax.TightInset + [0.02 0.02 0.02 0.02];
 axis(ax,'vis3d');
 
-exportgraphics(fig, fullfile(FigDir,'fig_traj3d.pdf'), 'ContentType','image');
-savefig(fig, fullfile(FigDir,'fig_traj3d.fig'));
+exportgraphics(fig, fullfile(FigDir, sprintf('fig_traj3d_%s.pdf', FILE_TAG)), 'ContentType','image');
+savefig(fig, fullfile(FigDir, sprintf('fig_traj3d_%s.fig', FILE_TAG)));
 
 % ---------------- 3-sigma plots ----------------
 Nf = size(cov,1);
@@ -863,12 +975,14 @@ for k = 1:Nf
     sig(k,:) = sqrt(max(diag(Pk),0));
 end
 sig3 = 3*sig;
+
 t = t_target_ekf(:);
 err = s_ekf(:,1:6) - s_target_ekf(:,1:6);
 err_pos_km   = err(:,1:3) * LU;
 err_vel_kms  = err(:,4:6) * VU;
 sig3_pos_km  = sig3(:,1:3) * LU;
 sig3_vel_kms = sig3(:,4:6) * VU;
+
 cBound = [0.85 0.10 0.10];
 cErr   = [0.00 0.45 0.74];
 
@@ -887,16 +1001,16 @@ plotSigFig = @(fName, xData, errData, sigData, yLbl) ...
     create_sig_fig(fName, xData, errData, sigData, yLbl, figW, figH, ...
                    cBound, cErr, FigDir, availableObsCount, num_obs);
 
-plotSigFig('fig_3sig_x.pdf',  t, err_pos_km(:,1),  sig3_pos_km(:,1),  'e_x (km)');
-plotSigFig('fig_3sig_y.pdf',  t, err_pos_km(:,2),  sig3_pos_km(:,2),  'e_y (km)');
-plotSigFig('fig_3sig_z.pdf',  t, err_pos_km(:,3),  sig3_pos_km(:,3),  'e_z (km)');
-plotSigFig('fig_3sig_vx.pdf', t, err_vel_kms(:,1), sig3_vel_kms(:,1), 'e_{v_x} (km/s)');
-plotSigFig('fig_3sig_vy.pdf', t, err_vel_kms(:,2), sig3_vel_kms(:,2), 'e_{v_y} (km/s)');
-plotSigFig('fig_3sig_vz.pdf', t, err_vel_kms(:,3), sig3_vel_kms(:,3), 'e_{v_z} (km/s)');
+plotSigFig(sprintf('fig_3sig_x_%s.pdf',  FILE_TAG), t, err_pos_km(:,1),  sig3_pos_km(:,1),  'e_x (km)');
+plotSigFig(sprintf('fig_3sig_y_%s.pdf',  FILE_TAG), t, err_pos_km(:,2),  sig3_pos_km(:,2),  'e_y (km)');
+plotSigFig(sprintf('fig_3sig_z_%s.pdf',  FILE_TAG), t, err_pos_km(:,3),  sig3_pos_km(:,3),  'e_z (km)');
+plotSigFig(sprintf('fig_3sig_vx_%s.pdf', FILE_TAG), t, err_vel_kms(:,1), sig3_vel_kms(:,1), 'e_{v_x} (km/s)');
+plotSigFig(sprintf('fig_3sig_vy_%s.pdf', FILE_TAG), t, err_vel_kms(:,2), sig3_vel_kms(:,2), 'e_{v_y} (km/s)');
+plotSigFig(sprintf('fig_3sig_vz_%s.pdf', FILE_TAG), t, err_vel_kms(:,3), sig3_vel_kms(:,3), 'e_{v_z} (km/s)');
 
 gridFigW = 12;
 gridFigH = 6.8;
-create_sig_fig_grid('fig_3sig_grid.pdf', t, err_all, sig3_all, yLbls, ...
+create_sig_fig_grid(sprintf('fig_3sig_grid_%s.pdf', FILE_TAG), t, err_all, sig3_all, yLbls, ...
     gridFigW, gridFigH, cBound, cErr, FigDir, availableObsCount, num_obs);
 
 % ---------------- EKF performance print statements ----------------
@@ -914,10 +1028,13 @@ for k = 1:Nf
 end
 detPpos_km6 = detPpos * (LU^6);
 
+mean_stability = mean(stabilities(orbit_indices));
+
 safe_printf('\n--- EKF PERFORMANCE ---\n');
 safe_printf('RMSE position (km):     %.6e\n', rmse_pos_km);
 safe_printf('RMSE velocity (km/s):   %.6e\n', rmse_vel_kms);
 safe_printf('Mean det(P_pos) (km^6): %.6e\n', mean(detPpos_km6));
+safe_printf('Mean stability:         %.6e\n', mean_stability);
 
 % ---------------- One Excel file ----------------
 try
@@ -931,12 +1048,12 @@ try
         string(RUN_TAG), string(OPTIMIZER_MODE), seedVal, ...
         logical(useScreening), logical(costFlags.J1), logical(costFlags.J2), logical(costFlags.J3), ...
         MAX_ITERS, MAX_EVALS, TotalRuntime, screeningCount_final, ...
-        rmse_pos_km, rmse_vel_kms, mean(detPpos_km6), minCostVal, ...
+        rmse_pos_km, rmse_vel_kms, mean(detPpos_km6), mean_stability, minCostVal, ...
         'VariableNames', { ...
             'run_tag','optimizer','seed', ...
             'use_screening','use_J1','use_J2','use_J3', ...
             'max_iters','max_evals','runtime_s','screeningCount_final', ...
-            'rmse_pos_km','rmse_vel_kms','mean_detPpos_km6','min_cost' ...
+            'rmse_pos_km','rmse_vel_kms','mean_detPpos_km6','mean_stability','min_cost' ...
         });
 
     if isfile(EXCEL_FILE)
@@ -968,7 +1085,7 @@ try
     writetable(obsTbl, EXCEL_FILE, 'Sheet', char(obsSheet));
 
 catch ME
-    safe_printf(2,"WARNING: failed to write ExperimentSummary.xlsx: %s\n", ME.message);
+    safe_printf(2,"WARNING: failed to write ExperimentSummary file: %s\n", ME.message);
 end
 
 try
@@ -981,51 +1098,52 @@ function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
     tr = missionCfg.transfer;
     solverMode = upper(string(tr.solverMode));
 
-    parts = strings(0,1);
-    parts(end+1) = "type_" + string(missionCfg.type);
-    parts(end+1) = "solver_" + solverMode;
-    parts(end+1) = "depOrb_" + string(tr.depOrbitIndex);
-    parts(end+1) = "arrOrb_" + string(tr.arrOrbitIndex);
-    parts(end+1) = "dt_" + local_num_str(tr.dt);
-    parts(end+1) = "slots_" + string(slots_per_orbit);
-
-    if isfield(tr,'depSlot') && ~isempty(tr.depSlot)
-        parts(end+1) = "depSlot_" + string(tr.depSlot);
-    end
+    depOrb = get_field_or_default(tr, 'depOrbitIndex', 0);
+    arrOrb = get_field_or_default(tr, 'arrOrbitIndex', 0);
+    depSlot = get_field_or_default(tr, 'depSlot', 0);
+    arrSlot = get_field_or_default(tr, 'arrSlot', 0);
+    dtVal = get_field_or_default(tr, 'dt', 0);
 
     switch solverMode
         case "LOW_THRUST_CLASS"
-            p = tr.lowthrust;
-            parts(end+1) = "m0_"    + local_num_str(p.m0);
-            parts(end+1) = "Tmax_"  + local_num_str(p.Tmax);
-            parts(end+1) = "ve_"    + local_num_str(p.ve);
-            parts(end+1) = "sigma_" + local_num_str(p.sigma);
-            parts(end+1) = "tfg_"   + local_num_str(p.tf_guess);
+            lt = tr.lowthrust;
 
-            if isfield(tr,'arrSlot') && ~isempty(tr.arrSlot)
-                parts(end+1) = "arrSlot_" + string(tr.arrSlot);
-            end
+            cacheKey = sprintf('lt_d%d_a%d_ds%d_as%d_dt%s_sl%d_tf%s', ...
+                depOrb, ...
+                arrOrb, ...
+                depSlot, ...
+                arrSlot, ...
+                local_num_str(dtVal), ...
+                slots_per_orbit, ...
+                local_num_str(get_field_or_default(lt, 'tf_guess', 0)));
+
+        otherwise
+            cacheKey = sprintf('tr_d%d_a%d_ds%d_as%d_dt%s_sl%d', ...
+                depOrb, arrOrb, depSlot, arrSlot, local_num_str(dtVal), slots_per_orbit);
     end
 
-    rawKey = strjoin(parts, "__");
-    rawKey = replace(rawKey, ".", "p");
-    rawKey = replace(rawKey, "-", "m");
-    rawKey = replace(rawKey, "+", "");
-    rawKey = replace(rawKey, " ", "");
-    rawKey = regexprep(rawKey, '[^a-zA-Z0-9_]', '_');
+    cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_');
+end
 
-    if strlength(rawKey) > 180
-        cacheKey = extractBefore(rawKey, 181);
+function v = get_field_or_default(s, fieldName, defaultVal)
+    if isfield(s, fieldName) && ~isempty(s.(fieldName))
+        v = s.(fieldName);
     else
-        cacheKey = rawKey;
+        v = defaultVal;
     end
 end
 
 function s = local_num_str(x)
-    s = string(sprintf('%.12g', x));
+    if isempty(x) || ~isfinite(x)
+        s = "0";
+        return;
+    end
+    s = string(x);
+    s = replace(s, ".", "p");
+    s = replace(s, "-", "m");
 end
 
-function s = local_vec_str(v)
+function s = local_vec_str(v) 
     v = v(:).';
     c = strings(1, numel(v));
     for i = 1:numel(v)
@@ -1050,14 +1168,24 @@ function obsCount = sanitize_obs_count_vector(obsCount, N, num_obs)
     obsCount = max(0, min(num_obs, obsCount));
 end
 
-function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obsCount, maxObs)
+function cmap = make_obscount_cmap(maxObs)
+    maxObs = max(0, round(maxObs));
+    nBands = maxObs + 1;
 
-    % ---------- full-scale figure ----------
+    if nBands == 1
+        grayVals = 1.0;
+    else
+        grayVals = linspace(0.40, 1.00, nBands).';
+    end
+
+    cmap = [grayVals grayVals grayVals];
+end
+
+function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obsCount, maxObs)
     make_one_sig_fig( ...
         fullfile(outDir, fName), ...
         t, err, sig3, yLbl, w, h, cBnd, cErr, obsCount, maxObs, false);
 
-    % ---------- zoomed figure ----------
     [~, base, ext] = fileparts(fName);
     fNameZoom = fullfile(outDir, base + "_zoom" + ext);
 
@@ -1067,7 +1195,6 @@ function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obs
 end
 
 function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCount, maxObs, doZoom)
-
     f = figure('Color','w','Units','inches','Position',[1 1 w h], ...
                'PaperUnits','inches','PaperPosition',[0 0 w h]);
     ax = axes(f);
@@ -1075,9 +1202,7 @@ function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCou
     box(ax,'on');
     set(ax,'TickLabelInterpreter','tex', 'Layer','top');
 
-    % --- determine y-limits first ---
     yMax = max(abs([err(:); sig3(:)]));
-
     if doZoom
         vals = abs([err(:); sig3(:)]);
         vals = vals(isfinite(vals));
@@ -1092,27 +1217,18 @@ function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCou
     yPad = 0.08 * yMax;
     yLims = [-yMax-yPad, yMax+yPad];
 
-    % --- grayscale background showing available observers ---
     if ~isempty(obsCount) && ~all(isnan(obsCount))
         obsCount = obsCount(:).';
-        bg = repmat(obsCount, 2, 1);   % 2 rows so it fills the axes vertically
+        bg = repmat(obsCount, 2, 1);
 
         imagesc(ax, t(:).', yLims, bg);
         set(ax, 'YDir', 'normal');
 
-        cmap = [
-            0.40 0.40 0.40   % 0 observers (dark gray)
-            0.60 0.60 0.60   % 1 observer
-            0.80 0.80 0.80   % 2 observers
-            1.00 1.00 1.00   % 3 observers (white)
-        ];
-
-        cmap = cmap(1:maxObs+1,:);  % in case maxObs < 3
+        cmap = make_obscount_cmap(maxObs);
         colormap(ax, cmap);
-        clim(ax, [-0.5 maxObs+0.5]);
+        clim(ax, [-0.5, maxObs + 0.5]);
     end
 
-    % --- main curves on top ---
     hB = plot(ax, t,  sig3, '-', 'Color', cBnd);
          plot(ax, t, -sig3, '-', 'Color', cBnd);
     hE = plot(ax, t,  err,  '-', 'Color', cErr);
@@ -1122,13 +1238,11 @@ function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCou
     xlim(ax, [t(1) t(end)]);
     ylim(ax, yLims);
 
-    % --- legend ---
     lgd = legend(ax, [hE, hB], {'EKF error', '\pm 3\sigma bound'}, ...
         'Location', 'northeast');
     lgd.Box = 'on';
     lgd.ItemTokenSize = [18 12];
 
-    % --- colorbar legend ---
     if ~isempty(obsCount) && ~all(isnan(obsCount))
         cb = colorbar(ax);
         cb.Location = 'eastoutside';
@@ -1137,11 +1251,9 @@ function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCou
         cb.TickLabels = string(0:maxObs);
         cb.TickDirection = 'out';
 
-        % ---- lock axes size ----
         ax.Units = 'normalized';
         ax.Position = [0.12 0.14 0.68 0.80];
 
-        % ---- move colorbar further right ----
         cb.Units = 'normalized';
         cb.Position = [0.84 0.14 0.03 0.80];
         pos = cb.Position;
@@ -1149,20 +1261,16 @@ function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCou
         cb.Position = pos;
     end
 
-    % --- save figures ---
     exportgraphics(f, savePath, 'ContentType','image');
     savefig(f, replace(savePath, '.pdf', '.fig'));
     close(f);
 end
 
 function create_sig_fig_grid(fName, t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, outDir, obsCount, maxObs)
-
-    % ---------- full-scale figure ----------
     make_one_sig_grid_fig( ...
         fullfile(outDir, fName), ...
         t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, obsCount, maxObs, false);
 
-    % ---------- zoomed figure ----------
     [~, base, ext] = fileparts(fName);
     fNameZoom = fullfile(outDir, base + "_zoom" + ext);
 
@@ -1172,7 +1280,6 @@ function create_sig_fig_grid(fName, t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr,
 end
 
 function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, obsCount, maxObs, doZoom)
-
     f = figure('Color','w','Units','inches','Position',[1 1 w h], ...
                'PaperUnits','inches','PaperPosition',[0 0 w h]);
 
@@ -1191,9 +1298,7 @@ function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, 
         err  = errMat(:,i);
         sig3 = sig3Mat(:,i);
 
-        % --- determine y-limits first ---
         yMax = max(abs([err(:); sig3(:)]));
-
         if doZoom
             vals = abs([err(:); sig3(:)]);
             vals = vals(isfinite(vals));
@@ -1208,27 +1313,18 @@ function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, 
         yPad = 0.08 * yMax;
         yLims = [-yMax-yPad, yMax+yPad];
 
-        % --- grayscale background showing available observers ---
         if ~isempty(obsCount) && ~all(isnan(obsCount))
             obsCountRow = obsCount(:).';
-            bg = repmat(obsCountRow, 2, 1);   % 2 rows so it fills the axes vertically
+            bg = repmat(obsCountRow, 2, 1);
 
             imagesc(ax(i), t(:).', yLims, bg);
             set(ax(i), 'YDir', 'normal');
 
-            cmap = [
-                0.40 0.40 0.40   % 0 observers (dark gray)
-                0.60 0.60 0.60   % 1 observer
-                0.80 0.80 0.80   % 2 observers
-                1.00 1.00 1.00   % 3 observers (white)
-            ];
-
-            cmap = cmap(1:maxObs+1,:);  % in case maxObs < 3
+            cmap = make_obscount_cmap(maxObs);
             colormap(ax(i), cmap);
-            clim(ax(i), [-0.5 maxObs+0.5]);
+            clim(ax(i), [-0.5, maxObs + 0.5]);
         end
 
-        % --- main curves on top ---
         hB(i) = plot(ax(i), t,  sig3, '-', 'Color', cBnd);
                   plot(ax(i), t, -sig3, '-', 'Color', cBnd);
         hE(i) = plot(ax(i), t,  err,  '-', 'Color', cErr);
@@ -1242,13 +1338,11 @@ function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, 
         end
     end
 
-    % --- legend ---
     lgd = legend(ax(1), [hE(1), hB(1)], {'EKF error', '\pm 3\sigma bound'}, ...
         'Location', 'northeast');
     lgd.Box = 'on';
     lgd.ItemTokenSize = [18 12];
 
-    % --- colorbar legend ---
     if ~isempty(obsCount) && ~all(isnan(obsCount))
         cb = colorbar(ax(6));
         cb.Label.String = 'Available observers';
@@ -1256,17 +1350,14 @@ function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, 
         cb.TickLabels = string(0:maxObs);
         cb.TickDirection = 'out';
 
-        % try tiledlayout placement first
         try
             cb.Layout.Tile = 'east';
         catch
-            % fallback for older MATLAB versions
             cb.Units = 'normalized';
             cb.Position = [0.92 0.14 0.02 0.76];
         end
     end
 
-    % --- save figures ---
     exportgraphics(f, savePath, 'ContentType','image');
     savefig(f, replace(savePath, '.pdf', '.fig'));
     close(f);
@@ -1298,7 +1389,6 @@ function safe_printf(varargin)
             msg = sprintf(varargin{:});
         end
 
-        % print to MATLAB command window / batch stdout when available
         try
             fprintf(fid, '%s', msg);
             if isempty(msg) || msg(end) ~= newline
@@ -1307,7 +1397,6 @@ function safe_printf(varargin)
         catch
         end
 
-        % always write fallback file for GUI monitoring
         append_fallback_output(msg);
     catch
     end

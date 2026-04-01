@@ -24,3 +24,7 @@ results_*.mat
 /orbit_cache/
 
 /transfer_cache/
+
+/runs/
+
+/safe_output_fallback.txt
