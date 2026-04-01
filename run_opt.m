@@ -309,17 +309,15 @@ if strlength(string(RunDir)) == 0
     cd(RunDir);
 end
 
-FigDir = fullfile(RunDir, "figs");
+FigDir  = fullfile(RunDir, "figs");
 DataDir = fullfile(RunDir, "data");
-LogDir = fullfile(RunDir, "logs");
+LogDir  = fullfile(RunDir, "logs");
 
-CacheDir = fullfile(RunDir, "cache");
-TransferCacheDir = fullfile(CacheDir, "tr");
+TransferCacheDir = fullfile(CatalogDir, "transfer_cache");
 
 if ~exist(FigDir,'dir'), mkdir(FigDir); end
 if ~exist(DataDir,'dir'), mkdir(DataDir); end
 if ~exist(LogDir,'dir'), mkdir(LogDir); end
-if ~exist(CacheDir,'dir'), mkdir(CacheDir); end
 if ~exist(TransferCacheDir,'dir'), mkdir(TransferCacheDir); end
 
 switch upper(string(missionCfg.type))
