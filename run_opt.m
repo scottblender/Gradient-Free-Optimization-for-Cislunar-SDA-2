@@ -40,7 +40,7 @@ end
 OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 10;
+MAX_ITERS = 600;
 v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
 
 MAX_EVALS = 100;
@@ -378,17 +378,17 @@ costCfg.weights = [1, 1, 0.1];
 
 switch upper(string(missionCfg.type))
     case "LOW_THRUST_TRANSFER"
-        costCfg.pos_rmse_acc = 10 / LU;
-        costCfg.vel_rmse_acc = 0.01 / VU;
-        costCfg.sigma_pos_acc = 10 / LU;
-        costCfg.sigma_vel_acc = 0.01 / VU;
+        costCfg.pos_rmse_acc = 100 / LU;
+        costCfg.vel_rmse_acc = 0.1 / VU;
+        costCfg.sigma_pos_acc = 100 / LU;
+        costCfg.sigma_vel_acc = 0.1 / VU;
         costCfg.stability_acc = 1.0;
 
     case "LUNAR_GATEWAY"
-        costCfg.pos_rmse_acc = 0.1 / LU;
-        costCfg.vel_rmse_acc = 1.0e-4 / VU;
-        costCfg.sigma_pos_acc = 0.1 / LU;
-        costCfg.sigma_vel_acc = 1.0e-4 / VU;
+        costCfg.pos_rmse_acc = 1 / LU;
+        costCfg.vel_rmse_acc = 1.0e-3 / VU;
+        costCfg.sigma_pos_acc = 1 / LU;
+        costCfg.sigma_vel_acc = 1.0e-3 / VU;
         costCfg.stability_acc = 1.0;
 
     case "PERIODIC_ORBIT"
