@@ -26,8 +26,8 @@ catalogPath = fullfile(thisDir, 'JPL_CR3BP_OrbitCatalog.mat');
 S = load(catalogPath);
 CatalogDir = thisDir;
 T1 = S.T;
-t_lg = S.t_lg; 
-s_lg = S.s_lg; 
+t_lg = S.t_lg;
+s_lg = S.s_lg;
 
 % ---------------- Optimizer inputs ----------------
 % Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
@@ -40,7 +40,7 @@ end
 OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 600;
+MAX_ITERS = 10;
 v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
 
 MAX_EVALS = 100;
@@ -55,8 +55,8 @@ VU = LU / TU;    % km/s
 ode_opts = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
 
 % ---------------- Lunar Gateway ICs ----------------
-s_lg_ic     = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]'; 
-tspan_lg_ic = [0, 1.51110546287394]; 
+s_lg_ic     = [1.02202108343387, 0, -0.182096487798513, 0, -0.103255420206012, 0]';
+tspan_lg_ic = [0, 1.51110546287394];
 
 % ---------------- Catalog / orbit database ----------------
 num_orbits      = height(T1);
@@ -158,7 +158,29 @@ vj1 = getenv("USE_J1"); if ~isempty(vj1), costFlags.J1 = (str2double(vj1) ~= 0);
 vj2 = getenv("USE_J2"); if ~isempty(vj2), costFlags.J2 = (str2double(vj2) ~= 0); end
 vj3 = getenv("USE_J3"); if ~isempty(vj3), costFlags.J3 = (str2double(vj3) ~= 0); end
 
-% set up data logging (in-memory only)
+% ---------------- Measurement model ----------------
+measCfg = struct();
+measCfg.type = "ANGLES_ONLY";
+
+v = getenv("MEAS_MODEL");
+if ~isempty(v)
+    measCfg.type = upper(string(v));
+end
+
+if measCfg.type ~= "ANGLES_ONLY" && measCfg.type ~= "ANGLES_RANGE"
+    error("Unknown MEAS_MODEL: %s", measCfg.type);
+end
+
+switch measCfg.type
+    case "ANGLES_ONLY"
+        measCode = "AO";
+    case "ANGLES_RANGE"
+        measCode = "AR";
+    otherwise
+        measCode = "UNK";
+end
+
+% ---------------- Data logging ----------------
 dq = parallel.pool.DataQueue;
 assignin('base', 'OptimizationLog', {});
 afterEach(dq, @(data) append_log(data));
@@ -170,8 +192,8 @@ function append_log(data)
 end
 
 opt_flag          = 'SOO';
-const_stabilities = parallel.pool.Constant(stabilities); 
-const_orbit_db    = parallel.pool.Constant(orbit_database); 
+const_stabilities = parallel.pool.Constant(stabilities);
+const_orbit_db    = parallel.pool.Constant(orbit_database);
 
 % ---------------- Mission type ----------------
 MISSION_TYPE = "LOW_THRUST_TRANSFER";
@@ -247,7 +269,7 @@ switch missionCfg.type
         error("Unknown MISSION_TYPE: %s", missionCfg.type);
 end
 
-% --- override number of periods from environment ---
+% ---------------- Override number of periods ----------------
 v = getenv("NPERIODS");
 if ~isempty(v)
     nper = str2double(v);
@@ -263,12 +285,16 @@ if ~isempty(v)
 end
 
 % ---------------- Run tag / logging / outputs ----------------
-vseed = getenv("SEED"); if isempty(vseed), vseed = "0"; end
-seedVal = str2double(vseed); if isnan(seedVal), seedVal = 0; end
+vseed = getenv("SEED");
+if isempty(vseed), vseed = "0"; end
+
+seedVal = str2double(vseed);
+if isnan(seedVal), seedVal = 0; end
 rng(seedVal, 'twister');
 
-RUN_TAG = sprintf('%s_scr%d_J%d%d%d_seed%03d', char(OPTIMIZER_MODE), ...
-    double(useScreening), double(costFlags.J1), double(costFlags.J2), double(costFlags.J3), seedVal);
+RUN_TAG = sprintf('%s_scr%d_%s_J%d%d%d_seed%03d', char(OPTIMIZER_MODE), ...
+    double(useScreening), char(measCode), ...
+    double(costFlags.J1), double(costFlags.J2), double(costFlags.J3), seedVal);
 
 if strlength(string(RunDir)) == 0
     ts = string(datetime('now','Format','yyyyMMdd_HHmmss'));
@@ -356,9 +382,17 @@ if strcmp(MISSION_TYPE, "LOW_THRUST_TRANSFER")
 
     q_pos = 6.25e-4;
     q_vel = 6.25e-4;
-    r_ang = 1e-8;
     Q_k = diag([q_pos q_pos q_pos q_vel q_vel q_vel]);
-    R_k = diag([r_ang r_ang]);
+
+    r_ang   = 1e-8;
+    r_range = (10 / LU)^2;
+
+    switch measCfg.type
+        case "ANGLES_ONLY"
+            R_k = diag([r_ang r_ang]);
+        case "ANGLES_RANGE"
+            R_k = diag([r_ang r_ang r_range]);
+    end
 
 elseif strcmp(MISSION_TYPE, "LUNAR_GATEWAY") || strcmp(MISSION_TYPE, "PERIODIC_ORBIT")
     pos_var  = (1 / LU)^2;
@@ -367,9 +401,17 @@ elseif strcmp(MISSION_TYPE, "LUNAR_GATEWAY") || strcmp(MISSION_TYPE, "PERIODIC_O
 
     q_pos = 1e-8;
     q_vel = 1e-8;
-    r_ang = 1e-8;
     Q_k = diag([q_pos q_pos q_pos q_vel q_vel q_vel]);
-    R_k = diag([r_ang r_ang]);
+
+    r_ang   = 1e-8;
+    r_range = (1 / LU)^2;
+
+    switch measCfg.type
+        case "ANGLES_ONLY"
+            R_k = diag([r_ang r_ang]);
+        case "ANGLES_RANGE"
+            R_k = diag([r_ang r_ang r_range]);
+    end
 end
 
 % ---------------- Cost thresholds ----------------
@@ -512,9 +554,10 @@ s_unique_truth = s_truth(idx_u_truth, :);
 F_truth = griddedInterpolant(t_unique_truth, s_unique_truth, 'spline');
 s_target_ekf = F_truth(t_target_ekf);
 
-% Objective Function Wrapper
-ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_target_ekf, t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
-    sunFcn, sun_min, moon_min, opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags, costCfg);
+% ---------------- Objective function wrapper ----------------
+ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_target_ekf, ...
+    t_target_ekf, P_0, Q_k, R_k, mu, LU, sunFcn, sun_min, moon_min, ...
+    opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags, costCfg, measCfg);
 
 RunTimer = tic;
 
@@ -579,7 +622,7 @@ switch upper(OPTIMIZER_MODE)
         for i = 1:num_obs_cfg
             vars = [vars, ...
                 optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
-                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')]; 
+                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')];
         end
 
         if isappdata(0, 'BAYES_EVAL_COUNTER'), rmappdata(0, 'BAYES_EVAL_COUNTER'); end
@@ -658,18 +701,18 @@ switch upper(OPTIMIZER_MODE)
         LB = LB_common;
         UB = UB_common;
 
-        aco_opts.nAnts                = 60;
-        aco_opts.MaxIters             = MAX_ITERS;
-        aco_opts.alpha                = 1.0;
-        aco_opts.beta                 = 1.0;
-        aco_opts.rho                  = 0.2;
-        aco_opts.Q                    = 1.0;
-        aco_opts.UseParallel          = true;
-        aco_opts.TauMin               = 1e-12;
-        aco_opts.UseIterBestDeposit   = true;
-        aco_opts.IterBestWeight       = 1.0;
-        aco_opts.StallIters           = inf;
-        aco_opts.Logger               = @safe_printf;
+        aco_opts.nAnts              = 60;
+        aco_opts.MaxIters           = MAX_ITERS;
+        aco_opts.alpha              = 1.0;
+        aco_opts.beta               = 1.0;
+        aco_opts.rho                = 0.2;
+        aco_opts.Q                  = 1.0;
+        aco_opts.UseParallel        = true;
+        aco_opts.TauMin             = 1e-12;
+        aco_opts.UseIterBestDeposit = true;
+        aco_opts.IterBestWeight     = 1.0;
+        aco_opts.StallIters         = inf;
+        aco_opts.Logger             = @safe_printf;
 
         [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
 
@@ -742,11 +785,13 @@ end
 
 availableObsCount = [];
 try
-    [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf(observer_ICs, s_target_ekf, t_target_ekf, ...
-        P_0, Q_k, R_k, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+    [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf( ...
+        observer_ICs, s_target_ekf, t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
+        sunFcn, sun_min, moon_min, useScreening, measCfg);
 catch
-    [s_ekf, cov, screeningCount_final] = cr3bp_ekf(observer_ICs, s_target_ekf, t_target_ekf, ...
-        P_0, Q_k, R_k, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+    [s_ekf, cov, screeningCount_final] = cr3bp_ekf( ...
+        observer_ICs, s_target_ekf, t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
+        sunFcn, sun_min, moon_min, useScreening, measCfg);
 end
 
 safe_printf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
@@ -1043,12 +1088,12 @@ try
     end
 
     summaryRow = table( ...
-        string(RUN_TAG), string(OPTIMIZER_MODE), seedVal, ...
+        string(RUN_TAG), string(OPTIMIZER_MODE), string(measCfg.type), seedVal, ...
         logical(useScreening), logical(costFlags.J1), logical(costFlags.J2), logical(costFlags.J3), ...
         MAX_ITERS, MAX_EVALS, TotalRuntime, screeningCount_final, ...
         rmse_pos_km, rmse_vel_kms, mean(detPpos_km6), mean_stability, minCostVal, ...
         'VariableNames', { ...
-            'run_tag','optimizer','seed', ...
+            'run_tag','optimizer','measurement_model','seed', ...
             'use_screening','use_J1','use_J2','use_J3', ...
             'max_iters','max_evals','runtime_s','screeningCount_final', ...
             'rmse_pos_km','rmse_vel_kms','mean_detPpos_km6','mean_stability','min_cost' ...
@@ -1091,16 +1136,16 @@ try
 catch
 end
 
-% ---------------- Helper Functions ----------------
+% ---------------- Helper functions ----------------
 function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
     tr = missionCfg.transfer;
     solverMode = upper(string(tr.solverMode));
 
-    depOrb = get_field_or_default(tr, 'depOrbitIndex', 0);
-    arrOrb = get_field_or_default(tr, 'arrOrbitIndex', 0);
+    depOrb  = get_field_or_default(tr, 'depOrbitIndex', 0);
+    arrOrb  = get_field_or_default(tr, 'arrOrbitIndex', 0);
     depSlot = get_field_or_default(tr, 'depSlot', 0);
     arrSlot = get_field_or_default(tr, 'arrSlot', 0);
-    dtVal = get_field_or_default(tr, 'dt', 0);
+    dtVal   = get_field_or_default(tr, 'dt', 0);
 
     switch solverMode
         case "LOW_THRUST_CLASS"
@@ -1141,7 +1186,7 @@ function s = local_num_str(x)
     s = replace(s, "-", "m");
 end
 
-function s = local_vec_str(v) 
+function s = local_vec_str(v)
     v = v(:).';
     c = strings(1, numel(v));
     for i = 1:numel(v)
@@ -1423,26 +1468,24 @@ end
 
 function append_fallback_output(msg)
     try
-        if isstring(msg)
-            msg = char(msg);
-        end
-
         fallbackFile = getenv('SAFE_FALLBACK_FILE');
         if isempty(fallbackFile)
-            fallbackFile = fullfile(pwd, 'safe_output_fallback.txt');
+            return;
         end
 
         fid = fopen(fallbackFile, 'a');
-        if fid ~= -1
-            fprintf(fid, '%s', msg);
-            if isempty(msg) || msg(end) ~= newline
-                fprintf(fid, '\n');
-            end
-            fclose(fid);
+        if fid < 0
+            return;
+        end
+
+        cleaner = onCleanup(@() fclose(fid));
+        fprintf(fid, '%s', msg);
+        if isempty(msg) || msg(end) ~= newline
+            fprintf(fid, '\n');
         end
     catch
     end
-end
+end    
 
 function [state, options, optchanged] = ga_outfun(options, state, flag)
     optchanged = false;

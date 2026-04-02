@@ -1,6 +1,6 @@
 function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
     s_target, t_target, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, ...
-    opt_flag, solverName, dq, useScreening, costFlags, costCfg)
+    opt_flag, solverName, dq, useScreening, costFlags, costCfg, measCfg)
 
     % ---------------- defaults ----------------
     if nargin < 17 || isempty(useScreening)
@@ -15,12 +15,25 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         error('objective_wrapper requires costCfg.');
     end
 
+    if nargin < 20 || isempty(measCfg)
+        measCfg = struct();
+        measCfg.type = "ANGLES_ONLY";
+    end
+
+    if ~isfield(measCfg, 'type') || isempty(measCfg.type)
+        measCfg.type = "ANGLES_ONLY";
+    end
+    measCfg.type = upper(string(measCfg.type));
+
     if ~isfield(costFlags,'J1'), costFlags.J1 = true; end
     if ~isfield(costFlags,'J2'), costFlags.J2 = true; end
     if ~isfield(costFlags,'J3'), costFlags.J3 = true; end
 
     J_1 = NaN; J_2 = NaN; J_3 = NaN;
     screeningCount = NaN;
+    x = [];
+    orbit_indices = [];
+    slot_indices = [];
 
     try
         if isa(orbit_database_in, 'parallel.pool.Constant')
@@ -62,7 +75,7 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         end
 
         [s_ekf, cov, screeningCount, ~] = cr3bp_ekf(observer_ICs, s_target, t_target, ...
-            P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, useScreening);
+            P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, useScreening, measCfg);
 
         [J_total, J_1, J_2, J_3] = compute_cost( ...
             s_target, s_ekf, cov, stabilities_vec, opt_flag, costFlags, costCfg);
@@ -87,6 +100,7 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         entry.useJ1 = logical(costFlags.J1);
         entry.useJ2 = logical(costFlags.J2);
         entry.useJ3 = logical(costFlags.J3);
+        entry.meas_model = char(measCfg.type);
 
         if strcmpi(opt_flag,"SOO")
             entry.J_total = J_total;

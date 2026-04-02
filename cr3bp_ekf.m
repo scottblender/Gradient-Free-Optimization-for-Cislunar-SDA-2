@@ -1,10 +1,20 @@
 function [s_ekf, cov, screeningCount, availableObsCount] = cr3bp_ekf( ...
     observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
-    sunFcn, sun_min, moon_min, useScreening)
+    sunFcn, sun_min, moon_min, useScreening, measCfg)
 
 if nargin < 13 || isempty(useScreening)
     useScreening = true;   % default ON
 end
+
+if nargin < 14 || isempty(measCfg)
+    measCfg = struct();
+    measCfg.type = "ANGLES_ONLY";
+end
+
+if ~isfield(measCfg,'type') || isempty(measCfg.type)
+    measCfg.type = "ANGLES_ONLY";
+end
+measCfg.type = upper(string(measCfg.type));
 
 num_steps = length(t_target);
 num_obs   = size(observer_ICs, 1);
@@ -58,11 +68,7 @@ for k = 2:num_steps
     % --- UPDATE ---
     for i = 1:num_obs
         r_obs = current_obs_states(i, 1:3)';
-
         r_target_truth = s_target(k,1:3)';
-        z_clean = measurement_model(r_target_truth, r_obs);
-        noise   = mvnrnd([0;0], R, 1).';     % assumes R is 2x2 covariance
-        z_meas  = z_clean + noise;
 
         r_sun = sunFcn(t);
 
@@ -86,11 +92,19 @@ for k = 2:num_steps
             end
         end
 
-        z_pred  = measurement_model(x_upd(1:3), r_obs);
+        % build measurement using selected measurement model
+        z_clean = measurement_model(r_target_truth, r_obs, measCfg);
+        noise   = mvnrnd(zeros(size(R,1),1), R, 1).';
+        z_meas  = z_clean + noise;
+
+        z_pred  = measurement_model(x_upd(1:3), r_obs, measCfg);
         y_tilde = z_meas - z_pred;
+
+        % wrap right ascension residual
         y_tilde(1) = atan2(sin(y_tilde(1)), cos(y_tilde(1)));
 
-        H = measurement_jacobian(x_upd(1:3), r_obs);
+        H = measurement_jacobian(x_upd(1:3), r_obs, measCfg);
+
         S = H * P_upd * H' + R;
         S = (S + S')/2;
 
