@@ -196,7 +196,7 @@ const_stabilities = parallel.pool.Constant(stabilities);
 const_orbit_db    = parallel.pool.Constant(orbit_database);
 
 % ---------------- Mission type ----------------
-MISSION_TYPE = "LOW_THRUST_TRANSFER";
+MISSION_TYPE = "LUNAR_GATEWAY";
 
 envMission = getenv("MISSION_TYPE");
 if ~isempty(envMission)
@@ -385,7 +385,7 @@ if strcmp(MISSION_TYPE, "LOW_THRUST_TRANSFER")
     Q_k = diag([q_pos q_pos q_pos q_vel q_vel q_vel]);
 
     r_ang   = 1e-8;
-    r_range = (10 / LU)^2;
+    r_range = (1 / LU)^2;
 
     switch measCfg.type
         case "ANGLES_ONLY"

@@ -2,11 +2,11 @@ function [s_ekf, cov, screeningCount, availableObsCount] = cr3bp_ekf( ...
     observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
     sunFcn, sun_min, moon_min, useScreening, measCfg)
 
-if nargin < 13 || isempty(useScreening)
+if nargin < 12 || isempty(useScreening)
     useScreening = true;   % default ON
 end
 
-if nargin < 14 || isempty(measCfg)
+if nargin < 13 || isempty(measCfg)
     measCfg = struct();
     measCfg.type = "ANGLES_ONLY";
 end
@@ -94,7 +94,9 @@ for k = 2:num_steps
 
         % build measurement using selected measurement model
         z_clean = measurement_model(r_target_truth, r_obs, measCfg);
-        noise   = mvnrnd(zeros(size(R,1),1), R, 1).';
+        z_clean = z_clean(:);
+        noise = mvnrnd(zeros(1, size(R,1)), R, 1);
+        noise = noise(:);
         z_meas  = z_clean + noise;
 
         z_pred  = measurement_model(x_upd(1:3), r_obs, measCfg);

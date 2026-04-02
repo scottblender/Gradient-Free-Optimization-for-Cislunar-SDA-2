@@ -20,7 +20,7 @@ thisFile = mfilename('fullpath');
 thisDir  = fileparts(thisFile);
 addpath(genpath(thisDir));
 
-FigDir = fullfile(thisDir, 'figs');
+FigDir = fullfile(thisDir, 'database_figs');
 if ~exist(FigDir, 'dir')
     mkdir(FigDir);
 end
@@ -242,7 +242,7 @@ missionCfg.transfer.lowthrust.w_mass_indirect = 1;
 
 % --- Build low-thrust truth trajectory ---
 [t_transfer, s_transfer, truthInfo] = build_target_truth( ...
-    missionCfg, T, orbit_database, times, states, mu, ode_opts); %#ok<NASGU>
+    missionCfg, T, orbit_database, times, states, mu, ode_opts); 
 
 depIdx  = missionCfg.transfer.depOrbitIndex;
 arrIdx  = missionCfg.transfer.arrOrbitIndex;
@@ -254,8 +254,8 @@ arrSlot = max(1, min(arrSlot, size(orbit_database{arrIdx},1)));
 
 s_dep_orb = states{depIdx};
 s_arr_orb = states{arrIdx};
-depState0 = orbit_database{depIdx}(depSlot,:); %#ok<NASGU>
-arrState0 = orbit_database{arrIdx}(arrSlot,:); %#ok<NASGU>
+depState0 = orbit_database{depIdx}(depSlot,:); 
+arrState0 = orbit_database{arrIdx}(arrSlot,:); 
 
 % --- Colors (matched to your prior figure) ---
 cCoast    = [0.91 0.29 0.24];
