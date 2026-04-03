@@ -1,11 +1,12 @@
-# ---------------- run_all_soo.ps1 ----------------
+# ---------------- run_baseline_soo.ps1 ----------------
 $ErrorActionPreference = "Stop"
 
-$Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
-$MissionTypes = @("LOW_THRUST_TRANSFER", "LUNAR_GATEWAY")
 $MeasurementModels = @("ANGLES_ONLY", "ANGLES_RANGE")
+$MissionTypes = @("LOW_THRUST_TRANSFER", "LUNAR_GATEWAY")
 $ObserverCounts = @(3, 5, 7, 10)
-$GatewayPeriods = @(1, 3, 5, 10)
+
+# Only use 1, 3, 5 periods for Lunar Gateway
+$GatewayPeriods = @(1, 3, 5)
 
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RunOpt = Join-Path $ProjectRoot "run_opt.m"
@@ -16,11 +17,9 @@ if (-not (Test-Path $MatlabExe)) { throw "Cannot find matlab.exe at: $MatlabExe"
 
 $RunsRoot = Join-Path $ProjectRoot "runs"
 $BaselineRoot = Join-Path $RunsRoot "BASELINE"
-$ComparisonRoot = Join-Path $RunsRoot "COMPARISON"
 
 New-Item -ItemType Directory -Force -Path $RunsRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $BaselineRoot | Out-Null
-New-Item -ItemType Directory -Force -Path $ComparisonRoot | Out-Null
 
 function Get-MissionCode {
     param([string]$Mission)
@@ -100,7 +99,7 @@ exit(0);
     Write-Host "Saved -> $RunDir"
 }
 
-# ---------------- (A) Baseline GA ----------------
+# ---------------- Baseline GA ----------------
 $gaBaselineIters = 600
 $baselineSeed = 0
 
@@ -150,73 +149,6 @@ foreach ($meas in $MeasurementModels) {
     }
 }
 
-# ---------------- (B) Comparison sweep ----------------
-$itersSweep = 100
-$sweepSeed = 0
-
-$Cases = @(
-    @{ screening=$true;  J1=$true;  J2=$true;  J3=$true  },
-    @{ screening=$false; J1=$true;  J2=$true;  J3=$true  },
-    @{ screening=$true;  J1=$true;  J2=$false; J3=$false },
-    @{ screening=$true;  J1=$false; J2=$true;  J3=$false },
-    @{ screening=$true;  J1=$false; J2=$false; J3=$true  }
-)
-
-foreach ($alg in $Algs) {
-    $algCode = $alg.ToLower()
-    $AlgRoot = Join-Path $ComparisonRoot "runs_$alg"
-    New-Item -ItemType Directory -Force -Path $AlgRoot | Out-Null
-
-    foreach ($meas in $MeasurementModels) {
-        $measCode = Get-MeasCode $meas
-        $MeasRoot = Join-Path $AlgRoot $measCode
-        New-Item -ItemType Directory -Force -Path $MeasRoot | Out-Null
-
-        foreach ($mission in $MissionTypes) {
-            $MissionCode = Get-MissionCode $mission
-            $MissionOutDir = Join-Path $MeasRoot $MissionCode
-            New-Item -ItemType Directory -Force -Path $MissionOutDir | Out-Null
-
-            foreach ($nObs in $ObserverCounts) {
-
-                if ($mission -eq "LUNAR_GATEWAY") {
-                    $periodList = $GatewayPeriods
-                }
-                else {
-                    $periodList = @(1)
-                }
-
-                foreach ($nper in $periodList) {
-                    foreach ($cc in $Cases) {
-
-                        $screenCode = if ($cc.screening) { "1" } else { "0" }
-                        $jCode = "$( [int]$cc.J1 )$( [int]$cc.J2 )$( [int]$cc.J3 )"
-
-                        if ($mission -eq "LOW_THRUST_TRANSFER") {
-                            $runName = "s_${algCode}${itersSweep}_${measCode}_o${nObs}_s${screenCode}_j${jCode}"
-                        }
-                        else {
-                            $runName = "s_${algCode}${itersSweep}_${measCode}_o${nObs}_p${nper}_s${screenCode}_j${jCode}"
-                        }
-
-                        $RunDir = Join-Path $MissionOutDir $runName
-
-                        Write-Host "`n============================="
-                        Write-Host "Running: [$mission] [$meas] $runName"
-                        Write-Host "============================="
-
-                        Invoke-MatlabRun -RunDir $RunDir -Alg $alg -MaxIters $itersSweep `
-                            -MissionType $mission -MeasModel $meas -NumObservers $nObs -NPeriods $nper `
-                            -UseScreening $cc.screening -UseJ1 $cc.J1 -UseJ2 $cc.J2 -UseJ3 $cc.J3 `
-                            -Seed $sweepSeed
-                    }
-                }
-            }
-        }
-    }
-}
-
-Write-Host "`nAll runs complete."
-Write-Host "Baseline   -> $BaselineRoot"
-Write-Host "Comparison -> $ComparisonRoot"
+Write-Host "`nBaseline runs complete."
+Write-Host "Baseline -> $BaselineRoot"
 # -------------------------------------------------
