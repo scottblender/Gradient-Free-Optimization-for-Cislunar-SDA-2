@@ -196,7 +196,7 @@ const_stabilities = parallel.pool.Constant(stabilities);
 const_orbit_db    = parallel.pool.Constant(orbit_database);
 
 % ---------------- Mission type ----------------
-MISSION_TYPE = "LUNAR_GATEWAY";
+MISSION_TYPE = "LOW_THRUST_TRANSFER";
 
 envMission = getenv("MISSION_TYPE");
 if ~isempty(envMission)
@@ -533,6 +533,20 @@ if contains(string(missionCfg.type), "TRANSFER") && useTransferCache
 else
     [t_target, s_target, truthInfo] = build_target_truth( ...
         missionCfg, T1, orbit_database, times, states, mu, ode_opts);
+end
+
+% ---------------- Moon impact check ----------------
+if contains(string(missionCfg.type), "TRANSFER")
+    r_moon = [1 - mu, 0, 0];
+    R_moon = 1737.1 / LU;   % LU
+    h_min  = 100 / LU;    % example 100 km keep-out altitude
+
+    d_moon = vecnorm(s_target(:,1:3) - r_moon, 2, 2);
+    min_d_moon = min(d_moon);
+
+    if min_d_moon <= (R_moon + h_min)
+        error('Low-thrust trajectory violates Moon keep-out zone. Min distance = %.6e LU.', min_d_moon);
+    end
 end
 
 % ---------------- EKF cadence ----------------
@@ -905,9 +919,16 @@ if isTransferMission
     end
 end
 
-rM = [1-mu, 0, 0];
-hM = plot3(ax, rM(1), rM(2), rM(3), 'ko', ...
-    'MarkerSize',8, 'MarkerFaceColor',[0.70 0.70 0.70], 'LineWidth',1.0);
+R_moon = 1737.1 / LU; 
+
+[Xs, Ys, Zs] = sphere(40);
+Xs = R_moon * Xs + (1 - mu);
+Ys = R_moon * Ys;
+Zs = R_moon * Zs;
+
+hM = surf(ax, Xs, Ys, Zs, ...
+    'FaceColor', [0.7 0.7 0.7], ...
+    'EdgeColor', 'k');
 
 [xL1, xL2] = cr3bp_L1L2(mu);
 hL1 = plot3(ax, xL1, 0, 0, 'k^', ...
