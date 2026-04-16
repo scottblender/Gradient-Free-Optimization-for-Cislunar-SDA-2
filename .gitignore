@@ -28,3 +28,5 @@ results_*.mat
 /runs/
 
 /safe_output_fallback.txt
+
+/postprocess_summary/
