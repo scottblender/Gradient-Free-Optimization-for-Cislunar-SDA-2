@@ -203,6 +203,9 @@ function [runTbl, obsTbl] = read_one_experiment_file(file)
     if ~ismember('runtime_s', runTbl.Properties.VariableNames)
         runTbl.runtime_s = NaN;
     end
+    if ~ismember('num_function_evals', runTbl.Properties.VariableNames)
+        runTbl.num_function_evals = NaN;
+    end
 
     runTbl.file_path      = string(file);
     runTbl.case_name      = string(meta.case_name);
@@ -213,6 +216,18 @@ function [runTbl, obsTbl] = read_one_experiment_file(file)
     runTbl.nperiods       = meta.nperiods;
     runTbl.model_group    = string(meta.model_group);
     runTbl.case_label     = string(meta.case_label);
+
+    % ---------------- Function evaluations from SECOND sheet ----------------
+    if numel(sheetList) >= 2
+        try
+            evalTbl = readtable(file, 'Sheet', sheetList{2}, 'TextType', 'string');
+            runTbl.num_function_evals = height(evalTbl);
+        catch
+            runTbl.num_function_evals = NaN;
+        end
+    else
+        runTbl.num_function_evals = NaN;
+    end
 
     % ---------------- Observer sheet ----------------
     obsSheetName = "";
@@ -485,7 +500,8 @@ function print_run_summary_console(runsTbl)
 
     showVars = intersect({ ...
         'case_name','mission_type','measurement_model','nperiods','num_observers', ...
-        'min_cost','rmse_pos_km','mean_detPpos_km6','mean_stability','runtime_s'}, ...
+        'min_cost','rmse_pos_km','mean_detPpos_km6','mean_stability','runtime_s', ...
+        'num_function_evals'}, ...
         runsTbl.Properties.VariableNames, 'stable');
 
     disp(runsTbl(:, showVars));
@@ -567,7 +583,7 @@ function plot_observer_count_metric_by_mission(T, figDir, yField, yLabel, fileSt
         box(ax, 'on');
         set(ax, 'TickLabelInterpreter', 'tex', 'Layer', 'top');
         grid(ax, 'on');
-        ax.GridAlpha = 0.25;     % light grid (important)
+        ax.GridAlpha = 0.25;     
         ax.MinorGridAlpha = 0.15;
         ax.LineWidth = 1.2; 
 
