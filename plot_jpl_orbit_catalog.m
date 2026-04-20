@@ -38,10 +38,19 @@ T = S.T;
 
 % ---------------- JPL constants ----------------
 mu = 1.215058560962404E-2;
+LU = 384400; % km
 ode_opts = odeset('RelTol', 1e-13, 'AbsTol', 1e-13);
 
 % ---------------- Lagrange points ----------------
 [xL1, xL2] = cr3bp_L1L2(mu);
+
+% ---------------- Moon surface ----------------
+R_moon = 1737.1 / LU; % Moon radius in LU
+
+[Xm, Ym, Zm] = sphere(40);
+Xm = R_moon * Xm + (1 - mu);
+Ym = R_moon * Ym;
+Zm = R_moon * Zm;
 
 % ---------------- Catalog / orbit database ----------------
 num_orbits      = height(T);
@@ -82,6 +91,18 @@ filenames = ["northern_halo", "southern_halo", ...
              "northern_rectilinear", "southern_rectilinear", ...
              "dro_family"];
 
+titlestrs = ["Northern Halo L1 and L2", ...
+             "Southern Halo L1 and L2", ...
+             "Northern Rectilinear L1 and L2", ...
+             "Southern Rectilinear L1 and L2", ...
+             "Distant Retrograde Orbits"];
+
+% ---------------- Colors ----------------
+cL1   = [0 0 1];         % blue
+cL2   = [1 0 0];         % red
+cMoon = [0.70 0.70 0.70];
+cLP   = [0.85 0.85 0.85];
+
 % ---------------- Family plotting loop ----------------
 for i = 1:numel(families)
     fig = figure('Color','w','Units','inches','Position',[1 1 8 6], ...
@@ -90,7 +111,6 @@ for i = 1:numel(families)
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
-    grid(ax,'on');
     axis(ax,'equal');
     set(ax, 'TickLabelInterpreter','tex', 'Layer','top');
     ax.Projection = 'orthographic';
@@ -106,7 +126,7 @@ for i = 1:numel(families)
     current_pair = families{i};
 
     if i < 5
-        famColors = [0.00 0.45 0.74; 0.85 0.33 0.10];
+        famColors = [cL1; cL2];
         h = gobjects(5,1); % fam1, fam2, moon, L1, L2
 
         for k = 1:2
@@ -122,7 +142,7 @@ for i = 1:numel(families)
                 for r = rows_to_plot
                     state = subT.state{r};
                     p = plot3(ax, state(:,1), state(:,2), state(:,3), '-', ...
-                        'Color', famColors(k,:), 'LineWidth', 2.0);
+                        'Color', famColors(k,:), 'LineWidth', 1.8);
 
                     if r == rows_to_plot(1)
                         h(k) = p;
@@ -131,74 +151,110 @@ for i = 1:numel(families)
             end
         end
 
-        h(3) = plot3(ax, 1-mu, 0, 0, 'o', ...
-            'MarkerSize',8, ...
-            'MarkerFaceColor',[0.70 0.70 0.70], ...
-            'MarkerEdgeColor',[0.30 0.30 0.30], ...
-            'LineWidth',1.0);
+        h(3) = surf(ax, Xm, Ym, Zm, ...
+            'FaceColor', cMoon, ...
+            'EdgeColor', 'none', ...
+            'FaceLighting', 'gouraud');
 
         h(4) = plot3(ax, xL1, 0, 0, '^', ...
             'MarkerSize',8, ...
-            'MarkerFaceColor',[0.85 0.85 0.85], ...
+            'MarkerFaceColor',cLP, ...
             'MarkerEdgeColor',[0.60 0.60 0.60], ...
             'LineWidth',1.0);
 
         h(5) = plot3(ax, xL2, 0, 0, 'v', ...
             'MarkerSize',8, ...
-            'MarkerFaceColor',[0.85 0.85 0.85], ...
+            'MarkerFaceColor',cLP, ...
             'MarkerEdgeColor',[0.60 0.60 0.60], ...
             'LineWidth',1.0);
 
-        labels = {'L1 family', 'L2 family', 'Moon', 'L1', 'L2'};
-    else
-        h = gobjects(2,1);
+        labels = {'L1', 'L2', 'Moon', 'L1 point', 'L2 point'};
 
+     else
+        h = gobjects(2,1);
+    
         targetFamily = current_pair(1);
         idx = orbitFamily == targetFamily;
         subT = T(idx, :);
-
+    
+        yScale = 1;   % display-only vertical exaggeration for DRO figure
+    
         numOrbits = height(subT);
         if numOrbits > 0
-            plot_stride = max(1, round(numOrbits / 15));
+            plot_stride = max(1, round(numOrbits / 12));
             rows_to_plot = 1:plot_stride:numOrbits;
-
+    
             for r = rows_to_plot
                 state = subT.state{r};
-                p = plot3(ax, state(:,1), state(:,2), state(:,3), '-', ...
-                    'Color', [0.00 0.45 0.74], 'LineWidth', 2.0);
-
+                p = plot(ax, state(:,1), yScale*state(:,2), '-', ...
+                    'Color', cL1, 'LineWidth', 1.8);
+    
                 if r == rows_to_plot(1)
                     h(1) = p;
                 end
             end
         end
-
-        h(2) = plot3(ax, 1-mu, 0, 0, 'o', ...
-            'MarkerSize',8, ...
-            'MarkerFaceColor',[0.70 0.70 0.70], ...
-            'MarkerEdgeColor',[0.30 0.30 0.30], ...
-            'LineWidth',1.0);
-
+    
+        % Moon as a filled circle in the x-y plane
+        th = linspace(0, 2*pi, 200);
+        xMoon = (1 - mu) + R_moon*cos(th);
+        yMoon = yScale * (R_moon*sin(th));
+    
+        h(2) = fill(ax, xMoon, yMoon, cMoon, ...
+            'EdgeColor', 'none', ...
+            'FaceAlpha', 1.0);
+    
         labels = {'DRO', 'Moon'};
+    
+        % Switch to 2-D formatting for DROs
+        view(ax, 2);
+        axis(ax, 'equal');
+    
+        % Tighten limits to the actual DRO family
+        x_center = 1 - mu;
+        y_center = 0;
+        
+        dy = yScale * 0.015;
+        pad = 1.15;
+        
+        dx = pad * dy;
+        
+        xlim(ax, [x_center - dx, x_center + dx]);
+        ylim(ax, [y_center - dx, y_center + dx]);
+
+        xlabel(ax, 'X (LU)');
+        ylabel(ax, sprintf('%.1f \\times Y (LU)', yScale));
+        zlabel(ax, '');
+    
+        ax.Box = 'on';
+        ax.Layer = 'top';
+        ax.YAxis.Exponent = 0;
+        xtickformat(ax, '%.3f');
+        ytickformat(ax, '%.2f');
     end
 
-    xlabel(ax,'x (LU)');
-    ylabel(ax,'y (LU)');
-    zlabel(ax,'z (LU)');
+    xlabel(ax,'X (LU)');
+    ylabel(ax,'Y (LU)');
+    zlabel(ax,'Z (LU)');
     set(ax,'FontSize',16,'LineWidth',1.8);
+    % title(ax, titlestrs(i), 'FontSize', 18, 'FontWeight', 'bold');
+
+    camlight(ax, 'headlight');
+    material(ax, 'dull');
 
     validHandles = isgraphics(h);
     if any(validHandles)
-        lgd = legend(ax, h(validHandles), labels(validHandles), 'Location','best');
+        lgd = legend(ax, h(validHandles), labels(validHandles));
+        lgd.Location = 'northoutside';
+        lgd.Orientation = 'horizontal';
         lgd.Box = 'on';
         lgd.ItemTokenSize = [18 12];
     end
 
     axis(ax,'tight');
     axis(ax,'vis3d');
-    pad = 0.10;
-    ax.Position = [pad pad 1-2*pad 1-2*pad];
-
+    ax.Units = 'normalized';
+    ax.Position = [0.12 0.12 0.76 0.76];
     save_pdf(fig, FigDir, filenames(i) + ".pdf");
     close(fig);
 end
@@ -254,15 +310,13 @@ arrSlot = max(1, min(arrSlot, size(orbit_database{arrIdx},1)));
 
 s_dep_orb = states{depIdx};
 s_arr_orb = states{arrIdx};
-depState0 = orbit_database{depIdx}(depSlot,:); 
+depState0 = orbit_database{depIdx}(depSlot,:);
 arrState0 = orbit_database{arrIdx}(arrSlot,:); 
 
-% --- Colors (matched to your prior figure) ---
+% --- Colors ---
 cCoast    = [0.91 0.29 0.24];
 cTransfer = [0.27 0.31 0.86];
 cOrbit    = [0.47 0.78 0.94];
-cMoon     = [0.55 0.58 0.62];
-cLP       = [0.88 0.88 0.88];
 
 fig = figure('Color','w','Units','inches','Position',[1 1 8 6], ...
              'PaperUnits','inches','PaperPosition',[0 0 8 6]);
@@ -270,7 +324,6 @@ fig = figure('Color','w','Units','inches','Position',[1 1 8 6], ...
 ax = axes(fig);
 hold(ax,'on');
 box(ax,'on');
-grid(ax,'on');
 axis(ax,'equal');
 set(ax, 'TickLabelInterpreter','tex', 'Layer','top');
 ax.Projection = 'orthographic';
@@ -289,12 +342,11 @@ plot3(ax, s_dep_orb(:,1), s_dep_orb(:,2), s_dep_orb(:,3), '-', ...
 plot3(ax, s_arr_orb(:,1), s_arr_orb(:,2), s_arr_orb(:,3), '-', ...
     'Color', cOrbit, 'LineWidth', 1.8);
 
-% --- Markers ---
-hM = plot3(ax, 1-mu, 0, 0, 'o', ...
-    'MarkerSize',8, ...
-    'MarkerFaceColor',cMoon, ...
-    'MarkerEdgeColor',cMoon, ...
-    'LineWidth',1.0);
+% --- Markers / surface ---
+hM = surf(ax, Xm, Ym, Zm, ...
+    'FaceColor', cMoon, ...
+    'EdgeColor', 'none', ...
+    'FaceLighting', 'gouraud');
 
 hL1 = plot3(ax, xL1, 0, 0, '^', ...
     'MarkerSize',8, ...
@@ -324,6 +376,9 @@ xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
 zlabel(ax,'z (LU)');
 set(ax,'FontSize',16,'LineWidth',1.8);
+
+camlight(ax, 'headlight');
+material(ax, 'dull');
 
 lgd = legend(ax, [hCoast, hTransfer, hStart, hEnd, hM, hL1, hL2], ...
     {'Coasting', 'Transfer', 'Transfer start', 'Transfer end', 'Moon', 'L1', 'L2'}, ...
@@ -369,7 +424,6 @@ else
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
-    grid(ax,'on');
     axis(ax,'equal');
     set(ax, 'TickLabelInterpreter','tex', 'Layer','top');
     ax.Projection = 'orthographic';
@@ -393,11 +447,10 @@ else
     text(sampleState(1), sampleState(2), sampleState(3), '  selected slot', ...
         'FontSize', 14, 'FontWeight', 'bold', 'Parent', ax);
 
-    hM = plot3(ax, 1-mu, 0, 0, 'o', ...
-        'MarkerSize',8, ...
-        'MarkerFaceColor',cMoon, ...
-        'MarkerEdgeColor',cMoon, ...
-        'LineWidth',1.0);
+    hM = surf(ax, Xm, Ym, Zm, ...
+        'FaceColor', cMoon, ...
+        'EdgeColor', 'none', ...
+        'FaceLighting', 'gouraud');
 
     hL1s = plot3(ax, xL1, 0, 0, '^', ...
         'MarkerSize',8, ...
@@ -409,6 +462,9 @@ else
     ylabel(ax,'y (LU)');
     zlabel(ax,'z (LU)');
     set(ax,'FontSize',16,'LineWidth',1.8);
+
+    camlight(ax, 'headlight');
+    material(ax, 'dull');
 
     lgd = legend(ax, [hOrb; hSlots; hSample; hM; hL1s], ...
         {'Northern halo orbit', 'Candidate slots', 'Selected slot example', 'Moon', 'L1'}, ...
@@ -438,12 +494,7 @@ function [xL1, xL2] = cr3bp_L1L2(mu)
         - mu     * (x - (1-mu)) ./ abs(x - (1-mu)).^3;
 
     delta = (mu/3)^(1/3);
-    x2 = 1 - mu;
 
-    x0_L1 = x2 - delta;
-    x0_L2 = x2 + delta;
-
-    opts = optimset('Display','off');
-    xL1 = fzero(f, x0_L1, opts);
-    xL2 = fzero(f, x0_L2, opts);
+    xL1 = fzero(f, [1-mu-delta, 1-mu-1e-6]);
+    xL2 = fzero(f, [1-mu+1e-6, 1-mu+delta+0.5]);
 end
