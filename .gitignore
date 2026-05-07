@@ -30,3 +30,7 @@ results_*.mat
 /safe_output_fallback.txt
 
 /postprocess_summary/
+
+/database_figs/
+
+/comparison_postprocess_summary/
