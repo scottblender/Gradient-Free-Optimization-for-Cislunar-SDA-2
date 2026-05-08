@@ -1,4 +1,4 @@
-%% process_comparison_results.m
+%% process_comparison_results_cleaned_eps.m
 % Minimal comparison-study postprocessing script.
 %
 % Outputs only the requested paper figures/tables:
@@ -50,12 +50,13 @@ cfg.lgPeriods = 1;
 % Appearance for metric/bar panels.
 cfg.fontName = "Times New Roman";
 cfg.fontWeight = "bold";
-cfg.axisFontSize = 22;
-cfg.labelFontSize = 22;
-cfg.legendFontSize = 22;
+cfg.axisFontSize = 26;
+cfg.labelFontSize = 26;
+cfg.legendFontSize = 26;
 cfg.legendLocation = "northoutside";
 cfg.legendOrientation = "horizontal";
 cfg.titleFontSize = 20;
+cfg.removeTitles = true;
 cfg.axisLineWidth = 1.4;
 cfg.lineWidth = 2.2;
 cfg.markerSize = 8;
@@ -63,21 +64,24 @@ cfg.epsResolution = 600;
 
 % Individual trajectory panel source size. These are designed to be shrunk
 % in LaTeX subfigure grids.
-cfg.trajPanelWidthIn = 8.5;
-cfg.trajPanelHeightIn = 6.0;
-cfg.trajAxisFontSize = 26;
-cfg.trajLabelFontSize = 26;
-cfg.trajLineWidth = 2.0;
-cfg.trajMarkerSize = 5;
+cfg.singleFigWidthIn = 12.5;
+cfg.singleFigHeightIn = 9.5;
+
+cfg.trajPanelWidthIn = cfg.singleFigWidthIn;
+cfg.trajPanelHeightIn = cfg.singleFigHeightIn;
+cfg.trajAxisFontSize = 32;
+cfg.trajLabelFontSize = 36;
+cfg.trajLineWidth = 2.8;
+cfg.trajMarkerSize = 60;
 
 % Individual metric/cost panel sizes for LaTeX subfigure layouts.
 cfg.metricPanelWidthIn = 8.8;
 cfg.metricPanelHeightIn = 6.2;
 
 % Orbit-family plotting controls.
-cfg.orbitFamilyUseAllCostCombos = true;
-cfg.orbitFamilyUseAllObserverCounts = true;
-cfg.orbitFamilyUseBothScreeningFlags = true;
+cfg.orbitFamilyUseAllCostCombos = false;       % paper case: J111 only
+cfg.orbitFamilyUseAllObserverCounts = true;    % count across 3, 5, 7, 10
+cfg.orbitFamilyUseBothScreeningFlags = false;  % paper case: screening ON only
 
 %% ========================= OUTPUT FOLDERS =========================
 
@@ -771,57 +775,90 @@ end
 
 function exportTrajectoryPanelFromFig(figPath, outPath, cfg)
 fig = openfig(figPath, "invisible");
-set(fig, "Color", "w", "Units", "inches", "Position", [1 1 cfg.trajPanelWidthIn cfg.trajPanelHeightIn], "Renderer", "opengl");
 
-lgd = findall(fig, "Type", "legend");
-for i = 1:numel(lgd)
-    try
-        lgd(i).Visible = "off";
-    catch
-    end
+set(fig, "Color", "w");
+set(fig, "Units", "inches");
+set(fig, "Position", [1 1 cfg.singleFigWidthIn cfg.singleFigHeightIn]);
+set(fig, "Renderer", "opengl");
+
+applyFigureStyleForTrajectory(fig, cfg);
+setLegendVisibility(fig, "off");
+
+if isfield(cfg, "removeTitles") && cfg.removeTitles
+    removeAllTitles(fig);
 end
 
+drawnow;
+exportFigureAsImageEPS(fig, outPath, cfg);
+close(fig);
+end
+
+function applyFigureStyleForTrajectory(fig, cfg)
 ax = findall(fig, "Type", "axes");
+
 for i = 1:numel(ax)
     if strcmpi(ax(i).Tag, "legend")
         continue;
     end
+
     try
-        title(ax(i), "");
-        set(ax(i), "FontName", cfg.fontName, "FontSize", cfg.trajAxisFontSize, "FontWeight", cfg.fontWeight, "LineWidth", cfg.axisLineWidth);
-        ax(i).XLabel.FontName = cfg.fontName;
-        ax(i).YLabel.FontName = cfg.fontName;
-        ax(i).ZLabel.FontName = cfg.fontName;
+        set(ax(i), ...
+            "FontName", cfg.fontName, ...
+            "FontSize", cfg.trajAxisFontSize, ...
+            "FontWeight", cfg.fontWeight, ...
+            "LineWidth", cfg.axisLineWidth);
+
         ax(i).XLabel.FontSize = cfg.trajLabelFontSize;
         ax(i).YLabel.FontSize = cfg.trajLabelFontSize;
         ax(i).ZLabel.FontSize = cfg.trajLabelFontSize;
+
         ax(i).XLabel.FontWeight = cfg.fontWeight;
         ax(i).YLabel.FontWeight = cfg.fontWeight;
         ax(i).ZLabel.FontWeight = cfg.fontWeight;
-        ax(i).Units = "normalized";
-        ax(i).Position = [0.055 0.085 0.90 0.86];
-        ax(i).LooseInset = max(ax(i).TightInset, [0.005 0.005 0.005 0.005]);
+
+        title(ax(i), "");
+
+        % Dense trajectory grids are too small for per-panel axis text.
+        % Remove labels and tick labels so the plotted orbits use the space.
+        xlabel(ax(i), "");
+        ylabel(ax(i), "");
+        zlabel(ax(i), "");
+        ax(i).XTickLabel = [];
+        ax(i).YTickLabel = [];
+        ax(i).ZTickLabel = [];
+        ax(i).TickLength = [0.01 0.01];
+
         grid(ax(i), "on");
         box(ax(i), "on");
     catch
     end
 end
 
-objs = findall(fig);
-for i = 1:numel(objs)
+lines = findall(fig, "Type", "line");
+for i = 1:numel(lines)
     try
-        if isprop(objs(i), "LineWidth")
-            objs(i).LineWidth = max(objs(i).LineWidth, cfg.trajLineWidth);
-        end
-        if isprop(objs(i), "MarkerSize")
-            objs(i).MarkerSize = max(objs(i).MarkerSize, cfg.trajMarkerSize);
-        end
+        lines(i).LineWidth = cfg.trajLineWidth;
     catch
     end
 end
 
-exportFigure(fig, outPath, cfg);
-close(fig);
+scat = findall(fig, "Type", "scatter");
+for i = 1:numel(scat)
+    try
+        scat(i).SizeData = max(scat(i).SizeData, cfg.trajMarkerSize);
+    catch
+    end
+end
+end
+
+function setLegendVisibility(fig, visibilityState)
+lgd = findall(fig, "Type", "legend");
+for i = 1:numel(lgd)
+    try
+        lgd(i).Visible = visibilityState;
+    catch
+    end
+end
 end
 
 %% ========================= SCREENING BAR CHARTS =========================
@@ -1070,7 +1107,7 @@ bar(ax, categorical(optList,optList), Y, 'grouped');
 setCommonAxes(ax, cfg);
 lblArgs = commonLabelArgs(cfg);
 xlabel(ax, 'Optimizer', lblArgs{:});
-ylabel(ax, 'Contribution to J111 total cost', lblArgs{:});
+ylabel(ax, 'Contribution to total cost', lblArgs{:});
 ttlArgs = commonTitleArgs(cfg);
 title(ax, sprintf('%s: J111 cost-component breakdown (%s, 3 obs.)', caseSpec.label, upper(caseSpec.measurement_short)), ttlArgs{:});
 applyConsistentLegend(ax, {'J1','J2','J3'}, cfg);
@@ -1120,10 +1157,18 @@ barHandles = plotGroupedBarsByMeasurement(ax, T, cfg, 'min_cost_mean', 'Total co
 measList = cfg.measurementShortOrder(ismember(cfg.measurementShortOrder, unique(B.measurement_short)));
 baseHandles = gobjects(0);
 baseLabels = strings(0);
+baseStyles = {'--', '-.'};          % AO dashed, AR dash-dot
+baseColors = [0 0 0; 0.45 0.45 0.45];
+
 for j = 1:numel(measList)
     idx = find(B.measurement_short == measList(j), 1);
+
     if ~isempty(idx) && isfinite(B.min_cost_mean(idx))
-        h = yline(ax, B.min_cost_mean(idx), '--', 'LineWidth', cfg.lineWidth, 'DisplayName', "Baseline " + upper(measList(j)));
+        h = yline(ax, B.min_cost_mean(idx), baseStyles{j}, ...
+            'LineWidth', cfg.lineWidth + 0.4, ...
+            'Color', baseColors(j,:), ...
+            'DisplayName', "Baseline " + upper(measList(j)));
+
         baseHandles(end+1) = h;
         baseLabels(end+1) = "Baseline " + upper(measList(j));
     end
@@ -1523,19 +1568,7 @@ fams = strtrim(fams);
 fams = replace(fams, "_", " ");
 fams = replace(fams, "-", " ");
 fams = regexprep(fams, '\s+', ' ');
-fams = lower(fams);
-for i = 1:numel(fams)
-    if strlength(fams(i)) > 0
-        words = split(fams(i));
-        for j = 1:numel(words)
-            w = words(j);
-            if strlength(w) > 0
-                words(j) = upper(extractBefore(w,2)) + extractAfter(w,1);
-            end
-        end
-        fams(i) = strjoin(words, " ");
-    end
-end
+fams = upper(fams);
 end
 
 function figIndex = makeOrbitFamilyPlots(familyLong, cfg, outDir, studyLabel)
@@ -1546,6 +1579,18 @@ end
 
 T = familyLong;
 T = T(ismember(T.optimizer, cfg.optimizerOrder), :);
+
+% Keep orbit-family plots consistent with the two paper cases used in the
+% trajectory/metric figures: LG at cfg.lgPeriods and LT, both using
+% cfg.displayMeasurementShort.
+if ismember("measurement_short", string(T.Properties.VariableNames))
+    T = T(T.measurement_short == cfg.displayMeasurementShort, :);
+end
+if ismember("mission", string(T.Properties.VariableNames)) && ismember("period_key", string(T.Properties.VariableNames))
+    isLGKeep = T.mission == "lg" & T.period_key == "p" + string(cfg.lgPeriods);
+    isLTKeep = T.mission == "lt";
+    T = T(isLGKeep | isLTKeep, :);
+end
 if isempty(T)
     return;
 end
@@ -1637,12 +1682,35 @@ function exportFigure(fig, outPath, cfg)
 if ~strcmpi(ext, '.eps')
     outPath = fullfile(folder, name + ".eps");
 end
+
+if isfield(cfg, "removeTitles") && cfg.removeTitles
+    removeAllTitles(fig);
+end
+
 set(fig, 'Color', 'w', 'InvertHardcopy', 'off', 'Renderer', 'opengl');
 drawnow;
+exportFigureAsImageEPS(fig, outPath, cfg);
+end
+
+function removeAllTitles(fig)
+ax = findall(fig, "Type", "axes");
+for i = 1:numel(ax)
+    try
+        title(ax(i), "");
+    catch
+    end
+end
+end
+
+function exportFigureAsImageEPS(fig, outEps, cfg)
 try
-    exportgraphics(fig, outPath, 'ContentType', 'image', 'Resolution', cfg.epsResolution, 'BackgroundColor', 'white');
+    exportgraphics(fig, outEps, ...
+        'ContentType', 'image', ...
+        'Resolution', cfg.epsResolution, ...
+        'BackgroundColor', 'white');
 catch
-    print(fig, outPath, '-depsc', '-opengl', sprintf('-r%d', cfg.epsResolution));
+    warning('exportgraphics EPS image export failed. Falling back to print -depsc -opengl.');
+    print(fig, outEps, '-depsc', '-image', sprintf('-r%d', cfg.epsResolution));
 end
 end
 

@@ -49,41 +49,71 @@ end
 outDir = fullfile(rootDir, "BASELINE_REPORT_OUTPUT");
 
 % -----------------------------------------------------------------
-% GLOBAL FONT CONTROLS
+% GLOBAL FONT / STYLE CONTROLS
 % -----------------------------------------------------------------
-cfg.fontName = "Times New Roman";
+cfg.fontName   = "Times New Roman";
+cfg.fontWeight = "bold";
 
-cfg.axisFontSize       = 32;
-cfg.labelFontSize      = 36;
-cfg.titleFontSize      = 32;
-cfg.legendFontSize     = 28;
-cfg.sharedLegendSize   = 28;
-cfg.annotationFontSize = 30;
-cfg.fontWeight         = "bold";
+% -----------------------------------------------------------------
+% TRAJECTORY FIGURE CONTROLS
+% -----------------------------------------------------------------
+% These are used only when exporting the individual 3D trajectory EPS
+% files for the LaTeX subfigure workflow. Keep these smaller than the
+% Monte Carlo fonts because 3D axis labels are much easier to clip.
+cfg.trajFigWidthIn      = 9.0;
+cfg.trajFigHeightIn     = 8.0;
+cfg.trajAxisFontSize    = 37;
+cfg.trajLabelFontSize   = 37;
+cfg.trajTitleFontSize   = 30;
+cfg.trajLegendFontSize  = 30;
+cfg.trajSharedLegendSize = 28;
+cfg.trajAnnotationFontSize = 30;
 
-% Figure sizing
-cfg.singleFigWidthIn   = 13.0;
-cfg.singleFigHeightIn  = 9.5;
+% Padded axes box used in the temporary trajectory export figure:
+% [left bottom width height].
+% This keeps the tight subfigure look while reserving space for 3D labels.
+% If labels crop, increase left/bottom or reduce width/height slightly.
+cfg.trajPaddedAxesPosition = [0.18 0.18 0.70 0.60];
+cfg.trajXLabelPosition = [0.42 -0.10 0];
+cfg.trajYLabelPosition = [0.98 -0.05 0];
 
-cfg.mcFigWidthIn       = 11.0;
-cfg.mcFigHeightIn      = 7.5;
+cfg.trajLineWidth       = 3.6;
+cfg.trajAxisLineWidth   = 1.6;
+cfg.trajMinScatterSize  = 80;
+cfg.trajEpsResolution   = 600;
 
-cfg.legendFigWidthIn   = 7.5;
-cfg.legendFigHeightIn  = 0.9;
+% Quick preview of each trajectory export. This writes and briefly opens
+% a PNG that uses the exact same padded export figure as the EPS.
+cfg.previewTrajectoryExport = false;
+cfg.previewPauseSeconds = 5;
+cfg.previewResolution = 600;
 
-% Line and marker sizing
-cfg.lineWidth          = 2.8;
-cfg.axisLineWidth      = 1.8;
-cfg.minScatterSize     = 90;
-cfg.mcScatterSize      = 28;
-cfg.mcMarkerLineWidth  = 1.5;
+% -----------------------------------------------------------------
+% MONTE CARLO FIGURE CONTROLS
+% -----------------------------------------------------------------
+% These are separate from the trajectory settings. Font size 50 worked
+% well for the MC plots, so it is kept here.
+cfg.mcFigWidthIn        = 8.5;
+cfg.mcFigHeightIn       = 6.0;
+cfg.mcAxisFontSize      = 50;
+cfg.mcLabelFontSize     = 50;
+cfg.mcLegendFontSize    = 42;
+cfg.mcSharedLegendSize = 28;
+cfg.mcLineWidth         = 3.8;
+cfg.mcAxisLineWidth     = 1.8;
+cfg.mcScatterSize       = 28;
+cfg.mcMarkerLineWidth   = 3.5;
+
+% Shared legend-only figure controls
+cfg.legendFigWidthIn    = 7.5;
+cfg.legendFigHeightIn   = 0.9;
 
 % MC y-axis padding
 cfg.mcLowerYPadFrac = 0.15;
 cfg.mcUpperYPadFrac = 0.08;
 
 % EPS raster/image export
-cfg.epsResolution = 300;
+cfg.mcEpsResolution = 600;
 
 % Figure handling
 cfg.removeTitles = true;
@@ -94,12 +124,12 @@ cfg.singleTrajShowLegend = false;
 cfg.singleMCShowLegend   = false;
 
 % Save shared legend-only EPS files
-cfg.makeLegendOnlyFiles = true;
+cfg.makeLegendOnlyFiles = false;
 
 % -----------------------------------------------------------------
 % TRUE MONTE CARLO SETTINGS
 % -----------------------------------------------------------------
-cfg.makeTrueMonteCarloPlots = true;
+cfg.makeTrueMonteCarloPlots = false;
 cfg.mcNumSamples = 250;
 cfg.mcOrbitRadius = 10;
 cfg.mcSlotRadius  = 5;
@@ -1218,7 +1248,7 @@ function [mcTable, mcSummary] = makeTrueMonteCarloValidationPlot(Teval, Tobs, S,
     fig = createTrueMCFigure(mcTable.sample, mcTable.total_cost, ...
         JgaMin, cfg, cfg.singleMCShowLegend);
 
-    exportFigureAsImageEPS(fig, outEps, cfg);
+    exportMCFigureAsImageEPS(fig, outEps, cfg);
     close(fig);
 
     mcSummary = table();
@@ -1603,7 +1633,7 @@ function fig = createTrueMCFigure(xSample, yCost, JgaMin, cfg, showLegend)
         'MarkerFaceColor', 'none', ...
         'LineWidth', cfg.mcMarkerLineWidth);
 
-    yline(JgaMin, "r-", "LineWidth", cfg.lineWidth);
+    yline(JgaMin, "r-", "LineWidth", cfg.mcLineWidth);
 
     yAll = [yCost(:); JgaMin];
     yMin = min(yAll, [], "omitnan");
@@ -1621,21 +1651,21 @@ function fig = createTrueMCFigure(xSample, yCost, JgaMin, cfg, showLegend)
         ylim([yMin - lowerPad, yMax + upperPad]);
     end
 
-    xlabel("Local Monte Carlo Sample", ...
+    xlabel("All Samples", ...
         "FontName", cfg.fontName, ...
-        "FontSize", cfg.labelFontSize, ...
+        "FontSize", cfg.mcLabelFontSize, ...
         "FontWeight", cfg.fontWeight);
 
     ylabel("Total Cost", ...
         "FontName", cfg.fontName, ...
-        "FontSize", cfg.labelFontSize, ...
+        "FontSize", cfg.mcLabelFontSize, ...
         "FontWeight", cfg.fontWeight);
 
     set(gca, ...
         "FontName", cfg.fontName, ...
-        "FontSize", cfg.axisFontSize, ...
+        "FontSize", cfg.mcAxisFontSize, ...
         "FontWeight", cfg.fontWeight, ...
-        "LineWidth", cfg.axisLineWidth);
+        "LineWidth", cfg.mcAxisLineWidth);
 
     title("");
 
@@ -1643,7 +1673,7 @@ function fig = createTrueMCFigure(xSample, yCost, JgaMin, cfg, showLegend)
         legend({"Monte Carlo Samples", "GA Minimum"}, ...
             "Location", "northeast", ...
             "FontName", cfg.fontName, ...
-            "FontSize", cfg.legendFontSize, ...
+            "FontSize", cfg.mcLegendFontSize, ...
             "FontWeight", cfg.fontWeight);
     end
 end
@@ -1654,12 +1684,16 @@ function legendText = exportEnlargedFigAsImageEPS(figPath, outEps, cfg, showLege
 
     set(fig, "Color", "w");
     set(fig, "Units", "inches");
-    set(fig, "Position", [1 1 cfg.singleFigWidthIn cfg.singleFigHeightIn]);
+    set(fig, "Position", [1 1 cfg.trajFigWidthIn cfg.trajFigHeightIn]);
+    set(fig, "PaperUnits", "inches");
+    set(fig, "PaperPosition", [0 0 cfg.trajFigWidthIn cfg.trajFigHeightIn]);
+    set(fig, "PaperSize", [cfg.trajFigWidthIn cfg.trajFigHeightIn]);
+    set(fig, "InvertHardcopy", "off");
     set(fig, "Renderer", "opengl");
 
     legendText = extractLegendText(fig);
 
-    applyFigureStyle(fig, cfg);
+    applyTrajectoryFigureStyle(fig, cfg);
 
     if showLegend
         setLegendVisibility(fig, "on");
@@ -1668,11 +1702,13 @@ function legendText = exportEnlargedFigAsImageEPS(figPath, outEps, cfg, showLege
     end
 
     drawnow;
-    exportFigureAsImageEPS(fig, outEps, cfg);
+    pause(0.05);
+
+    exportTrajectoryEPS(fig, outEps, cfg);
     close(fig);
 end
 
-function applyFigureStyle(fig, cfg)
+function applyTrajectoryFigureStyle(fig, cfg)
 
     ax = findall(fig, "Type", "axes");
 
@@ -1683,34 +1719,43 @@ function applyFigureStyle(fig, cfg)
         end
 
         set(ax(i), ...
+            "Units", "normalized", ...
             "FontName", cfg.fontName, ...
-            "FontSize", cfg.axisFontSize, ...
+            "FontSize", cfg.trajAxisFontSize, ...
             "FontWeight", cfg.fontWeight, ...
-            "LineWidth", cfg.axisLineWidth);
+            "LineWidth", cfg.trajAxisLineWidth);
 
-        ax(i).XLabel.FontSize = cfg.labelFontSize;
-        ax(i).YLabel.FontSize = cfg.labelFontSize;
-        ax(i).ZLabel.FontSize = cfg.labelFontSize;
+        ax(i).XLabel.FontSize = cfg.trajLabelFontSize;
+        ax(i).YLabel.FontSize = cfg.trajLabelFontSize;
+        ax(i).ZLabel.FontSize = cfg.trajLabelFontSize;
 
         ax(i).XLabel.FontWeight = cfg.fontWeight;
         ax(i).YLabel.FontWeight = cfg.fontWeight;
         ax(i).ZLabel.FontWeight = cfg.fontWeight;
 
+        ax(i).XLabel.FontName = cfg.fontName;
+        ax(i).YLabel.FontName = cfg.fontName;
+        ax(i).ZLabel.FontName = cfg.fontName;
+
+        % Keep 3D geometry stable. The actual export padding is handled
+        % in exportTrajectoryEPS using cfg.trajPaddedAxesPosition.
+        axis(ax(i), "vis3d");
+        box(ax(i), "on");
+        grid(ax(i), "off");
+
         if cfg.removeTitles
             title(ax(i), "");
         else
-            ax(i).Title.FontSize = cfg.titleFontSize;
+            ax(i).Title.FontSize = cfg.trajTitleFontSize;
             ax(i).Title.FontWeight = cfg.fontWeight;
+            ax(i).Title.FontName = cfg.fontName;
         end
-
-        grid(ax(i), "on");
-        box(ax(i), "on");
     end
 
     lines = findall(fig, "Type", "line");
     for i = 1:numel(lines)
         try
-            lines(i).LineWidth = cfg.lineWidth;
+            lines(i).LineWidth = cfg.trajLineWidth;
         catch
         end
     end
@@ -1718,7 +1763,7 @@ function applyFigureStyle(fig, cfg)
     scat = findall(fig, "Type", "scatter");
     for i = 1:numel(scat)
         try
-            scat(i).SizeData = max(scat(i).SizeData, cfg.minScatterSize);
+            scat(i).SizeData = max(scat(i).SizeData, cfg.trajMinScatterSize);
         catch
         end
     end
@@ -1728,7 +1773,7 @@ function applyFigureStyle(fig, cfg)
         try
             set(lgd(i), ...
                 "FontName", cfg.fontName, ...
-                "FontSize", cfg.legendFontSize, ...
+                "FontSize", cfg.trajLegendFontSize, ...
                 "FontWeight", cfg.fontWeight, ...
                 "Box", "on");
         catch
@@ -1785,7 +1830,7 @@ function createTrajectoryLegendOnly(legendText, outEps, cfg)
     h = gobjects(numel(labels),1);
 
     for i = 1:numel(labels)
-        h(i) = plot(ax, nan, nan, "-", "LineWidth", cfg.lineWidth);
+        h(i) = plot(ax, nan, nan, "-", "LineWidth", cfg.trajLineWidth);
     end
 
     lgd = legend(ax, h, labels, ...
@@ -1794,7 +1839,7 @@ function createTrajectoryLegendOnly(legendText, outEps, cfg)
         "Box", "on");
 
     lgd.FontName = cfg.fontName;
-    lgd.FontSize = cfg.sharedLegendSize;
+    lgd.FontSize = cfg.trajSharedLegendSize;
     lgd.FontWeight = cfg.fontWeight;
 
     exportFigureAsImageEPS(fig, outEps, cfg);
@@ -1815,7 +1860,7 @@ function createMCLegendOnly(outEps, cfg)
         'MarkerFaceColor', 'none', ...
         'LineWidth', cfg.mcMarkerLineWidth);
 
-    h2 = plot(ax, nan, nan, "r-", "LineWidth", cfg.lineWidth);
+    h2 = plot(ax, nan, nan, "r-", "LineWidth", cfg.mcLineWidth);
 
     lgd = legend(ax, [h1 h2], ...
         ["Monte Carlo Samples", "GA Minimum"], ...
@@ -1824,23 +1869,213 @@ function createMCLegendOnly(outEps, cfg)
         "Box", "on");
 
     lgd.FontName = cfg.fontName;
-    lgd.FontSize = cfg.sharedLegendSize;
+    lgd.FontSize = cfg.mcSharedLegendSize;
     lgd.FontWeight = cfg.fontWeight;
 
     exportFigureAsImageEPS(fig, outEps, cfg);
     close(fig);
 end
 
-function exportFigureAsImageEPS(fig, outEps, cfg)
+function exportTrajectoryEPS(fig, outEps, cfg)
+%EXPORTTRAJECTORYEPS Export the main 3D trajectory axes through a padded
+%temporary figure. This is tighter than exporting the full original .fig,
+%but safer than axes-only export because it reserves whitespace for labels.
+
+    ax = findall(fig, "Type", "axes");
+
+    if isempty(ax)
+        error("No axes found for trajectory export.");
+    end
+
+    keep = true(numel(ax), 1);
+    for i = 1:numel(ax)
+        if strcmpi(ax(i).Tag, "legend")
+            keep(i) = false;
+        end
+    end
+    ax = ax(keep);
+
+    if isempty(ax)
+        error("No trajectory axes found for export.");
+    end
+
+    % Pick the largest axes as the main trajectory axes.
+    areas = zeros(numel(ax), 1);
+    for i = 1:numel(ax)
+        try
+            pos = ax(i).Position;
+            areas(i) = pos(3) * pos(4);
+        catch
+            areas(i) = 0;
+        end
+    end
+
+    [~, idx] = max(areas);
+    mainAx = ax(idx);
+
+    drawnow;
+
+    exportFig = figure( ...
+        "Color", "w", ...
+        "Units", "inches", ...
+        "Position", [1 1 cfg.trajFigWidthIn cfg.trajFigHeightIn], ...
+        "PaperUnits", "inches", ...
+        "PaperPosition", [0 0 cfg.trajFigWidthIn cfg.trajFigHeightIn], ...
+        "PaperSize", [cfg.trajFigWidthIn cfg.trajFigHeightIn], ...
+        "InvertHardcopy", "off", ...
+        "Renderer", "opengl", ...
+        "Visible", "off");
+
+    newAx = copyobj(mainAx, exportFig);
+
+    set(newAx, ...
+        "Units", "normalized", ...
+        "Position", cfg.trajPaddedAxesPosition, ...
+        "ActivePositionProperty", "position");
+
+    axis(newAx, "vis3d");
+    box(newAx, "on");
+    grid(newAx, "off");
+
+    set(newAx, ...
+        "FontName", cfg.fontName, ...
+        "FontSize", cfg.trajAxisFontSize, ...
+        "FontWeight", cfg.fontWeight, ...
+        "LineWidth", cfg.trajAxisLineWidth);
+
+    newAx.XLabel.FontName = cfg.fontName;
+    newAx.YLabel.FontName = cfg.fontName;
+    newAx.ZLabel.FontName = cfg.fontName;
+
+    newAx.XLabel.FontSize = cfg.trajLabelFontSize;
+    newAx.YLabel.FontSize = cfg.trajLabelFontSize;
+    newAx.ZLabel.FontSize = cfg.trajLabelFontSize;
+
+    newAx.XLabel.FontWeight = cfg.fontWeight;
+    newAx.YLabel.FontWeight = cfg.fontWeight;
+    newAx.ZLabel.FontWeight = cfg.fontWeight;
+
+    % Use capital axis labels for final trajectory export
+    newAx.XLabel.String = "X (LU)";
+    newAx.YLabel.String = "Y (LU)";
+    newAx.ZLabel.String = "Z (LU)";
+
+    try
+    newAx.XLabel.Units = "normalized";
+    newAx.YLabel.Units = "normalized";
+
+    newAx.XLabel.Position = cfg.trajXLabelPosition;
+    newAx.YLabel.Position = cfg.trajYLabelPosition;
+    catch
+    end
+
+    if cfg.removeTitles
+        title(newAx, "");
+    end
+
+    lines = findall(newAx, "Type", "line");
+    for i = 1:numel(lines)
+        try
+            lines(i).LineWidth = cfg.trajLineWidth;
+        catch
+        end
+    end
+
+    scat = findall(newAx, "Type", "scatter");
+    for i = 1:numel(scat)
+        try
+            scat(i).SizeData = max(scat(i).SizeData, cfg.trajMinScatterSize);
+        catch
+        end
+    end
+
+    drawnow;
+    pause(0.05);
+
+    % Quick preview before EPS export.
+    if isfield(cfg, "previewTrajectoryExport") && cfg.previewTrajectoryExport
+        previewPng = replace(string(outEps), ".eps", "_PREVIEW.png");
+
+        exportgraphics(exportFig, previewPng, ...
+            "ContentType", "image", ...
+            "Resolution", cfg.previewResolution, ...
+            "BackgroundColor", "white");
+
+        try
+            im = imread(previewPng);
+            previewFig = figure( ...
+                "Color", "w", ...
+                "Name", "Trajectory EPS Preview", ...
+                "NumberTitle", "off");
+            imshow(im, "Border", "tight");
+            title("Preview of trajectory export", ...
+                "FontName", cfg.fontName, ...
+                "FontWeight", cfg.fontWeight);
+            drawnow;
+
+            if isfield(cfg, "previewPauseSeconds")
+                pause(cfg.previewPauseSeconds);
+            else
+                pause(0.75);
+            end
+
+            try
+                close(previewFig);
+            catch
+            end
+        catch ME
+            warning("Could not display trajectory preview: %s", ME.message);
+        end
+    end
+
+    try
+        exportgraphics(exportFig, outEps, ...
+            "ContentType", "image", ...
+            "Resolution", cfg.trajEpsResolution, ...
+            "BackgroundColor", "white");
+    catch
+        warning("Trajectory exportgraphics failed. Falling back to print.");
+        print(exportFig, outEps, "-depsc", "-image", "-opengl", ...
+            sprintf("-r%d", cfg.trajEpsResolution));
+    end
+
+    close(exportFig);
+end
+
+function exportMCFigureAsImageEPS(fig, outEps, cfg)
+%EXPORTMCFIGUREASIMAGEEPS Keep Monte Carlo export as full-figure export.
 
     try
         exportgraphics(fig, outEps, ...
             "ContentType", "image", ...
-            "Resolution", cfg.epsResolution, ...
+            "Resolution", cfg.mcEpsResolution, ...
             "BackgroundColor", "white");
     catch
-        warning("exportgraphics EPS image export failed. Falling back to print -depsc -opengl.");
-        print(fig, outEps, "-depsc", "-opengl", sprintf("-r%d", cfg.epsResolution));
+        warning("MC exportgraphics failed. Falling back to print.");
+        print(fig, outEps, "-depsc", "-image", "-opengl", ...
+            sprintf("-r%d", cfg.mcEpsResolution));
+    end
+end
+
+function exportFigureAsImageEPS(fig, outEps, cfg)
+%EXPORTFIGUREASIMAGEEPS Generic helper retained for legend-only files.
+
+    if isfield(cfg, "trajEpsResolution")
+        res = cfg.trajEpsResolution;
+    elseif isfield(cfg, "mcEpsResolution")
+        res = cfg.mcEpsResolution;
+    else
+        res = 600;
+    end
+
+    try
+        exportgraphics(fig, outEps, ...
+            "ContentType", "image", ...
+            "Resolution", res, ...
+            "BackgroundColor", "white");
+    catch
+        warning("exportgraphics EPS image export failed. Falling back to print.");
+        print(fig, outEps, "-depsc", "-image", "-opengl", sprintf("-r%d", res));
     end
 end
 
