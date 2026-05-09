@@ -1,4 +1,4 @@
-%% process_comparison_results_cleaned_eps.m
+%% process_comparison_results.m
 % Minimal comparison-study postprocessing script.
 %
 % Outputs only the requested paper figures/tables:
@@ -33,7 +33,7 @@ fprintf("Using comparison-study runs folder:\n%s\n", rootDir);
 
 cfg = struct();
 
-cfg.outDir = fullfile(rootDir, "COMPARISON_REPORT_OUTPUT_CLEANED_EPS");
+cfg.outDir = fullfile(rootDir, "COMPARISON_REPORT_OUTPUT");
 
 cfg.optimizerOrder = ["GA","PSO","BAYESIAN","ABC","ACO"];
 cfg.observerOrder = [3 5 7 10];
@@ -47,36 +47,92 @@ cfg.paperCostCombos = ["J111","J110","J101","J011","J100","J010","J001"];
 cfg.displayMeasurementShort = "ao";
 cfg.lgPeriods = 1;
 
-% Appearance for metric/bar panels.
-cfg.fontName = "Times New Roman";
+% -----------------------------------------------------------------
+% GLOBAL FONT / STYLE CONTROLS
+% -----------------------------------------------------------------
+cfg.fontName   = "Times New Roman";
 cfg.fontWeight = "bold";
-cfg.axisFontSize = 26;
-cfg.labelFontSize = 26;
-cfg.legendFontSize = 26;
+cfg.removeTitles = true;
+
+% -----------------------------------------------------------------
+% TRAJECTORY FIGURE CONTROLS
+% -----------------------------------------------------------------
+% These mirror the newer baseline trajectory-export workflow: each
+% trajectory .fig is copied into a padded temporary export figure so the
+% LaTeX subfigure EPS panels stay tight without clipping labels.
+cfg.trajFigWidthIn      = 8.0;
+cfg.trajFigHeightIn     = 8.0;
+cfg.trajAxisFontSize    = 40;
+cfg.trajLabelFontSize   = 40;
+cfg.trajTitleFontSize   = 30;
+cfg.trajLegendFontSize  = 30;
+cfg.trajSharedLegendSize = 28;
+cfg.trajAnnotationFontSize = 30;
+
+% Padded axes box used in the temporary trajectory export figure:
+% [left bottom width height].
+cfg.trajPaddedAxesPosition = [0.18 0.18 0.70 0.60];
+cfg.trajXLabelPosition = [0.42 -0.10 0];
+cfg.trajYLabelPosition = [0.98 -0.05 0];
+
+cfg.trajXLabelString = "X (LU)";
+cfg.trajYLabelString = "Y (LU)";
+cfg.trajZLabelString = "Z (LU)";
+
+cfg.trajLineWidth       = 3.6;
+cfg.trajAxisLineWidth   = 1.6;
+cfg.trajMinScatterSize  = 80;
+cfg.trajEpsResolution   = 600;
+
+% Hide L1/L2 markers and labels in exported comparison trajectory panels.
+cfg.removeLibrationPointsFromTrajectory = true;
+
+% Optional preview of each trajectory export. Turn on only while tuning.
+cfg.previewTrajectoryExport = false;
+cfg.previewPauseSeconds = 5;
+cfg.previewResolution = 600;
+
+% -----------------------------------------------------------------
+% NON-TRAJECTORY FIGURE CONTROLS
+% -----------------------------------------------------------------
+% These are analogous to the MC controls in the baseline script. They are
+% used for screening bars, metric panels, cost bars, baseline-cost plots,
+% and orbit-family plots. Keeping this separate prevents trajectory edits
+% from changing the comparison/bar figures.
+cfg.plotFigWidthIn      = 10.5;
+cfg.plotFigHeightIn     = 8.0;
+cfg.plotMetricPanelWidthIn  = 10.5;
+cfg.plotMetricPanelHeightIn = 8.0;
+
+cfg.plotAxisFontSize    = 36;
+cfg.plotLabelFontSize   = 36;
+cfg.plotLegendFontSize  = 42;
+cfg.plotTitleFontSize   = 42;
+cfg.plotSharedLegendSize = 28;
+
+cfg.plotLineWidth       = 3.8;
+cfg.plotAxisLineWidth   = 1.8;
+cfg.plotMarkerSize      = 8;
+cfg.plotEpsResolution   = 600;
+
 cfg.legendLocation = "northoutside";
 cfg.legendOrientation = "horizontal";
-cfg.titleFontSize = 20;
-cfg.removeTitles = true;
-cfg.axisLineWidth = 1.4;
-cfg.lineWidth = 2.2;
-cfg.markerSize = 8;
-cfg.epsResolution = 600;
 
-% Individual trajectory panel source size. These are designed to be shrunk
-% in LaTeX subfigure grids.
-cfg.singleFigWidthIn = 12.5;
-cfg.singleFigHeightIn = 9.5;
+% Backward-compatible aliases used by existing helper functions.
+cfg.axisFontSize  = cfg.plotAxisFontSize;
+cfg.labelFontSize = cfg.plotLabelFontSize;
+cfg.legendFontSize = cfg.plotLegendFontSize;
+cfg.titleFontSize = cfg.plotTitleFontSize;
+cfg.axisLineWidth = cfg.plotAxisLineWidth;
+cfg.lineWidth = cfg.plotLineWidth;
+cfg.markerSize = cfg.plotMarkerSize;
+cfg.epsResolution = cfg.plotEpsResolution;
+cfg.metricPanelWidthIn = cfg.plotMetricPanelWidthIn;
+cfg.metricPanelHeightIn = cfg.plotMetricPanelHeightIn;
 
-cfg.trajPanelWidthIn = cfg.singleFigWidthIn;
-cfg.trajPanelHeightIn = cfg.singleFigHeightIn;
-cfg.trajAxisFontSize = 32;
-cfg.trajLabelFontSize = 36;
-cfg.trajLineWidth = 2.8;
-cfg.trajMarkerSize = 60;
-
-% Individual metric/cost panel sizes for LaTeX subfigure layouts.
-cfg.metricPanelWidthIn = 8.8;
-cfg.metricPanelHeightIn = 6.2;
+% Shared legend-only figure controls
+cfg.legendFigWidthIn    = 7.5;
+cfg.legendFigHeightIn   = 0.9;
 
 % Orbit-family plotting controls.
 cfg.orbitFamilyUseAllCostCombos = false;       % paper case: J111 only
@@ -778,7 +834,11 @@ fig = openfig(figPath, "invisible");
 
 set(fig, "Color", "w");
 set(fig, "Units", "inches");
-set(fig, "Position", [1 1 cfg.singleFigWidthIn cfg.singleFigHeightIn]);
+set(fig, "Position", [1 1 cfg.trajFigWidthIn cfg.trajFigHeightIn]);
+set(fig, "PaperUnits", "inches");
+set(fig, "PaperPosition", [0 0 cfg.trajFigWidthIn cfg.trajFigHeightIn]);
+set(fig, "PaperSize", [cfg.trajFigWidthIn cfg.trajFigHeightIn]);
+set(fig, "InvertHardcopy", "off");
 set(fig, "Renderer", "opengl");
 
 applyFigureStyleForTrajectory(fig, cfg);
@@ -788,8 +848,12 @@ if isfield(cfg, "removeTitles") && cfg.removeTitles
     removeAllTitles(fig);
 end
 
+if isfield(cfg, "removeLibrationPointsFromTrajectory") && cfg.removeLibrationPointsFromTrajectory
+    removeLibrationPointObjects(fig);
+end
+
 drawnow;
-exportFigureAsImageEPS(fig, outPath, cfg);
+exportTrajectoryEPS(fig, outPath, cfg);
 close(fig);
 end
 
@@ -803,10 +867,11 @@ for i = 1:numel(ax)
 
     try
         set(ax(i), ...
+            "Units", "normalized", ...
             "FontName", cfg.fontName, ...
             "FontSize", cfg.trajAxisFontSize, ...
             "FontWeight", cfg.fontWeight, ...
-            "LineWidth", cfg.axisLineWidth);
+            "LineWidth", cfg.trajAxisLineWidth);
 
         ax(i).XLabel.FontSize = cfg.trajLabelFontSize;
         ax(i).YLabel.FontSize = cfg.trajLabelFontSize;
@@ -816,20 +881,20 @@ for i = 1:numel(ax)
         ax(i).YLabel.FontWeight = cfg.fontWeight;
         ax(i).ZLabel.FontWeight = cfg.fontWeight;
 
+        ax(i).XLabel.FontName = cfg.fontName;
+        ax(i).YLabel.FontName = cfg.fontName;
+        ax(i).ZLabel.FontName = cfg.fontName;
+
+        ax(i).XLabel.String = cfg.trajXLabelString;
+        ax(i).YLabel.String = cfg.trajYLabelString;
+        ax(i).ZLabel.String = cfg.trajZLabelString;
+
         title(ax(i), "");
 
-        % Dense trajectory grids are too small for per-panel axis text.
-        % Remove labels and tick labels so the plotted orbits use the space.
-        xlabel(ax(i), "");
-        ylabel(ax(i), "");
-        zlabel(ax(i), "");
-        ax(i).XTickLabel = [];
-        ax(i).YTickLabel = [];
-        ax(i).ZTickLabel = [];
-        ax(i).TickLength = [0.01 0.01];
-
-        grid(ax(i), "on");
+        % Match the newer baseline trajectory style: no grid lines.
+        grid(ax(i), "off");
         box(ax(i), "on");
+        axis(ax(i), "vis3d");
     catch
     end
 end
@@ -845,7 +910,220 @@ end
 scat = findall(fig, "Type", "scatter");
 for i = 1:numel(scat)
     try
-        scat(i).SizeData = max(scat(i).SizeData, cfg.trajMarkerSize);
+        scat(i).SizeData = max(scat(i).SizeData, cfg.trajMinScatterSize);
+    catch
+    end
+end
+
+lgd = findall(fig, "Type", "legend");
+for i = 1:numel(lgd)
+    try
+        set(lgd(i), ...
+            "FontName", cfg.fontName, ...
+            "FontSize", cfg.trajLegendFontSize, ...
+            "FontWeight", cfg.fontWeight, ...
+            "Box", "on");
+    catch
+    end
+end
+end
+
+function exportTrajectoryEPS(fig, outPath, cfg)
+%EXPORTTRAJECTORYEPS Export the main 3D trajectory axes through a padded
+%temporary figure. This is tighter than exporting the full original .fig,
+%but safer than axes-only export because it reserves whitespace for labels.
+
+ax = findall(fig, "Type", "axes");
+
+if isempty(ax)
+    error("No axes found for trajectory export.");
+end
+
+keep = true(numel(ax), 1);
+for i = 1:numel(ax)
+    if strcmpi(ax(i).Tag, "legend")
+        keep(i) = false;
+    end
+end
+ax = ax(keep);
+
+if isempty(ax)
+    error("No trajectory axes found for export.");
+end
+
+% Pick the largest axes as the main trajectory axes.
+areas = zeros(numel(ax), 1);
+for i = 1:numel(ax)
+    try
+        pos = ax(i).Position;
+        areas(i) = pos(3) * pos(4);
+    catch
+        areas(i) = 0;
+    end
+end
+
+[~, idx] = max(areas);
+mainAx = ax(idx);
+
+drawnow;
+
+exportFig = figure( ...
+    "Color", "w", ...
+    "Units", "inches", ...
+    "Position", [1 1 cfg.trajFigWidthIn cfg.trajFigHeightIn], ...
+    "PaperUnits", "inches", ...
+    "PaperPosition", [0 0 cfg.trajFigWidthIn cfg.trajFigHeightIn], ...
+    "PaperSize", [cfg.trajFigWidthIn cfg.trajFigHeightIn], ...
+    "InvertHardcopy", "off", ...
+    "Renderer", "opengl", ...
+    "Visible", "off");
+
+newAx = copyobj(mainAx, exportFig);
+
+set(newAx, ...
+    "Units", "normalized", ...
+    "Position", cfg.trajPaddedAxesPosition, ...
+    "ActivePositionProperty", "position");
+
+axis(newAx, "vis3d");
+box(newAx, "on");
+grid(newAx, "off");
+
+set(newAx, ...
+    "FontName", cfg.fontName, ...
+    "FontSize", cfg.trajAxisFontSize, ...
+    "FontWeight", cfg.fontWeight, ...
+    "LineWidth", cfg.trajAxisLineWidth);
+
+newAx.XLabel.FontName = cfg.fontName;
+newAx.YLabel.FontName = cfg.fontName;
+newAx.ZLabel.FontName = cfg.fontName;
+
+newAx.XLabel.FontSize = cfg.trajLabelFontSize;
+newAx.YLabel.FontSize = cfg.trajLabelFontSize;
+newAx.ZLabel.FontSize = cfg.trajLabelFontSize;
+
+newAx.XLabel.FontWeight = cfg.fontWeight;
+newAx.YLabel.FontWeight = cfg.fontWeight;
+newAx.ZLabel.FontWeight = cfg.fontWeight;
+
+newAx.XLabel.String = cfg.trajXLabelString;
+newAx.YLabel.String = cfg.trajYLabelString;
+newAx.ZLabel.String = cfg.trajZLabelString;
+
+try
+    newAx.XLabel.Units = "normalized";
+    newAx.YLabel.Units = "normalized";
+    newAx.XLabel.Position = cfg.trajXLabelPosition;
+    newAx.YLabel.Position = cfg.trajYLabelPosition;
+catch
+end
+
+if cfg.removeTitles
+    title(newAx, "");
+end
+
+if isfield(cfg, "removeLibrationPointsFromTrajectory") && cfg.removeLibrationPointsFromTrajectory
+    removeLibrationPointObjects(exportFig);
+end
+
+lines = findall(newAx, "Type", "line");
+for i = 1:numel(lines)
+    try
+        lines(i).LineWidth = cfg.trajLineWidth;
+    catch
+    end
+end
+
+scat = findall(newAx, "Type", "scatter");
+for i = 1:numel(scat)
+    try
+        scat(i).SizeData = max(scat(i).SizeData, cfg.trajMinScatterSize);
+    catch
+    end
+end
+
+drawnow;
+pause(0.05);
+
+if isfield(cfg, "previewTrajectoryExport") && cfg.previewTrajectoryExport
+    previewPng = replace(string(outPath), ".eps", "_PREVIEW.png");
+    exportgraphics(exportFig, previewPng, ...
+        "ContentType", "image", ...
+        "Resolution", cfg.previewResolution, ...
+        "BackgroundColor", "white");
+    try
+        im = imread(previewPng);
+        previewFig = figure("Color", "w", "Name", "Trajectory EPS Preview", "NumberTitle", "off");
+        imshow(im, "Border", "tight");
+        drawnow;
+        pause(cfg.previewPauseSeconds);
+        close(previewFig);
+    catch
+    end
+end
+
+try
+    exportgraphics(exportFig, outPath, ...
+        "ContentType", "image", ...
+        "Resolution", cfg.trajEpsResolution, ...
+        "BackgroundColor", "white");
+catch
+    warning("Trajectory exportgraphics failed. Falling back to print.");
+    print(exportFig, outPath, "-depsc", "-image", "-opengl", sprintf("-r%d", cfg.trajEpsResolution));
+end
+
+close(exportFig);
+end
+
+function removeLibrationPointObjects(fig)
+% Remove L1/L2 labels and markers from copied trajectory figures. The
+% function first removes objects explicitly named/labeled L1 or L2. As a
+% fallback, it removes gray triangular markers, which are how L1/L2 are
+% commonly drawn in these trajectory panels.
+
+objs = findall(fig);
+for i = 1:numel(objs)
+    try
+        txt = "";
+        if isprop(objs(i), "DisplayName")
+            txt = txt + " " + string(objs(i).DisplayName);
+        end
+        if isprop(objs(i), "String")
+            s = objs(i).String;
+            if iscell(s)
+                s = strjoin(string(s), " ");
+            end
+            txt = txt + " " + string(s);
+        end
+        if isprop(objs(i), "Tag")
+            txt = txt + " " + string(objs(i).Tag);
+        end
+        if contains(upper(txt), "L1") || contains(upper(txt), "L2")
+            delete(objs(i));
+        end
+    catch
+    end
+end
+
+% Fallback for unlabeled L1/L2 triangle markers.
+objs = findall(fig);
+for i = 1:numel(objs)
+    try
+        if isprop(objs(i), "Marker")
+            mk = string(objs(i).Marker);
+            if mk == "^" || mk == "v" || mk == ">" || mk == "<"
+                % Only remove if it looks like a small marker object rather
+                % than an orbit trajectory with many data points.
+                nPts = Inf;
+                if isprop(objs(i), "XData")
+                    nPts = numel(objs(i).XData);
+                end
+                if nPts <= 5
+                    delete(objs(i));
+                end
+            end
+        end
     catch
     end
 end
@@ -896,7 +1174,7 @@ for i = 1:numel(optList)
     end
 end
 
-fig = figure("Color","w","Units","inches","Position",[1 1 8.5 5.5]);
+fig = figure("Color","w","Units","inches","Position",[1 1 cfg.plotFigWidthIn cfg.plotFigHeightIn]);
 ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
@@ -960,7 +1238,7 @@ end
 end
 
 function exportGroupedMetricPanel(T, cfg, metricVar, yLabelText, outPath)
-fig = figure("Color","w","Units","inches","Position",[1 1 cfg.metricPanelWidthIn cfg.metricPanelHeightIn]);
+fig = figure("Color","w","Units","inches","Position",[1 1 cfg.plotMetricPanelWidthIn cfg.plotMetricPanelHeightIn]);
 ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
@@ -1098,7 +1376,7 @@ for i = 1:numel(optList)
     end
 end
 
-fig = figure("Color","w","Units","inches","Position",[1 1 8.5 5.5]);
+fig = figure("Color","w","Units","inches","Position",[1 1 cfg.plotFigWidthIn cfg.plotFigHeightIn]);
 ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
@@ -1147,7 +1425,7 @@ if isempty(T) || isempty(B)
     return;
 end
 
-fig = figure("Color","w","Units","inches","Position",[1 1 8.5 5.5]);
+fig = figure("Color","w","Units","inches","Position",[1 1 cfg.plotFigWidthIn cfg.plotFigHeightIn]);
 ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
@@ -1165,7 +1443,7 @@ for j = 1:numel(measList)
 
     if ~isempty(idx) && isfinite(B.min_cost_mean(idx))
         h = yline(ax, B.min_cost_mean(idx), baseStyles{j}, ...
-            'LineWidth', cfg.lineWidth + 0.4, ...
+            'LineWidth', cfg.plotLineWidth + 0.4, ...
             'Color', baseColors(j,:), ...
             'DisplayName', "Baseline " + upper(measList(j)));
 
@@ -1658,7 +1936,7 @@ counts = splitapply(@numel, ones(numel(G),1), G);
 [famNames, idx] = sort(string(famNames));
 counts = counts(idx);
 
-fig = figure("Color","w","Units","inches","Position",[1 1 8.5 5.5]);
+fig = figure("Color","w","Units","inches","Position",[1 1 cfg.plotFigWidthIn cfg.plotFigHeightIn]);
 ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
@@ -1706,16 +1984,16 @@ function exportFigureAsImageEPS(fig, outEps, cfg)
 try
     exportgraphics(fig, outEps, ...
         'ContentType', 'image', ...
-        'Resolution', cfg.epsResolution, ...
+        'Resolution', cfg.plotEpsResolution, ...
         'BackgroundColor', 'white');
 catch
     warning('exportgraphics EPS image export failed. Falling back to print -depsc -opengl.');
-    print(fig, outEps, '-depsc', '-image', sprintf('-r%d', cfg.epsResolution));
+    print(fig, outEps, '-depsc', '-image', sprintf('-r%d', cfg.plotEpsResolution));
 end
 end
 
 function setCommonAxes(ax, cfg)
-set(ax, 'FontName', cfg.fontName, 'FontSize', cfg.axisFontSize, 'FontWeight', cfg.fontWeight, 'LineWidth', cfg.axisLineWidth);
+set(ax, 'FontName', cfg.fontName, 'FontSize', cfg.plotAxisFontSize, 'FontWeight', cfg.fontWeight, 'LineWidth', cfg.plotAxisLineWidth);
 end
 
 function lgd = applyConsistentLegend(ax, labels, cfg)
@@ -1733,13 +2011,13 @@ lgd.AutoUpdate = 'off';
 end
 
 function args = commonLabelArgs(cfg)
-args = {'FontName', cfg.fontName, 'FontSize', cfg.labelFontSize, 'FontWeight', cfg.fontWeight};
+args = {'FontName', cfg.fontName, 'FontSize', cfg.plotLabelFontSize, 'FontWeight', cfg.fontWeight};
 end
 
 function args = commonTitleArgs(cfg)
-args = {'FontName', cfg.fontName, 'FontSize', cfg.titleFontSize, 'FontWeight', cfg.fontWeight};
+args = {'FontName', cfg.fontName, 'FontSize', cfg.plotTitleFontSize, 'FontWeight', cfg.fontWeight};
 end
 
 function args = commonLegendArgs(cfg)
-args = {'FontName', cfg.fontName, 'FontSize', cfg.legendFontSize, 'FontWeight', cfg.fontWeight};
+args = {'FontName', cfg.fontName, 'FontSize', cfg.plotLegendFontSize, 'FontWeight', cfg.fontWeight};
 end
