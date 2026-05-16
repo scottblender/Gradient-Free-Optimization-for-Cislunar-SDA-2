@@ -99,16 +99,16 @@ cfg.previewResolution = 600;
 % used for screening bars, metric panels, cost bars, baseline-cost plots,
 % and orbit-family plots. Keeping this separate prevents trajectory edits
 % from changing the comparison/bar figures.
-cfg.plotFigWidthIn      = 10.5;
-cfg.plotFigHeightIn     = 8.0;
-cfg.plotMetricPanelWidthIn  = 10.5;
-cfg.plotMetricPanelHeightIn = 8.0;
+cfg.plotFigWidthIn      = 8.5;
+cfg.plotFigHeightIn     = 6.0;
+cfg.plotMetricPanelWidthIn  = 8.5;
+cfg.plotMetricPanelHeightIn = 6.0;
 
-cfg.plotAxisFontSize    = 36;
-cfg.plotLabelFontSize   = 36;
-cfg.plotLegendFontSize  = 42;
-cfg.plotTitleFontSize   = 42;
-cfg.plotSharedLegendSize = 28;
+cfg.plotAxisFontSize    = 30;
+cfg.plotLabelFontSize   = 30;
+cfg.plotLegendFontSize  = 30;
+cfg.plotTitleFontSize   = 30;
+cfg.plotSharedLegendSize = 30;
 
 cfg.plotLineWidth       = 3.8;
 cfg.plotAxisLineWidth   = 1.8;
