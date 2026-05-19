@@ -60,10 +60,10 @@ cfg.removeTitles = true;
 % These mirror the newer baseline trajectory-export workflow: each
 % trajectory .fig is copied into a padded temporary export figure so the
 % LaTeX subfigure EPS panels stay tight without clipping labels.
-cfg.trajFigWidthIn      = 9.5;
-cfg.trajFigHeightIn     = 11.0;
-cfg.trajAxisFontSize    = 30;
-cfg.trajLabelFontSize   = 38;
+cfg.trajFigWidthIn      = 9.0;
+cfg.trajFigHeightIn     = 8.0;
+cfg.trajAxisFontSize    = 32;
+cfg.trajLabelFontSize   = 34;
 cfg.trajTitleFontSize   = 30;
 cfg.trajLegendFontSize  = 30;
 cfg.trajSharedLegendSize = 28;
@@ -71,9 +71,9 @@ cfg.trajAnnotationFontSize = 30;
 
 % Padded axes box used in the temporary trajectory export figure:
 % [left bottom width height].
-cfg.trajPaddedAxesPosition = [0.18 0.18 0.70 0.60];
-cfg.trajXLabelPosition = [0.42 -0.10 0];
-cfg.trajYLabelPosition = [0.98 -0.05 0];
+cfg.trajPaddedAxesPosition = [0.15 0.27 0.66 0.56];
+cfg.trajXLabelPosition = [0.42 -0.08 0];
+cfg.trajYLabelPosition = [0.98 -0.04 0];
 
 cfg.trajXLabelString = "X (LU)";
 cfg.trajYLabelString = "Y (LU)";
@@ -85,7 +85,7 @@ cfg.trajMinScatterSize  = 80;
 cfg.trajEpsResolution   = 600;
 
 % Hide L1/L2 markers and labels in exported comparison trajectory panels.
-cfg.removeLibrationPointsFromTrajectory = true;
+cfg.removeLibrationPointsFromTrajectory = false;
 
 % Optional preview of each trajectory export. Turn on only while tuning.
 cfg.previewTrajectoryExport = false;
@@ -99,13 +99,13 @@ cfg.previewResolution = 600;
 % used for screening bars, metric panels, cost bars, baseline-cost plots,
 % and orbit-family plots. Keeping this separate prevents trajectory edits
 % from changing the comparison/bar figures.
-cfg.plotFigWidthIn      = 9.5;
+cfg.plotFigWidthIn      = 9.8;
 cfg.plotFigHeightIn     = 6.2;
-cfg.plotMetricPanelWidthIn  = 9.5;
+cfg.plotMetricPanelWidthIn  = 9.8;
 cfg.plotMetricPanelHeightIn = 6.2;
 
-cfg.plotAxisFontSize    = 34;
-cfg.plotLabelFontSize   = 34;
+cfg.plotAxisFontSize    = 36;
+cfg.plotLabelFontSize   = 36;
 cfg.plotLegendFontSize  = 33;
 cfg.plotTitleFontSize   = 32;
 cfg.plotSharedLegendSize = 32;
@@ -121,10 +121,10 @@ cfg.plotEpsResolution   = 600;
 % These apply only to the orbit-family selection-count plots. Those plots
 % are the single-series/all-blue bar charts, so they now have independent
 % sizing and font controls from the grouped comparison bars above.
-cfg.familyFigWidthIn      = 9.5;
+cfg.familyFigWidthIn      = 9.8;
 cfg.familyFigHeightIn     = 6.2;
 cfg.familyAxisFontSize    = 38;
-cfg.familyLabelFontSize   = 38;
+cfg.familyLabelFontSize   = 44;
 cfg.familyLegendFontSize  = 32;
 cfg.familyTitleFontSize   = 32;
 cfg.familyLineWidth       = 3.8;
@@ -902,9 +902,9 @@ for i = 1:numel(ax)
         ax(i).YLabel.FontName = cfg.fontName;
         ax(i).ZLabel.FontName = cfg.fontName;
 
-        ax(i).XLabel.String = cfg.trajXLabelString;
-        ax(i).YLabel.String = cfg.trajYLabelString;
-        ax(i).ZLabel.String = cfg.trajZLabelString;
+        % Keep original label strings here.
+        % Final export labels are set only after copyobj in exportTrajectoryEPS,
+        % matching the baseline script's trajectory-export workflow.
 
         title(ax(i), "");
 
@@ -1094,18 +1094,18 @@ close(exportFig);
 end
 
 function removeLibrationPointObjects(fig)
-% Remove L1/L2 labels and markers from copied trajectory figures. The
-% function first removes objects explicitly named/labeled L1 or L2. As a
-% fallback, it removes gray triangular markers, which are how L1/L2 are
-% commonly drawn in these trajectory panels.
+% Remove L1/L2 labels and markers from copied trajectory figures.
 
 objs = findall(fig);
+
 for i = 1:numel(objs)
     try
         txt = "";
+
         if isprop(objs(i), "DisplayName")
             txt = txt + " " + string(objs(i).DisplayName);
         end
+
         if isprop(objs(i), "String")
             s = objs(i).String;
             if iscell(s)
@@ -1113,33 +1113,53 @@ for i = 1:numel(objs)
             end
             txt = txt + " " + string(s);
         end
+
         if isprop(objs(i), "Tag")
             txt = txt + " " + string(objs(i).Tag);
         end
-        if contains(upper(txt), "L1") || contains(upper(txt), "L2")
+
+        txtClean = upper(strtrim(txt));
+
+        if contains(txtClean, "L1") || contains(txtClean, "L2")
             delete(objs(i));
         end
     catch
     end
 end
 
-% Fallback for unlabeled L1/L2 triangle markers.
+% Second pass: remove small standalone triangle markers, which are commonly
+% used for L1/L2.
 objs = findall(fig);
+
 for i = 1:numel(objs)
     try
         if isprop(objs(i), "Marker")
             mk = string(objs(i).Marker);
+
             if mk == "^" || mk == "v" || mk == ">" || mk == "<"
-                % Only remove if it looks like a small marker object rather
-                % than an orbit trajectory with many data points.
                 nPts = Inf;
+
                 if isprop(objs(i), "XData")
                     nPts = numel(objs(i).XData);
                 end
+
                 if nPts <= 5
                     delete(objs(i));
                 end
             end
+        end
+    catch
+    end
+end
+
+% Third pass: remove any remaining text object that is exactly L1 or L2.
+txtObjs = findall(fig, "Type", "text");
+
+for i = 1:numel(txtObjs)
+    try
+        s = upper(strtrim(string(txtObjs(i).String)));
+        if s == "L1" || s == "L2"
+            delete(txtObjs(i));
         end
     catch
     end
@@ -1200,7 +1220,7 @@ bar(ax, categorical(optList,optList), [yOff yOn], 'grouped');
 setCommonAxes(ax, cfg);
 lblArgs = commonLabelArgs(cfg);
 xlabel(ax, "Optimizer", lblArgs{:});
-ylabel(ax, "Average screening events", lblArgs{:});
+ylabel(ax, "Avg. Screening Events", lblArgs{:});
 ttlArgs = commonTitleArgs(cfg);
 title(ax, caseSpec.label + " (" + upper(caseSpec.measurement_short) + ")", ttlArgs{:});
 applyConsistentLegend(ax, {"Screening OFF","Screening ON"}, cfg);
@@ -1233,10 +1253,10 @@ if isempty(T)
 end
 
 metricDefs = { ...
-    'min_cost_mean', 'cost', 'Total cost'; ...
-    'rmse_pos_km_mean', 'rmse', 'RMSE position (km)'; ...
+    'min_cost_mean', 'cost', 'Total Cost'; ...
+    'rmse_pos_km_mean', 'rmse', 'RMSE Position (km)'; ...
     'runtime_s_mean', 'runtime', 'Runtime (s)'; ...
-    'screening_events_mean', 'screening', 'Average screening events'};
+    'screening_events_mean', 'screening', 'Avg. Screening Events'};
 
 caseDir = fullfile(outDir, char(caseSpec.mission));
 makeDir(caseDir);
@@ -1402,7 +1422,7 @@ bar(ax, categorical(optList,optList), Y, 'grouped');
 setCommonAxes(ax, cfg);
 lblArgs = commonLabelArgs(cfg);
 xlabel(ax, 'Optimizer', lblArgs{:});
-ylabel(ax, 'Contribution to total cost', lblArgs{:});
+ylabel(ax, 'Total Cost Contribution', lblArgs{:});
 ttlArgs = commonTitleArgs(cfg);
 title(ax, sprintf('%s: J111 cost-component breakdown (%s, 3 obs.)', caseSpec.label, upper(caseSpec.measurement_short)), ttlArgs{:});
 applyConsistentLegend(ax, {'J1','J2','J3'}, cfg);
@@ -1447,7 +1467,7 @@ ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
 box(ax,'on');
-barHandles = plotGroupedBarsByMeasurement(ax, T, cfg, 'min_cost_mean', 'Total cost');
+barHandles = plotGroupedBarsByMeasurement(ax, T, cfg, 'min_cost_mean', 'Total Crojectost');
 
 measList = cfg.measurementShortOrder(ismember(cfg.measurementShortOrder, unique(B.measurement_short)));
 baseHandles = gobjects(0);
@@ -1963,7 +1983,7 @@ setFamilyAxes(ax, cfg);
 xtickangle(ax, cfg.familyXTickAngle);
 lblArgs = commonFamilyLabelArgs(cfg);
 xlabel(ax, 'Orbit family', lblArgs{:});
-ylabel(ax, 'Selection count', lblArgs{:});
+ylabel(ax, 'Count', lblArgs{:});
 ttlArgs = commonFamilyTitleArgs(cfg);
 title(ax, titleText, ttlArgs{:});
 
