@@ -60,10 +60,10 @@ cfg.removeTitles = true;
 % These mirror the newer baseline trajectory-export workflow: each
 % trajectory .fig is copied into a padded temporary export figure so the
 % LaTeX subfigure EPS panels stay tight without clipping labels.
-cfg.trajFigWidthIn      = 8.0;
-cfg.trajFigHeightIn     = 8.0;
-cfg.trajAxisFontSize    = 40;
-cfg.trajLabelFontSize   = 40;
+cfg.trajFigWidthIn      = 9.5;
+cfg.trajFigHeightIn     = 11.0;
+cfg.trajAxisFontSize    = 30;
+cfg.trajLabelFontSize   = 38;
 cfg.trajTitleFontSize   = 30;
 cfg.trajLegendFontSize  = 30;
 cfg.trajSharedLegendSize = 28;
@@ -99,21 +99,38 @@ cfg.previewResolution = 600;
 % used for screening bars, metric panels, cost bars, baseline-cost plots,
 % and orbit-family plots. Keeping this separate prevents trajectory edits
 % from changing the comparison/bar figures.
-cfg.plotFigWidthIn      = 8.5;
-cfg.plotFigHeightIn     = 6.0;
-cfg.plotMetricPanelWidthIn  = 8.5;
-cfg.plotMetricPanelHeightIn = 6.0;
+cfg.plotFigWidthIn      = 9.5;
+cfg.plotFigHeightIn     = 6.2;
+cfg.plotMetricPanelWidthIn  = 9.5;
+cfg.plotMetricPanelHeightIn = 6.2;
 
-cfg.plotAxisFontSize    = 30;
-cfg.plotLabelFontSize   = 30;
-cfg.plotLegendFontSize  = 30;
-cfg.plotTitleFontSize   = 30;
-cfg.plotSharedLegendSize = 30;
+cfg.plotAxisFontSize    = 34;
+cfg.plotLabelFontSize   = 34;
+cfg.plotLegendFontSize  = 33;
+cfg.plotTitleFontSize   = 32;
+cfg.plotSharedLegendSize = 32;
 
 cfg.plotLineWidth       = 3.8;
 cfg.plotAxisLineWidth   = 1.8;
 cfg.plotMarkerSize      = 8;
 cfg.plotEpsResolution   = 600;
+
+% -----------------------------------------------------------------
+% ALL-BLUE BAR CHART CONTROLS
+% -----------------------------------------------------------------
+% These apply only to the orbit-family selection-count plots. Those plots
+% are the single-series/all-blue bar charts, so they now have independent
+% sizing and font controls from the grouped comparison bars above.
+cfg.familyFigWidthIn      = 9.5;
+cfg.familyFigHeightIn     = 6.2;
+cfg.familyAxisFontSize    = 38;
+cfg.familyLabelFontSize   = 38;
+cfg.familyLegendFontSize  = 32;
+cfg.familyTitleFontSize   = 32;
+cfg.familyLineWidth       = 3.8;
+cfg.familyAxisLineWidth   = 1.8;
+cfg.familyEpsResolution   = 600;
+cfg.familyXTickAngle      = 35;
 
 cfg.legendLocation = "northoutside";
 cfg.legendOrientation = "horizontal";
@@ -1448,7 +1465,7 @@ for j = 1:numel(measList)
             'DisplayName', "Baseline " + upper(measList(j)));
 
         baseHandles(end+1) = h;
-        baseLabels(end+1) = "Baseline " + upper(measList(j));
+        baseLabels(end+1) = "Base. " + upper(measList(j));
     end
 end
 
@@ -1936,20 +1953,24 @@ counts = splitapply(@numel, ones(numel(G),1), G);
 [famNames, idx] = sort(string(famNames));
 counts = counts(idx);
 
-fig = figure("Color","w","Units","inches","Position",[1 1 cfg.plotFigWidthIn cfg.plotFigHeightIn]);
+fig = figure("Color","w","Units","inches","Position",[1 1 cfg.familyFigWidthIn cfg.familyFigHeightIn]);
 ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
 box(ax,'on');
 bar(ax, categorical(famNames, famNames), counts);
-setCommonAxes(ax, cfg);
-xtickangle(ax, 35);
-lblArgs = commonLabelArgs(cfg);
+setFamilyAxes(ax, cfg);
+xtickangle(ax, cfg.familyXTickAngle);
+lblArgs = commonFamilyLabelArgs(cfg);
 xlabel(ax, 'Orbit family', lblArgs{:});
 ylabel(ax, 'Selection count', lblArgs{:});
-ttlArgs = commonTitleArgs(cfg);
+ttlArgs = commonFamilyTitleArgs(cfg);
 title(ax, titleText, ttlArgs{:});
-exportFigure(fig, outPath, cfg);
+
+% Use family-specific export resolution without affecting grouped bar charts.
+cfgExport = cfg;
+cfgExport.plotEpsResolution = cfg.familyEpsResolution;
+exportFigure(fig, outPath, cfgExport);
 close(fig);
 end
 
@@ -1996,6 +2017,10 @@ function setCommonAxes(ax, cfg)
 set(ax, 'FontName', cfg.fontName, 'FontSize', cfg.plotAxisFontSize, 'FontWeight', cfg.fontWeight, 'LineWidth', cfg.plotAxisLineWidth);
 end
 
+function setFamilyAxes(ax, cfg)
+set(ax, 'FontName', cfg.fontName, 'FontSize', cfg.familyAxisFontSize, 'FontWeight', cfg.fontWeight, 'LineWidth', cfg.familyAxisLineWidth);
+end
+
 function lgd = applyConsistentLegend(ax, labels, cfg)
 lgArgs = commonLegendArgs(cfg);
 lgd = legend(ax, labels, 'Location', cfg.legendLocation, 'Orientation', cfg.legendOrientation, lgArgs{:});
@@ -2006,6 +2031,7 @@ end
 function lgd = applyConsistentLegendWithHandles(ax, handles, labels, cfg)
 lgArgs = commonLegendArgs(cfg);
 lgd = legend(ax, handles, labels, 'Location', cfg.legendLocation, 'Orientation', cfg.legendOrientation, lgArgs{:});
+lgd.NumColumns = numel(labels);
 lgd.Box = 'on';
 lgd.AutoUpdate = 'off';
 end
@@ -2014,8 +2040,16 @@ function args = commonLabelArgs(cfg)
 args = {'FontName', cfg.fontName, 'FontSize', cfg.plotLabelFontSize, 'FontWeight', cfg.fontWeight};
 end
 
+function args = commonFamilyLabelArgs(cfg)
+args = {'FontName', cfg.fontName, 'FontSize', cfg.familyLabelFontSize, 'FontWeight', cfg.fontWeight};
+end
+
 function args = commonTitleArgs(cfg)
 args = {'FontName', cfg.fontName, 'FontSize', cfg.plotTitleFontSize, 'FontWeight', cfg.fontWeight};
+end
+
+function args = commonFamilyTitleArgs(cfg)
+args = {'FontName', cfg.fontName, 'FontSize', cfg.familyTitleFontSize, 'FontWeight', cfg.fontWeight};
 end
 
 function args = commonLegendArgs(cfg)
