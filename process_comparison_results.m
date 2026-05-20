@@ -79,6 +79,11 @@ cfg.trajXLabelString = "X (LU)";
 cfg.trajYLabelString = "Y (LU)";
 cfg.trajZLabelString = "Z (LU)";
 
+% For paper trajectory panels, the plots are intended to show geometry.
+% Turning these off avoids MATLAB 3D tick/axis-label clipping and rotation.
+cfg.trajShowAxisLabels = false;
+cfg.trajShowTickLabels = false;
+
 cfg.trajLineWidth       = 3.6;
 cfg.trajAxisLineWidth   = 1.6;
 cfg.trajMinScatterSize  = 80;
@@ -912,6 +917,8 @@ for i = 1:numel(ax)
         grid(ax(i), "off");
         box(ax(i), "on");
         axis(ax(i), "vis3d");
+
+        applyTrajectoryAxisTextVisibility(ax(i), cfg);
     catch
     end
 end
@@ -1024,17 +1031,25 @@ newAx.XLabel.FontWeight = cfg.fontWeight;
 newAx.YLabel.FontWeight = cfg.fontWeight;
 newAx.ZLabel.FontWeight = cfg.fontWeight;
 
-newAx.XLabel.String = cfg.trajXLabelString;
-newAx.YLabel.String = cfg.trajYLabelString;
-newAx.ZLabel.String = cfg.trajZLabelString;
+if isfield(cfg, "trajShowAxisLabels") && cfg.trajShowAxisLabels
+    newAx.XLabel.String = cfg.trajXLabelString;
+    newAx.YLabel.String = cfg.trajYLabelString;
+    newAx.ZLabel.String = cfg.trajZLabelString;
 
-try
-    newAx.XLabel.Units = "normalized";
-    newAx.YLabel.Units = "normalized";
-    newAx.XLabel.Position = cfg.trajXLabelPosition;
-    newAx.YLabel.Position = cfg.trajYLabelPosition;
-catch
+    try
+        newAx.XLabel.Units = "normalized";
+        newAx.YLabel.Units = "normalized";
+        newAx.XLabel.Position = cfg.trajXLabelPosition;
+        newAx.YLabel.Position = cfg.trajYLabelPosition;
+    catch
+    end
+else
+    newAx.XLabel.String = "";
+    newAx.YLabel.String = "";
+    newAx.ZLabel.String = "";
 end
+
+applyTrajectoryAxisTextVisibility(newAx, cfg);
 
 if cfg.removeTitles
     title(newAx, "");
@@ -1059,6 +1074,10 @@ for i = 1:numel(scat)
     catch
     end
 end
+
+% Re-apply right before preview/export because MATLAB can restore ticks
+% after camera/font updates in copied 3D axes.
+applyTrajectoryAxisTextVisibility(newAx, cfg);
 
 drawnow;
 pause(0.05);
@@ -1091,6 +1110,47 @@ catch
 end
 
 close(exportFig);
+end
+
+
+function applyTrajectoryAxisTextVisibility(ax, cfg)
+%APPLYTRAJECTORYAXISTEXTVISIBILITY Hide trajectory-axis text when the
+%trajectory panels are used only to show geometry.
+
+if isfield(cfg, "trajShowAxisLabels") && ~cfg.trajShowAxisLabels
+    try
+        ax.XLabel.String = "";
+        ax.YLabel.String = "";
+        ax.ZLabel.String = "";
+    catch
+    end
+end
+
+if isfield(cfg, "trajShowTickLabels") && ~cfg.trajShowTickLabels
+    % Hide both the tick labels and the tick marks themselves.
+    % This keeps the 3D axes box for geometry/context, but removes the
+    % tick clutter that was causing LaTeX/EPS export problems.
+    try
+        set(ax, ...
+            "XTick", [], ...
+            "YTick", [], ...
+            "ZTick", [], ...
+            "XTickLabel", {}, ...
+            "YTickLabel", {}, ...
+            "ZTickLabel", {});
+    catch
+    end
+
+    try
+        ax.XAxis.TickValues = [];
+        ax.YAxis.TickValues = [];
+        ax.ZAxis.TickValues = [];
+        ax.XAxis.TickLabels = {};
+        ax.YAxis.TickLabels = {};
+        ax.ZAxis.TickLabels = {};
+    catch
+    end
+end
 end
 
 function removeLibrationPointObjects(fig)
