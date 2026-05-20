@@ -79,8 +79,8 @@ cfg.trajXLabelString = "X (LU)";
 cfg.trajYLabelString = "Y (LU)";
 cfg.trajZLabelString = "Z (LU)";
 
-% For paper trajectory panels, the plots are intended to show geometry.
-% Turning these off avoids MATLAB 3D tick/axis-label clipping and rotation.
+% For trajectory panels, keep the geometry but remove axis clutter.
+% Non-trajectory plots are unaffected.
 cfg.trajShowAxisLabels = false;
 cfg.trajShowTickLabels = false;
 
@@ -412,6 +412,17 @@ baselineFamilyLong = table();
 if ~isempty(baselineRaw)
     baselineFamilyLong = collectObserverSelectionsFromExcelFiles(baselineRaw, "baseline");
     if ~isempty(baselineFamilyLong)
+
+        % Baseline observer-selection sheets may not carry screening_flag.
+        % Treat missing baseline screening flags as the paper screening case
+        % so makeOrbitFamilyPlots does not filter out all baseline rows.
+        if ismember("screening_flag", string(baselineFamilyLong.Properties.VariableNames))
+            missingScreen = ~isfinite(double(baselineFamilyLong.screening_flag));
+            baselineFamilyLong.screening_flag(missingScreen) = cfg.paperScreeningFlag;
+        else
+            baselineFamilyLong.screening_flag = repmat(cfg.paperScreeningFlag, height(baselineFamilyLong), 1);
+        end
+
         writetable(baselineFamilyLong, summaryXlsx, "Sheet", "OrbitFamilies_Baseline");
         baselineFamilyIndex = makeOrbitFamilyPlots(baselineFamilyLong, cfg, familyDir, "baseline");
         if ~isempty(baselineFamilyIndex)
@@ -917,8 +928,6 @@ for i = 1:numel(ax)
         grid(ax(i), "off");
         box(ax(i), "on");
         axis(ax(i), "vis3d");
-
-        applyTrajectoryAxisTextVisibility(ax(i), cfg);
     catch
     end
 end
@@ -1013,6 +1022,17 @@ axis(newAx, "vis3d");
 box(newAx, "on");
 grid(newAx, "off");
 
+% Hide tick marks and tick labels for trajectory panels when requested.
+if isfield(cfg, "trajShowTickLabels") && ~cfg.trajShowTickLabels
+    set(newAx, ...
+        "XTick", [], ...
+        "YTick", [], ...
+        "ZTick", [], ...
+        "XTickLabel", {}, ...
+        "YTickLabel", {}, ...
+        "ZTickLabel", {});
+end
+
 set(newAx, ...
     "FontName", cfg.fontName, ...
     "FontSize", cfg.trajAxisFontSize, ...
@@ -1031,25 +1051,23 @@ newAx.XLabel.FontWeight = cfg.fontWeight;
 newAx.YLabel.FontWeight = cfg.fontWeight;
 newAx.ZLabel.FontWeight = cfg.fontWeight;
 
-if isfield(cfg, "trajShowAxisLabels") && cfg.trajShowAxisLabels
-    newAx.XLabel.String = cfg.trajXLabelString;
-    newAx.YLabel.String = cfg.trajYLabelString;
-    newAx.ZLabel.String = cfg.trajZLabelString;
-
-    try
-        newAx.XLabel.Units = "normalized";
-        newAx.YLabel.Units = "normalized";
-        newAx.XLabel.Position = cfg.trajXLabelPosition;
-        newAx.YLabel.Position = cfg.trajYLabelPosition;
-    catch
-    end
-else
+if isfield(cfg, "trajShowAxisLabels") && ~cfg.trajShowAxisLabels
     newAx.XLabel.String = "";
     newAx.YLabel.String = "";
     newAx.ZLabel.String = "";
+else
+    newAx.XLabel.String = cfg.trajXLabelString;
+    newAx.YLabel.String = cfg.trajYLabelString;
+    newAx.ZLabel.String = cfg.trajZLabelString;
 end
 
-applyTrajectoryAxisTextVisibility(newAx, cfg);
+try
+    newAx.XLabel.Units = "normalized";
+    newAx.YLabel.Units = "normalized";
+    newAx.XLabel.Position = cfg.trajXLabelPosition;
+    newAx.YLabel.Position = cfg.trajYLabelPosition;
+catch
+end
 
 if cfg.removeTitles
     title(newAx, "");
@@ -1074,10 +1092,6 @@ for i = 1:numel(scat)
     catch
     end
 end
-
-% Re-apply right before preview/export because MATLAB can restore ticks
-% after camera/font updates in copied 3D axes.
-applyTrajectoryAxisTextVisibility(newAx, cfg);
 
 drawnow;
 pause(0.05);
@@ -1110,47 +1124,6 @@ catch
 end
 
 close(exportFig);
-end
-
-
-function applyTrajectoryAxisTextVisibility(ax, cfg)
-%APPLYTRAJECTORYAXISTEXTVISIBILITY Hide trajectory-axis text when the
-%trajectory panels are used only to show geometry.
-
-if isfield(cfg, "trajShowAxisLabels") && ~cfg.trajShowAxisLabels
-    try
-        ax.XLabel.String = "";
-        ax.YLabel.String = "";
-        ax.ZLabel.String = "";
-    catch
-    end
-end
-
-if isfield(cfg, "trajShowTickLabels") && ~cfg.trajShowTickLabels
-    % Hide both the tick labels and the tick marks themselves.
-    % This keeps the 3D axes box for geometry/context, but removes the
-    % tick clutter that was causing LaTeX/EPS export problems.
-    try
-        set(ax, ...
-            "XTick", [], ...
-            "YTick", [], ...
-            "ZTick", [], ...
-            "XTickLabel", {}, ...
-            "YTickLabel", {}, ...
-            "ZTickLabel", {});
-    catch
-    end
-
-    try
-        ax.XAxis.TickValues = [];
-        ax.YAxis.TickValues = [];
-        ax.ZAxis.TickValues = [];
-        ax.XAxis.TickLabels = {};
-        ax.YAxis.TickLabels = {};
-        ax.ZAxis.TickLabels = {};
-    catch
-    end
-end
 end
 
 function removeLibrationPointObjects(fig)
@@ -1527,7 +1500,7 @@ ax = axes(fig);
 hold(ax,'on');
 grid(ax,'on');
 box(ax,'on');
-barHandles = plotGroupedBarsByMeasurement(ax, T, cfg, 'min_cost_mean', 'Total Crojectost');
+barHandles = plotGroupedBarsByMeasurement(ax, T, cfg, 'min_cost_mean', 'Total Cost Contribution');
 
 measList = cfg.measurementShortOrder(ismember(cfg.measurementShortOrder, unique(B.measurement_short)));
 baseHandles = gobjects(0);
