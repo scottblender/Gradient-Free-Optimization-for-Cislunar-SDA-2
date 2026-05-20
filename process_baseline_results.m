@@ -129,7 +129,28 @@ cfg.makeLegendOnlyFiles = false;
 % -----------------------------------------------------------------
 % TRUE MONTE CARLO SETTINGS
 % -----------------------------------------------------------------
-cfg.makeTrueMonteCarloPlots = false;
+% Master/table switch: set this true if you want to compute/load the MC
+% samples and write the MC summary/sample tables even when no figures are
+% requested.
+cfg.makeTrueMonteCarloPlots = true;
+
+% Figure switches: these independently control which MC figures are saved.
+% IMPORTANT: If either one is true, the script automatically runs/loads the
+% MC validation even when cfg.makeTrueMonteCarloPlots is false.
+cfg.makeTrueMCScatterPlots = false;
+cfg.makeTrueMCBoxPlots     = true;
+
+% Effective MC run switch. This is what the processing loop uses.
+% This means these cases all work:
+%   scatter=true,  box=false  -> saves only scatter EPS files
+%   scatter=false, box=true   -> saves only box-and-whisker EPS files
+%   scatter=true,  box=true   -> saves both EPS file types
+%   scatter=false, box=false, makeTrueMonteCarloPlots=true -> MC tables only
+cfg.runTrueMonteCarloValidation = ...
+    cfg.makeTrueMonteCarloPlots || ...
+    cfg.makeTrueMCScatterPlots || ...
+    cfg.makeTrueMCBoxPlots;
+
 cfg.mcNumSamples = 250;
 cfg.mcOrbitRadius = 10;
 cfg.mcSlotRadius  = 5;
@@ -407,7 +428,7 @@ for k = 1:numel(xlsxFiles)
     end
 
     %% ---------- TRUE Monte Carlo validation ----------
-    if cfg.makeTrueMonteCarloPlots
+    if cfg.runTrueMonteCarloValidation
         try
             [mcSampleTbl, mcSummary] = makeTrueMonteCarloValidationPlot( ...
                 Teval, Tobs, S, runInfo, baseCtx, cfg, mcOutDir);
@@ -1243,13 +1264,43 @@ function [mcTable, mcSummary] = makeTrueMonteCarloValidationPlot(Teval, Tobs, S,
     end
 
     outStem = makeFigureStem(runInfo, "mc");
-    outEps  = fullfile(outDir, outStem + ".eps");
 
-    fig = createTrueMCFigure(mcTable.sample, mcTable.total_cost, ...
-        JgaMin, cfg, cfg.singleMCShowLegend);
+    if ~isfield(cfg, "makeTrueMCScatterPlots")
+        cfg.makeTrueMCScatterPlots = true;
+    end
+    if ~isfield(cfg, "makeTrueMCBoxPlots")
+        cfg.makeTrueMCBoxPlots = false;
+    end
 
-    exportMCFigureAsImageEPS(fig, outEps, cfg);
-    close(fig);
+    scatterEps = "";
+    boxEps     = "";
+
+    % ------------------------------------------------------------
+    % Optional MC scatter plot
+    % ------------------------------------------------------------
+    if cfg.makeTrueMCScatterPlots
+        scatterEps = fullfile(outDir, outStem + ".eps");
+
+        fig = createTrueMCFigure(mcTable.sample, mcTable.total_cost, ...
+            JgaMin, cfg, cfg.singleMCShowLegend);
+
+        exportMCFigureAsImageEPS(fig, scatterEps, cfg);
+        close(fig);
+    end
+
+    % ------------------------------------------------------------
+    % Optional MC box-and-whisker plot
+    % ------------------------------------------------------------
+    if cfg.makeTrueMCBoxPlots
+        boxStem = makeFigureStem(runInfo, "mc_box");
+        boxEps  = fullfile(outDir, boxStem + ".eps");
+
+        fig = createTrueMCBoxFigure(mcTable.total_cost, ...
+            JgaMin, cfg, cfg.singleMCShowLegend);
+
+        exportMCFigureAsImageEPS(fig, boxEps, cfg);
+        close(fig);
+    end
 
     mcSummary = table();
 
@@ -1274,7 +1325,18 @@ function [mcTable, mcSummary] = makeTrueMonteCarloValidationPlot(Teval, Tobs, S,
         mcSummary.("xbest_" + string(j)) = xBest(j);
     end
 
-    mcSummary.plot_file = string(outEps);
+    mcSummary.scatter_plot_file = string(scatterEps);
+    mcSummary.box_plot_file     = string(boxEps);
+
+    % Backward-compatible generic plot field. Prefer the scatter plot
+    % if it exists; otherwise use the box-and-whisker plot.
+    if strlength(string(scatterEps)) > 0
+        mcSummary.plot_file = string(scatterEps);
+    elseif strlength(string(boxEps)) > 0
+        mcSummary.plot_file = string(boxEps);
+    else
+        mcSummary.plot_file = "";
+    end
 end
 
 function JgaMin = getGaMinimumCostFromExcel(Teval, S)
@@ -1671,6 +1733,96 @@ function fig = createTrueMCFigure(xSample, yCost, JgaMin, cfg, showLegend)
 
     if showLegend
         legend({"Monte Carlo Samples", "GA Minimum"}, ...
+            "Location", "northeast", ...
+            "FontName", cfg.fontName, ...
+            "FontSize", cfg.mcLegendFontSize, ...
+            "FontWeight", cfg.fontWeight);
+    end
+end
+
+function fig = createTrueMCBoxFigure(yCost, JgaMin, cfg, showLegend)
+
+    fig = figure("Color","w", "Units","inches", ...
+        "Position",[1 1 cfg.mcFigWidthIn cfg.mcFigHeightIn]);
+
+    set(fig, "Renderer", "opengl");
+
+    hold on; grid on; box on;
+
+    yCost = yCost(:);
+    yCost = yCost(isfinite(yCost));
+
+    if isempty(yCost)
+        warning("No finite Monte Carlo costs available for box plot.");
+        yCost = NaN;
+    end
+
+    % Box-and-whisker representation of the MC objective values.
+    % boxchart is preferred when available; boxplot is used as a fallback.
+    try
+        b = boxchart(ones(size(yCost)), yCost, ...
+            "BoxWidth", 0.45, ...
+            "MarkerStyle", "o", ...
+            "LineWidth", cfg.mcMarkerLineWidth);
+
+        try
+            b.MarkerSize = max(4, round(cfg.mcScatterSize / 8));
+        catch
+        end
+    catch
+        boxplot(yCost, ...
+            "Labels", {""}, ...
+            "Widths", 0.45, ...
+            "Symbol", "o");
+    end
+
+    % GA minimum reference line.
+    yline(JgaMin, "r-", "LineWidth", cfg.mcLineWidth);
+
+    yAll = [yCost(:); JgaMin];
+    yMin = min(yAll, [], "omitnan");
+    yMax = max(yAll, [], "omitnan");
+
+    if isfinite(yMin) && isfinite(yMax)
+        if yMax > yMin
+            yRange = yMax - yMin;
+            lowerPad = cfg.mcLowerYPadFrac * yRange;
+            upperPad = cfg.mcUpperYPadFrac * yRange;
+        else
+            lowerPad = max(1e-6, 0.05 * abs(yMin) + 1e-6);
+            upperPad = lowerPad;
+        end
+        ylim([yMin - lowerPad, yMax + upperPad]);
+    end
+
+    xlim([0.5 1.5]);
+    xticks(1);
+    xticklabels("MC Samples");
+
+    xlabel("", ...
+        "FontName", cfg.fontName, ...
+        "FontSize", cfg.mcLabelFontSize, ...
+        "FontWeight", cfg.fontWeight);
+
+    ylabel("Total Cost", ...
+        "FontName", cfg.fontName, ...
+        "FontSize", cfg.mcLabelFontSize, ...
+        "FontWeight", cfg.fontWeight);
+
+    set(gca, ...
+        "FontName", cfg.fontName, ...
+        "FontSize", cfg.mcAxisFontSize, ...
+        "FontWeight", cfg.fontWeight, ...
+        "LineWidth", cfg.mcAxisLineWidth);
+
+    title("");
+
+    if showLegend
+        % Dummy handles keep the legend clean and consistent.
+        hBox = plot(nan, nan, "k-", "LineWidth", cfg.mcMarkerLineWidth);
+        hGA  = plot(nan, nan, "r-", "LineWidth", cfg.mcLineWidth);
+
+        legend([hBox hGA], {"Monte Carlo Distribution", "GA Minimum"}, ...
             "Location", "northeast", ...
             "FontName", cfg.fontName, ...
             "FontSize", cfg.mcLegendFontSize, ...
