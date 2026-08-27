@@ -60,8 +60,8 @@ cfg.removeTitles = true;
 % These mirror the newer baseline trajectory-export workflow: each
 % trajectory .fig is copied into a padded temporary export figure so the
 % LaTeX subfigure EPS panels stay tight without clipping labels.
-cfg.trajFigWidthIn      = 9.0;
-cfg.trajFigHeightIn     = 8.0;
+cfg.trajFigWidthIn      = 6.0;
+cfg.trajFigHeightIn     = 6.0;
 cfg.trajAxisFontSize    = 32;
 cfg.trajLabelFontSize   = 34;
 cfg.trajTitleFontSize   = 30;
@@ -1117,7 +1117,8 @@ try
     exportgraphics(exportFig, outPath, ...
         "ContentType", "image", ...
         "Resolution", cfg.trajEpsResolution, ...
-        "BackgroundColor", "white");
+        "BackgroundColor", "white", ...
+        "Padding","tight");
 catch
     warning("Trajectory exportgraphics failed. Falling back to print.");
     print(exportFig, outPath, "-depsc", "-image", "-opengl", sprintf("-r%d", cfg.trajEpsResolution));

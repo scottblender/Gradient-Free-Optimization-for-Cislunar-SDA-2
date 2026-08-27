@@ -5,11 +5,12 @@ close all;
 clear;
 clc
 tic
-path = "C:\Users\scott\Documents\MATLAB\Gradient-Free-Optimization-for-Cislunar-SDA-2\JPL_Data";
-files = dir(fullfile(path,'*.csv'));
+thisDir = fileparts(mfilename('fullpath'));
+dataPath = fullfile(thisDir, 'JPL_Data');   % project-relative
+files = dir(fullfile(dataPath,'*.csv'));
 data = cell(length(files),1); % preallocate cell based on size of each file
 parfor i = 1:length(files)
-    Ti = readtable(fullfile(path, files(i).name), "VariableNamingRule", "preserve");
+    Ti = readtable(fullfile(dataPath, files(i).name), "VariableNamingRule", "preserve");
     Ti.sourceFile = repmat(string(files(i).name), height(Ti), 1);  % <-- add this
     data{i} = Ti;
 end
@@ -130,8 +131,18 @@ rLG = s_lg(:,1:3);
 states_local = T.state;      % cell array
 N_local      = numel(states_local);
 
-nearLG = false(N_local,1);
+% filter out DRO orbits (if any) before computing near-LG proximity
+isDRO = contains(T.orbitFamily, "DRO", "IgnoreCase", true);
+if any(isDRO)
+    fprintf('Excluding %d DRO orbits from consideration (user requested no DROs)\n', nnz(isDRO));
+    T = T(~isDRO, :);
+    % update local variables that depend on T
+    states_local = T.state;
+    N_local = numel(states_local);
+end
+
 nearLG_score = nan(N_local,1);
+nearLG = false(N_local,1);
 
 parfor j = 1:N_local
     s = states_local{j}; % Mx6 integrated trajectory

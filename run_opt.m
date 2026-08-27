@@ -40,7 +40,7 @@ end
 OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 10;
+MAX_ITERS = 600;
 v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
 
 MAX_EVALS = 100;
@@ -196,7 +196,7 @@ const_stabilities = parallel.pool.Constant(stabilities);
 const_orbit_db    = parallel.pool.Constant(orbit_database);
 
 % ---------------- Mission type ----------------
-MISSION_TYPE = "LOW_THRUST_TRANSFER";
+MISSION_TYPE = "LUNAR_GATEWAY";
 
 envMission = getenv("MISSION_TYPE");
 if ~isempty(envMission)
