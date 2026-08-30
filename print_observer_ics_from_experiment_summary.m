@@ -81,6 +81,18 @@ excelFile = find_experiment_summary_file(runRootPath, CONFIG_TAG, PERIOD_TAG);
 
 fprintf('\nSelected ExperimentSummary file:\n  %s\n', excelFile);
 
+% Slot numbers in older summaries refer to a different phase grid.
+runSummary = readtable(excelFile, 'Sheet', 'Summary');
+if isempty(runSummary) || ...
+        ~ismember('slot_definition', runSummary.Properties.VariableNames) || ...
+        string(runSummary.slot_definition(1)) ~= "equal_time_half_open_v1" || ...
+        ~ismember('slots_per_orbit', runSummary.Properties.VariableNames) || ...
+        runSummary.slots_per_orbit(1) ~= slots_per_orbit
+    error('slots:IncompatibleSummary', ...
+        ['This summary does not use the requested half-open slot grid. ' ...
+         'Use its original code/grid for legacy results, or rerun optimization.']);
+end
+
 
 %% ---------------- Read observer configuration from Excel ----------------
 
@@ -127,7 +139,7 @@ if ~exist(OrbitCacheDir, 'dir')
 end
 
 orbitDbCacheFile = fullfile(OrbitCacheDir, ...
-    sprintf('orbit_database_slots_%d.mat', slots_per_orbit));
+    sprintf('orbit_database_slots_%d_halfopen_v1.mat', slots_per_orbit));
 
 rebuildOrbitDb = true;
 
@@ -135,7 +147,11 @@ if isfile(orbitDbCacheFile)
     try
         C = load(orbitDbCacheFile, 'orbit_database', 'cacheMeta');
 
-        if isfield(C, 'orbit_database') && numel(C.orbit_database) == num_orbits
+        if isfield(C, 'orbit_database') && numel(C.orbit_database) == num_orbits && ...
+                isfield(C, 'cacheMeta') && isfield(C.cacheMeta, 'slot_definition') && ...
+                string(C.cacheMeta.slot_definition) == "equal_time_half_open_v1" && ...
+                isfield(C.cacheMeta, 'slots_per_orbit') && ...
+                C.cacheMeta.slots_per_orbit == slots_per_orbit
             orbit_database = C.orbit_database;
             rebuildOrbitDb = false;
             fprintf('\nLoaded cached orbit database from:\n  %s\n', orbitDbCacheFile);
@@ -157,7 +173,7 @@ if rebuildOrbitDb
         s_raw  = states{i};
         period = tf(i);
 
-        t_slots = linspace(0, period, slots_per_orbit)';
+        t_slots = orbit_slot_times(period, slots_per_orbit);
 
         [t_unique, idx_u] = unique(t_raw);
         s_unique = s_raw(idx_u, :);
@@ -172,6 +188,7 @@ if rebuildOrbitDb
     cacheMeta.created         = string(datetime('now'));
     cacheMeta.num_orbits      = num_orbits;
     cacheMeta.slots_per_orbit = slots_per_orbit;
+    cacheMeta.slot_definition = "equal_time_half_open_v1";
 
     save(orbitDbCacheFile, 'orbit_database', 'cacheMeta', '-v7.3');
 

@@ -721,14 +721,18 @@ function baseCtx = buildBaseCatalogContext(projectDir, catalogPath, cfg)
     end
 
     orbitDbCacheFile = fullfile(OrbitCacheDir, ...
-        sprintf('orbit_database_slots_%d.mat', cfg.slots_per_orbit));
+        sprintf('orbit_database_slots_%d_halfopen_v1.mat', cfg.slots_per_orbit));
 
     rebuildOrbitDb = true;
 
     if cfg.useOrbitCache && isfile(orbitDbCacheFile)
         try
             C = load(orbitDbCacheFile, 'orbit_database', 'cacheMeta');
-            if isfield(C, 'orbit_database') && numel(C.orbit_database) == baseCtx.num_orbits
+            if isfield(C, 'orbit_database') && numel(C.orbit_database) == baseCtx.num_orbits && ...
+                    isfield(C, 'cacheMeta') && isfield(C.cacheMeta, 'slot_definition') && ...
+                    string(C.cacheMeta.slot_definition) == "equal_time_half_open_v1" && ...
+                    isfield(C.cacheMeta, 'slots_per_orbit') && ...
+                    C.cacheMeta.slots_per_orbit == cfg.slots_per_orbit
                 baseCtx.orbit_database = C.orbit_database;
                 rebuildOrbitDb = false;
                 fprintf("Loaded cached orbit database:\n%s\n", orbitDbCacheFile);
@@ -754,7 +758,7 @@ function baseCtx = buildBaseCatalogContext(projectDir, catalogPath, cfg)
             s_raw  = states{i};
             period = tf(i);
 
-            t_slots = linspace(0, period, slots_per_orbit)';
+            t_slots = orbit_slot_times(period, slots_per_orbit);
 
             [t_unique, idx_u] = unique(t_raw);
             s_unique = s_raw(idx_u, :);
@@ -771,6 +775,7 @@ function baseCtx = buildBaseCatalogContext(projectDir, catalogPath, cfg)
         cacheMeta.created = string(datetime('now'));
         cacheMeta.num_orbits = baseCtx.num_orbits;
         cacheMeta.slots_per_orbit = cfg.slots_per_orbit;
+        cacheMeta.slot_definition = "equal_time_half_open_v1";
 
         try
             save(orbitDbCacheFile, 'orbit_database', 'cacheMeta', '-v7.3');
@@ -879,6 +884,16 @@ function runInfo = fillRunInfoFromSummary(runInfo, S)
 end
 
 function ctx = buildObjectiveContextForRun(runInfo, S, baseCtx, cfg)
+
+    % Never reinterpret a legacy solution's slot indices on the new grid.
+    if ~ismember('slot_definition', S.Properties.VariableNames) || ...
+            string(S.slot_definition(1)) ~= "equal_time_half_open_v1" || ...
+            ~ismember('slots_per_orbit', S.Properties.VariableNames) || ...
+            S.slots_per_orbit(1) ~= cfg.slots_per_orbit
+        error('slots:IncompatibleSummary', ...
+            ['Cannot recompute this run with the half-open slot grid. ' ...
+             'Use its original code/grid for legacy results, or rerun optimization.']);
+    end
 
     ctx = struct();
 
@@ -1062,6 +1077,7 @@ function [t_target, s_target, truthInfo] = buildOrLoadTargetTruth(missionCfg, ba
             cacheMeta = struct();
             cacheMeta.cacheKey = cacheKey;
             cacheMeta.created = string(datetime('now'));
+            cacheMeta.slot_definition = "equal_time_half_open_v1";
 
             save(cacheFile, 't_target', 's_target', 'truthInfo', 'cacheMeta', '-v7.3');
         catch ME
@@ -1386,7 +1402,7 @@ function cacheFile = makeMCCacheFile(runInfo, xBest, cfg)
         char(cacheMeta.xBestHash));
 
     rawName = string(matlab.lang.makeValidName(string(rawName)));
-    cacheFile = fullfile(cfg.mcCacheDir, rawName + ".mat");
+    cacheFile = fullfile(cfg.mcCacheDir, rawName + "_halfopen_v1_sunlu_v2.mat");
 end
 
 function [cacheFile, cacheFileToSave] = findExistingOrNewMCCacheFile(runInfo, xBest, cfg)
@@ -1482,12 +1498,22 @@ function cacheMeta = makeMCCacheMeta(runInfo, xBest, cfg)
     cacheMeta.mcSeed = double(cfg.mcSeed);
     cacheMeta.EKF_DT = double(cfg.EKF_DT);
     cacheMeta.slots_per_orbit = double(cfg.slots_per_orbit);
+    cacheMeta.slot_definition = "equal_time_half_open_v1";
+    cacheMeta.sun_model_version = "sun_lu_v2";
 
     cacheMeta.xBest = double(xBest(:).');
     cacheMeta.xBestHash = simpleVectorHash(cacheMeta.xBest);
 end
 
 function tf = isMCCacheCompatible(cacheMeta, runInfo, xBest, cfg)
+
+    tf = false;
+    if ~isfield(cacheMeta, 'slot_definition') || ...
+            string(cacheMeta.slot_definition) ~= "equal_time_half_open_v1" || ...
+            ~isfield(cacheMeta, 'sun_model_version') || ...
+            string(cacheMeta.sun_model_version) ~= "sun_lu_v2"
+        return;
+    end
 
     checks = [
         string(cacheMeta.run_name) == string(runInfo.runName)
@@ -2385,7 +2411,7 @@ function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
                 local_num_str(dtVal), slots_per_orbit);
     end
 
-    cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_');
+    cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_') + "_halfopen_v1";
 end
 
 function v = get_field_or_default(s, fieldName, defaultVal)
@@ -2494,4 +2520,3 @@ function col = makeMissingColumn(n, exampleCol)
         col(:) = missing;
     end
 end
-

@@ -61,6 +61,7 @@ tspan_lg_ic = [0, 1.51110546287394];
 % ---------------- Catalog / orbit database ----------------
 num_orbits      = height(T1);
 slots_per_orbit = 50;
+slot_definition = "equal_time_half_open_v1";
 
 tf          = T1.("Period (TU) ");
 states      = T1.("state");
@@ -72,14 +73,18 @@ if ~exist(OrbitCacheDir,'dir'), mkdir(OrbitCacheDir); end
 
 catalogFile = "JPL_CR3BP_OrbitCatalog.mat";
 orbitDbCacheFile = fullfile(OrbitCacheDir, ...
-    sprintf('orbit_database_slots_%d.mat', slots_per_orbit));
+    sprintf('orbit_database_slots_%d_halfopen_v1.mat', slots_per_orbit));
 
 rebuildOrbitDb = true;
 
 if isfile(orbitDbCacheFile)
     try
         C = load(orbitDbCacheFile, 'orbit_database', 'cacheMeta');
-        if isfield(C, 'orbit_database') && numel(C.orbit_database) == num_orbits
+        if isfield(C, 'orbit_database') && numel(C.orbit_database) == num_orbits && ...
+                isfield(C, 'cacheMeta') && isfield(C.cacheMeta, 'slot_definition') && ...
+                string(C.cacheMeta.slot_definition) == slot_definition && ...
+                isfield(C.cacheMeta, 'slots_per_orbit') && ...
+                C.cacheMeta.slots_per_orbit == slots_per_orbit
             orbit_database = C.orbit_database;
             rebuildOrbitDb = false;
             safe_printf('Loaded cached orbit database from:\n  %s\n', orbitDbCacheFile);
@@ -100,7 +105,7 @@ if rebuildOrbitDb
         s_raw  = states{i};
         period = tf(i);
 
-        t_slots = linspace(0, period, slots_per_orbit)';
+        t_slots = orbit_slot_times(period, slots_per_orbit);
 
         [t_unique, idx_u] = unique(t_raw);
         s_unique = s_raw(idx_u, :);
@@ -115,6 +120,7 @@ if rebuildOrbitDb
     cacheMeta.catalogFile     = string(catalogFile);
     cacheMeta.num_orbits      = num_orbits;
     cacheMeta.slots_per_orbit = slots_per_orbit;
+    cacheMeta.slot_definition = slot_definition;
 
     try
         save(orbitDbCacheFile, 'orbit_database', 'cacheMeta', '-v7.3');
@@ -501,6 +507,7 @@ if contains(string(missionCfg.type), "TRANSFER") && useTransferCache
         cacheMeta.missionType     = string(missionCfg.type);
         cacheMeta.created         = string(datetime('now'));
         cacheMeta.slots_per_orbit = slots_per_orbit;
+        cacheMeta.slot_definition = slot_definition;
         cacheMeta.mu              = mu;
 
         tmpFile = fullfile(TransferCacheDir, cacheKey + "_t.mat");
@@ -1120,6 +1127,9 @@ try
             'rmse_pos_km','rmse_vel_kms','mean_detPpos_km6','mean_stability','min_cost' ...
         });
 
+    summaryRow.slot_definition = slot_definition;
+    summaryRow.slots_per_orbit = slots_per_orbit;
+
     if isfile(EXCEL_FILE)
         writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary', 'WriteMode','append');
     else
@@ -1186,7 +1196,8 @@ function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
                 depOrb, arrOrb, depSlot, arrSlot, local_num_str(dtVal), slots_per_orbit);
     end
 
-    cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_');
+    % Transfer endpoints are selected by slot; old cached truth is invalid.
+    cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_') + "_halfopen_v1";
 end
 
 function v = get_field_or_default(s, fieldName, defaultVal)

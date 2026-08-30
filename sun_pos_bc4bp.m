@@ -4,8 +4,8 @@ function r_sun = sun_pos_bc4bp(t_lg, LU, TU, theta0, i_sun)
     %
     % Inputs:
     %   t_lg - propagation time of target (lunar gateway) in TU
-    %   LU - length unit in EM system
-    %   TU - time unit in EM system
+    %   LU - length unit in EM system [km/LU]
+    %   TU - time unit in EM system [seconds/TU]
     %   theta0 - initial sun phase angle (rad)
     %   i_sun - initial sun inclination angle out of EM plane (rad)
     %   
@@ -15,7 +15,7 @@ function r_sun = sun_pos_bc4bp(t_lg, LU, TU, theta0, i_sun)
     
     % initial distance of sun
     AU_km = 149597870.7;
-    a_sun = AU_km*LU;
+    a_sun = AU_km / LU;  % km / (km/LU) = LU
     
     % sun mean motion
     n_sun = (2*pi/(365.256363004 * 86400))*TU;
