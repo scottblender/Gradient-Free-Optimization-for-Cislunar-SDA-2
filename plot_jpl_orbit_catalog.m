@@ -226,7 +226,7 @@ for i = 1:num_orbits
     s_raw  = states{i};
     period = tf(i);
 
-    t_slots = linspace(0, period, slots_per_orbit)';
+    t_slots = (0:slots_per_orbit-1)' * period / slots_per_orbit;
 
     [t_unique, idx_u] = unique(t_raw);
     s_unique = s_raw(idx_u, :);
@@ -683,7 +683,7 @@ else
     t_nh = times{idxNH};
     T_nh = tf(idxNH);
 
-    slot_times = linspace(0, T_nh, slot_plot_count)';
+    slot_times = (0:slot_plot_count-1)' * T_nh / slot_plot_count;
     [t_unique, idx_u] = unique(t_nh);
     s_unique = s_nh(idx_u,:);
     F_nh = griddedInterpolant(t_unique, s_unique, 'spline');

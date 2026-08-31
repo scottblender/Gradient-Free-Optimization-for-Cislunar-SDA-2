@@ -100,7 +100,7 @@ if rebuildOrbitDb
         s_raw  = states{i};
         period = tf(i);
 
-        t_slots = linspace(0, period, slots_per_orbit)';
+        t_slots = (0:slots_per_orbit-1)' * period / slots_per_orbit;
 
         [t_unique, idx_u] = unique(t_raw);
         s_unique = s_raw(idx_u, :);
