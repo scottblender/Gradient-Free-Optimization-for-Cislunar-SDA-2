@@ -15,7 +15,7 @@ function r_sun = sun_pos_bc4bp(t_lg, LU, TU, theta0, i_sun)
     
     % initial distance of sun
     AU_km = 149597870.7;
-    a_sun = AU_km*LU;
+    a_sun = AU_km/LU;
     
     % sun mean motion
     n_sun = (2*pi/(365.256363004 * 86400))*TU;
