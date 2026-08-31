@@ -51,7 +51,7 @@ function Invoke-MatlabRun {
     param(
         [string]$RunDir,
         [string]$Alg,
-        [int]$MaxIters,
+        [int]$MaxEvals,
         [string]$MissionType,
         [string]$MeasModel,
         [int]$NumObservers,
@@ -66,7 +66,8 @@ function Invoke-MatlabRun {
     New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 
     $env:OPTIMIZER_MODE = $Alg
-    $env:MAX_ITERS = "$MaxIters"
+    $env:MAX_EVALS = "$MaxEvals"
+    $env:USE_PARALLEL_OPT = "1"
     $env:MISSION_TYPE = $MissionType
     $env:MEAS_MODEL = $MeasModel
     $env:NUM_OBSERVERS = "$NumObservers"
@@ -103,7 +104,7 @@ exit(0);
 }
 
 # ---------------- Baseline GA ----------------
-$gaBaselineIters = 600
+$gaBaselineEvals = 6000
 $baselineSeed = 0
 
 foreach ($meas in $MeasurementModels) {
@@ -131,19 +132,20 @@ foreach ($meas in $MeasurementModels) {
             foreach ($nper in $periodList) {
 
                 if ($mission -eq "LOW_THRUST_TRANSFER") {
-                    $caseName = "b_ga${gaBaselineIters}_${measCode}_o${nObs}"
+                    $caseName = "b_ga${gaBaselineEvals}_${measCode}_o${nObs}"
                 }
                 else {
-                    $caseName = "b_ga${gaBaselineIters}_${measCode}_o${nObs}_p${nper}"
+                    $caseName = "b_ga${gaBaselineEvals}_${measCode}_o${nObs}_p${nper}"
                 }
 
                 $RunDir = Join-Path $MissionOutDir $caseName
 
                 Write-Host "`n============================="
                 Write-Host "Baseline GA: [$mission] [$meas] $caseName"
+                Write-Host "FE budget: $gaBaselineEvals"
                 Write-Host "============================="
 
-                Invoke-MatlabRun -RunDir $RunDir -Alg "GA" -MaxIters $gaBaselineIters `
+                Invoke-MatlabRun -RunDir $RunDir -Alg "GA" -MaxEvals $gaBaselineEvals `
                     -MissionType $mission -MeasModel $meas -NumObservers $nObs -NPeriods $nper `
                     -UseScreening $true -UseJ1 $true -UseJ2 $true -UseJ3 $true `
                     -Seed $baselineSeed
