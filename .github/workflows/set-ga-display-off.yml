@@ -1,0 +1,41 @@
+name: Set GA display off
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/set-ga-display-off.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch run_opt.m
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('run_opt.m')
+          s = p.read_text()
+          old = """            options = optimoptions('ga', ...\n                'UseParallel', USE_PARALLEL, ...\n                'UseVectorized', false, ...\n                'Display', 'iter', ..."""
+          new = """            options = optimoptions('ga', ...\n                'UseParallel', USE_PARALLEL, ...\n                'UseVectorized', false, ...\n                'Display', 'off', ..."""
+          if old not in s:
+              raise SystemExit('GA display block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "OpenAI"
+          git config user.email "noreply@openai.com"
+          git add run_opt.m
+          git commit -m "Use custom GA progress logging only"
+          git push origin main
