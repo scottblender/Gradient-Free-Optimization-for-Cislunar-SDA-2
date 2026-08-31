@@ -52,7 +52,7 @@ function Invoke-MatlabRun {
     param(
         [string]$RunDir,
         [string]$Alg,
-        [int]$MaxIters,
+        [int]$MaxEvals,
         [string]$MissionType,
         [string]$MeasModel,
         [int]$NumObservers,
@@ -67,7 +67,8 @@ function Invoke-MatlabRun {
     New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 
     $env:OPTIMIZER_MODE = $Alg
-    $env:MAX_ITERS = "$MaxIters"
+    $env:MAX_EVALS = "$MaxEvals"
+    $env:USE_PARALLEL_OPT = "1"
     $env:MISSION_TYPE = $MissionType
     $env:MEAS_MODEL = $MeasModel
     $env:NUM_OBSERVERS = "$NumObservers"
@@ -104,8 +105,11 @@ exit(0);
 }
 
 # ---------------- Comparison sweep ----------------
-$itersSweep = 100
-$sweepSeed = 0
+# Universal search-effort budget used by every optimizer.
+$evalBudget = 6000
+
+# Independent stochastic repeats for Reviewer 2 statistics.
+$Seeds = 0..19
 
 $Cases = @(
     @{ screening=$true;  J1=$true;  J2=$true;  J3=$true  },
@@ -123,6 +127,7 @@ foreach ($alg in $Algs) {
     foreach ($meas in $MeasurementModels) {
         $measCode = Get-MeasCode $meas
         $MeasRoot = Join-Path $AlgRoot $measCode
+        New-Item -ItemType Directory -Force -Path $AlgRoot | Out-Null
         New-Item -ItemType Directory -Force -Path $MeasRoot | Out-Null
 
         foreach ($mission in $MissionTypes) {
@@ -141,27 +146,31 @@ foreach ($alg in $Algs) {
 
                 foreach ($nper in $periodList) {
                     foreach ($cc in $Cases) {
+                        foreach ($seed in $Seeds) {
 
-                        $screenCode = if ($cc.screening) { "1" } else { "0" }
-                        $jCode = "$( [int]$cc.J1 )$( [int]$cc.J2 )$( [int]$cc.J3 )"
+                            $screenCode = if ($cc.screening) { "1" } else { "0" }
+                            $jCode = "$( [int]$cc.J1 )$( [int]$cc.J2 )$( [int]$cc.J3 )"
+                            $seedCode = $seed.ToString("000")
 
-                        if ($mission -eq "LOW_THRUST_TRANSFER") {
-                            $runName = "s_${algCode}${itersSweep}_${measCode}_o${nObs}_s${screenCode}_j${jCode}"
+                            if ($mission -eq "LOW_THRUST_TRANSFER") {
+                                $runName = "s_${algCode}${evalBudget}_${measCode}_o${nObs}_s${screenCode}_j${jCode}_seed${seedCode}"
+                            }
+                            else {
+                                $runName = "s_${algCode}${evalBudget}_${measCode}_o${nObs}_p${nper}_s${screenCode}_j${jCode}_seed${seedCode}"
+                            }
+
+                            $RunDir = Join-Path $MissionOutDir $runName
+
+                            Write-Host "`n============================="
+                            Write-Host "Running: [$mission] [$meas] $runName"
+                            Write-Host "FE budget: $evalBudget | seed: $seed"
+                            Write-Host "============================="
+
+                            Invoke-MatlabRun -RunDir $RunDir -Alg $alg -MaxEvals $evalBudget `
+                                -MissionType $mission -MeasModel $meas -NumObservers $nObs -NPeriods $nper `
+                                -UseScreening $cc.screening -UseJ1 $cc.J1 -UseJ2 $cc.J2 -UseJ3 $cc.J3 `
+                                -Seed $seed
                         }
-                        else {
-                            $runName = "s_${algCode}${itersSweep}_${measCode}_o${nObs}_p${nper}_s${screenCode}_j${jCode}"
-                        }
-
-                        $RunDir = Join-Path $MissionOutDir $runName
-
-                        Write-Host "`n============================="
-                        Write-Host "Running: [$mission] [$meas] $runName"
-                        Write-Host "============================="
-
-                        Invoke-MatlabRun -RunDir $RunDir -Alg $alg -MaxIters $itersSweep `
-                            -MissionType $mission -MeasModel $meas -NumObservers $nObs -NPeriods $nper `
-                            -UseScreening $cc.screening -UseJ1 $cc.J1 -UseJ2 $cc.J2 -UseJ3 $cc.J3 `
-                            -Seed $sweepSeed
                     }
                 }
             }
