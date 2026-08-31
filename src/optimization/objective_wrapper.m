@@ -1,4 +1,4 @@
-function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
+function [J_total, entry] = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
     s_target, t_target, P0, Q, R, mu, LU, ...
     sunFcn, sun_min, moon_min, earth_min, ...
     opt_flag, solverName, dq, useScreening, costFlags, costCfg, measCfg)
@@ -82,34 +82,34 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
     end
 
     % ---------------- logging ----------------
+    entry = struct();
+    entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
+    entry.solver = char(solverName);
+    entry.opt_flag = char(opt_flag);
+    entry.J1_rmse = J_1;
+    entry.J2_det  = J_2;
+    entry.J3_stab = J_3;
+    entry.useJ1 = logical(costFlags.J1);
+    entry.useJ2 = logical(costFlags.J2);
+    entry.useJ3 = logical(costFlags.J3);
+    entry.meas_model = char(measCfg.type);
+    entry.sun_min_deg   = rad2deg(sun_min);
+    entry.moon_min_deg  = rad2deg(moon_min);
+    entry.earth_min_deg = rad2deg(earth_min);
+
+    if strcmpi(opt_flag,"SOO")
+        entry.J_total = J_total;
+    else
+        entry.J_total1 = J_total(1);
+        entry.J_total2 = J_total(2);
+        entry.J_total3 = J_total(3);
+    end
+
+    entry.screeningCount = screeningCount;
+    entry.x = x(:).';
+    entry.orbit_indices = orbit_indices(:).';
+    entry.slot_indices  = slot_indices(:).';
     if nargin >= 17 && ~isempty(dq)
-        entry = struct();
-        entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
-        entry.solver = char(solverName);
-        entry.opt_flag = char(opt_flag);
-        entry.J1_rmse = J_1;
-        entry.J2_det  = J_2;
-        entry.J3_stab = J_3;
-        entry.useJ1 = logical(costFlags.J1);
-        entry.useJ2 = logical(costFlags.J2);
-        entry.useJ3 = logical(costFlags.J3);
-        entry.meas_model = char(measCfg.type);
-        entry.sun_min_deg   = rad2deg(sun_min);
-        entry.moon_min_deg  = rad2deg(moon_min);
-        entry.earth_min_deg = rad2deg(earth_min);
-
-        if strcmpi(opt_flag,"SOO")
-            entry.J_total = J_total;
-        else
-            entry.J_total1 = J_total(1);
-            entry.J_total2 = J_total(2);
-            entry.J_total3 = J_total(3);
-        end
-
-        entry.screeningCount = screeningCount;
-        entry.x = x(:).';
-        entry.orbit_indices = orbit_indices(:).';
-        entry.slot_indices  = slot_indices(:).';
         send(dq, entry);
     end
 end

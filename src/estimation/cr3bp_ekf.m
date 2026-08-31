@@ -19,6 +19,31 @@ measCfg.type = upper(string(measCfg.type));
 
 num_steps = length(t_target);
 num_obs   = size(observer_ICs, 1);
+
+% Fixed noise is optional; omitting the seed preserves fresh-noise behavior.
+useFixedNoise = isfield(measCfg, 'noiseSeed') && ...
+    ~isempty(measCfg.noiseSeed);
+
+if useFixedNoise
+    validateattributes(measCfg.noiseSeed, {'numeric'}, ...
+        {'scalar', 'real', 'finite', 'integer', '>=', 0, '<=', 2^32-1});
+
+    noiseStream = RandStream('mt19937ar', ...
+        'Seed', measCfg.noiseSeed, ...
+        'NormalTransform', 'Inversion');
+
+    num_meas = size(R, 1);
+    L_noise = chol(R, 'lower');
+
+    % Generate noise for every observer and epoch before screening.
+    measurementNoise = L_noise * ...
+        randn(noiseStream, num_meas, num_steps*num_obs);
+
+    % Dimensions: measurement component, epoch, observer.
+    measurementNoise = reshape( ...
+        measurementNoise, num_meas, num_steps, num_obs);
+end
+
 x_est     = s_target(1,1:6)';
 P_est     = P0;
 current_obs_states = observer_ICs;
@@ -95,8 +120,12 @@ for k = 2:num_steps
         % build measurement using selected measurement model
         z_clean = measurement_model(r_target_truth, r_obs, measCfg);
         z_clean = z_clean(:);
-        noise = mvnrnd(zeros(1, size(R,1)), R, 1);
-        noise = noise(:);
+        if useFixedNoise
+            noise = measurementNoise(:, k, i);
+        else
+            noise = mvnrnd(zeros(1, size(R,1)), R, 1);
+            noise = noise(:);
+        end
         z_meas  = z_clean + noise;
 
         z_pred  = measurement_model(x_upd(1:3), r_obs, measCfg);

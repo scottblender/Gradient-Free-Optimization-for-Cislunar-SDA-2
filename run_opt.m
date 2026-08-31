@@ -294,6 +294,17 @@ seedVal = str2double(vseed);
 if isnan(seedVal), seedVal = 0; end
 rng(seedVal, 'twister');
 
+% Keep measurement noise separate from the optimizer seed.
+measCfg.noiseSeed = 1001;
+
+v = getenv("MEAS_NOISE_SEED");
+if ~isempty(v)
+    measCfg.noiseSeed = str2double(v);
+end
+
+validateattributes(measCfg.noiseSeed, {'numeric'}, ...
+    {'scalar', 'real', 'finite', 'integer', '>=', 0, '<=', 2^32-1});
+
 RUN_TAG = sprintf('%s_scr%d_%s_J%d%d%d_seed%03d', char(OPTIMIZER_MODE), ...
     double(useScreening), char(measCode), ...
     double(costFlags.J1), double(costFlags.J2), double(costFlags.J3), seedVal);
@@ -569,6 +580,8 @@ s_unique_truth = s_truth(idx_u_truth, :);
 
 F_truth = griddedInterpolant(t_unique_truth, s_unique_truth, 'spline');
 s_target_ekf = F_truth(t_target_ekf);
+save(fullfile(DataDir, 'measurement_config.mat'), ...
+    'measCfg', 'R_k', 't_target_ekf', 'seedVal');
 
 % ---------------- Objective function wrapper ----------------
 ObjFcn = @(x) objective_wrapper( ...
@@ -1129,6 +1142,7 @@ try
     summaryRow.sun_min_deg       = sun_min_deg;
     summaryRow.moon_min_deg      = moon_min_deg;
     summaryRow.earth_min_deg     = earth_min_deg;
+    summaryRow.measurement_noise_seed = measCfg.noiseSeed;
     if isfile(EXCEL_FILE)
         writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary', 'WriteMode','append');
     else
