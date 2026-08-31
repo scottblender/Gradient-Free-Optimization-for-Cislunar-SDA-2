@@ -1,4 +1,4 @@
-function [xval, fval, nEvals] = abc_discrete(ObjFcn, LB, UB, opts)
+function [xval, fval, nEvals, history] = abc_discrete(ObjFcn, LB, UB, opts)
 % --- abc_discrete.m (VARIABLE # ORBIT/SLOT PAIRS) --- %
 % Discrete Artificial Bee Colony (ABC) optimizer for integer decision vectors:
 %   x = [orb1 slot1 orb2 slot2 ... orbP slotP], P = nvars/2
@@ -48,6 +48,8 @@ end
 costs  = inf(nFood,1);
 trials = zeros(nFood,1);
 nEvals = 0;
+histFE = zeros(0,1);
+histBest = zeros(0,1);
 
 [costInit, nDone] = evaluate_batch_limited( ...
     ObjFcn, food_sources, opts.UseParallelInit, opts.MaxEvals - nEvals);
@@ -57,6 +59,7 @@ nEvals = nEvals + nDone;
 [fval, idxBest] = min(costs);
 xval = food_sources(idxBest,:);
 stallCount = 0;
+[histFE, histBest] = record_history(histFE, histBest, nEvals, fval);
 
 opts.Logger('ABC init     | FE = %5d/%5d | bestJ = %.6g\n', ...
     nEvals, opts.MaxEvals, fval);
@@ -91,6 +94,7 @@ while itr < opts.MaxIters && nEvals < opts.MaxEvals
     end
 
     [fval, xval] = update_best(costs, food_sources, fval, xval);
+    [histFE, histBest] = record_history(histFE, histBest, nEvals, fval);
 
     if nEvals >= opts.MaxEvals
         opts.Logger('ABC iter %3d | FE = %5d/%5d | bestJ = %.6g | phase = employed\n', ...
@@ -128,6 +132,7 @@ while itr < opts.MaxIters && nEvals < opts.MaxEvals
     end
 
     [fval, xval] = update_best(costs, food_sources, fval, xval);
+    [histFE, histBest] = record_history(histFE, histBest, nEvals, fval);
 
     if nEvals >= opts.MaxEvals
         opts.Logger('ABC iter %3d | FE = %5d/%5d | bestJ = %.6g | phase = onlooker\n', ...
@@ -159,6 +164,7 @@ while itr < opts.MaxIters && nEvals < opts.MaxEvals
         end
 
         [fval, xval] = update_best(costs, food_sources, fval, xval);
+        [histFE, histBest] = record_history(histFE, histBest, nEvals, fval);
     end
 
     if fval < fvalAtStart
@@ -179,6 +185,9 @@ while itr < opts.MaxIters && nEvals < opts.MaxEvals
         break;
     end
 end
+
+history = table(histFE, histBest, ...
+    'VariableNames', {'fe','bestJ'});
 end
 
 
@@ -215,18 +224,18 @@ end
 end
 
 
+function [histFE, histBest] = record_history(histFE, histBest, fe, bestJ)
+if isempty(histFE) || fe > histFE(end)
+    histFE(end+1,1) = fe;
+    histBest(end+1,1) = bestJ;
+elseif fe == histFE(end)
+    histBest(end) = min(histBest(end), bestJ);
+end
+end
+
+
 function v = abc_neighbor_discrete(x, Foods, LB, UB, nPairs)
 % Structured neighbor generation for discrete orbit/slot design with variable # pairs.
-%
-% x:      1 x (2*nPairs) = [orb1 slot1 ... orbP slotP]
-% Foods:  nFood x (2*nPairs) population (used to pick partner solution)
-%
-% Moves:
-%   1) Local slot tweak (same orbit)              40%
-%   2) Orbit perturb + reset slot                 30%
-%   3) Swap two orbit/slot pairs                  15%
-%   4) ABC-style difference on pair               10%
-%   5) Random restart of one pair                  5%
 
 clampRound = @(z) max(LB, min(UB, round(z)));
 v = x;
