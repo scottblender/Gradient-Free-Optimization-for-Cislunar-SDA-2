@@ -60,6 +60,7 @@ end
 fval = inf;
 xval = clampRound(LB + rand(1,nVars).*(UB-LB));
 stallCount = 0;
+nEvals = 0;
 
 % ==========================
 % main ACO loop
