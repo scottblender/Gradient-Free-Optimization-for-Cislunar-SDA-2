@@ -30,12 +30,6 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
     if ~isfield(costFlags, 'J2'), costFlags.J2 = true; end
     if ~isfield(costFlags, 'J3'), costFlags.J3 = true; end
 
-    J_1 = NaN; J_2 = NaN; J_3 = NaN;
-    screeningCount = NaN;
-    x = [];
-    orbit_indices = [];
-    slot_indices = [];
-
     try
         if isa(orbit_database_in, 'parallel.pool.Constant')
             orbit_database = orbit_database_in.Value;
@@ -83,12 +77,8 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         [J_total, J_1, J_2, J_3] = compute_cost( ...
             s_target, s_ekf, cov, stabilities_vec, opt_flag, costFlags, costCfg);
 
-    catch
-        if strcmpi(opt_flag, 'MOO')
-            J_total = [1e6; 1e6; 1e6];
-        else
-            J_total = 1e6;
-        end
+    catch ME
+        rethrow(ME);
     end
 
     % ---------------- logging ----------------

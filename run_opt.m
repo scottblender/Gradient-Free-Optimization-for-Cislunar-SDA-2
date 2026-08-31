@@ -41,10 +41,10 @@ end
 OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
 % Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 600;
+MAX_ITERS = 10;
 v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
 
-MAX_EVALS = 100;
+MAX_EVALS = 10;
 v = getenv("MAX_EVALS"); if ~isempty(v), MAX_EVALS = str2double(v); end
 
 % ---------------- JPL constants ----------------
@@ -140,8 +140,7 @@ end
 % ---------------- Visibility parameters ----------------
 sun_min_deg   = 20;
 moon_min_deg  = 10;
-earth_min_deg = 0;     % Initial equivalence check
-
+earth_min_deg = 15;     
 sun_min   = deg2rad(sun_min_deg);
 moon_min  = deg2rad(moon_min_deg);
 earth_min = deg2rad(earth_min_deg);
