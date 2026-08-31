@@ -16,8 +16,9 @@ earth_min = deg2rad(10);    % Test setting only
 observer_pairs = [];
 
 % ---------------- Project path ----------------
-thisDir = fileparts(mfilename('fullpath'));
-addpath(genpath(thisDir));
+projectDir = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectDir);
+projectPaths = setup_project();
 
 % ---------------- Constants ----------------
 mu = 1.215058560962404E-2;
@@ -30,10 +31,10 @@ sunFcn = @(t) sun_pos_bc4bp(t, LU, TU, 0, 0);
 R_sun = 695700 / LU;
 
 % ---------------- Load existing orbit catalog ----------------
-catalogFile = fullfile(thisDir, 'JPL_CR3BP_OrbitCatalog.mat');
+catalogFile = projectPaths.catalog;
 
 assert(isfile(catalogFile), ...
-    'Place JPL_CR3BP_OrbitCatalog.mat in the project folder.');
+    'Place JPL_CR3BP_OrbitCatalog.mat in data/ or the project root.');
 
 C = load(catalogFile, 'T');
 

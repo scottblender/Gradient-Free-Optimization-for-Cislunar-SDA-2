@@ -1,4 +1,11 @@
 *.asv
+# Local inputs, generated caches, and results in the organized layout.
+/data/*
+!/data/README.md
+/results/*
+!/results/README.md
+
+# Legacy locations remain ignored for existing local workspaces.
 /JPL_Data/
 /resources/
 

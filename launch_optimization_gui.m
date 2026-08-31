@@ -3,6 +3,8 @@ function launch_optimization_gui()
 % Launches a NEW MATLAB batch process so this GUI is not closed by:
 % clear; close all; clc;
 
+    projectPaths = setup_project();
+
     figW = 1180;
     figH = 800;
 
@@ -94,7 +96,8 @@ function launch_optimization_gui()
     lblRunDir = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Run Directory');
     efRunDir = uieditfield(leftPanel, 'text', ...
         'Position',[fieldX y 250 22], ...
-        'Value', pwd);
+        'Value', fullfile(projectPaths.runs, ...
+            ['gui_' char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'))]));
 
     btnBrowseRunDir = uibutton(leftPanel, 'push', ...
         'Position',[fieldX+260 y 30 22], ...
@@ -492,9 +495,9 @@ function launch_optimization_gui()
 end
 
 function cmd = buildLaunchCommand(params)
-    scriptPath = fullfile(pwd, 'run_opt.m');
+    scriptPath = fullfile(fileparts(mfilename('fullpath')), 'run_opt.m');
     if ~isfile(scriptPath)
-        error('Could not find run_opt.m in the current folder.');
+        error('Could not find run_opt.m in the project root.');
     end
 
     ensureRunDir(params.RUN_DIR);

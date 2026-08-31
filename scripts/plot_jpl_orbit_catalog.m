@@ -17,11 +17,11 @@ set(groot, ...
     'defaultLineLineWidth',3.0);
 
 % ---------------- Paths / output directory ----------------
-thisFile = mfilename('fullpath');
-thisDir  = fileparts(thisFile);
-addpath(genpath(thisDir));
+projectDir = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectDir);
+projectPaths = setup_project();
 
-FigDir = fullfile(thisDir, 'database_figs');
+FigDir = fullfile(projectPaths.results, 'database_figs');
 if ~exist(FigDir, 'dir')
     mkdir(FigDir);
 end
@@ -29,7 +29,7 @@ end
 fprintf('Figure directory: %s\n', FigDir);
 
 % ---------------- Load JPL data ----------------
-catalogPath = fullfile(thisDir, 'JPL_CR3BP_OrbitCatalog.mat');
+catalogPath = projectPaths.catalog;
 if ~isfile(catalogPath)
     error('Data file not found: %s', catalogPath);
 end

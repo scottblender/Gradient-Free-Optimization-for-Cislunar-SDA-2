@@ -21,7 +21,7 @@ clear; close all; clc;
 
 %% ---------------- User inputs ----------------
 
-% Choose run root:
+% Choose a run root relative to results/ (legacy project-root paths also work):
 %   "runs_GA" for baseline
 %   "runs"    for comparison
 RUN_ROOT = "runs/20260624_141925";
@@ -57,18 +57,20 @@ VU = LU / TU;      % km/s
 
 %% ---------------- Paths ----------------
 
-thisFile = mfilename('fullpath');
-thisDir  = fileparts(thisFile);
+projectDir = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectDir);
+projectPaths = setup_project();
 
-addpath(genpath(thisDir));
-
-runRootPath = fullfile(thisDir, RUN_ROOT);
+runRootPath = fullfile(projectPaths.results, RUN_ROOT);
+if ~isfolder(runRootPath)
+    runRootPath = fullfile(projectPaths.root, RUN_ROOT);
+end
 
 if ~isfolder(runRootPath)
     error('Run root folder does not exist:\n%s', runRootPath);
 end
 
-catalogPath = fullfile(thisDir, 'JPL_CR3BP_OrbitCatalog.mat');
+catalogPath = projectPaths.catalog;
 
 if ~isfile(catalogPath)
     error('Could not find JPL_CR3BP_OrbitCatalog.mat at:\n%s', catalogPath);
@@ -120,7 +122,7 @@ fprintf('\nLoaded JPL catalog with %d orbits.\n', num_orbits);
 
 %% ---------------- Build/load orbit slot database ----------------
 
-OrbitCacheDir = fullfile(thisDir, "orbit_cache");
+OrbitCacheDir = projectPaths.orbitCache;
 
 if ~exist(OrbitCacheDir, 'dir')
     mkdir(OrbitCacheDir);

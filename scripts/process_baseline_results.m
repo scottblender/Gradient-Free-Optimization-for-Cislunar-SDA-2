@@ -14,34 +14,44 @@
 % Requirements:
 %   - objective_wrapper.m on path
 %   - build_target_truth.m on path
-%   - JPL_CR3BP_OrbitCatalog.mat accessible in project directory
+%   - JPL_CR3BP_OrbitCatalog.mat in data/ or the project root
 %
 % Figures are exported as EPS with image/raster content.
 
 clear; clc; close all;
 
+projectDir = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectDir);
+projectPaths = setup_project();
+
 %% ========================= FIND runs_GA =========================
 
-if isfolder(fullfile(pwd, "runs_GA"))
-    rootDir = fullfile(pwd, "runs_GA");
-elseif strcmpi(string(getCurrentFolderName()), "runs_GA")
+if strcmpi(string(getCurrentFolderName()), "runs_GA")
     rootDir = pwd;
 else
-    error("Could not find runs_GA. Put this script inside runs_GA or one folder above it.");
+    candidates = [
+        string(fullfile(projectPaths.runs, "BASELINE", "runs_GA"))
+        string(fullfile(projectPaths.results, "runs_GA"))
+        string(fullfile(pwd, "runs_GA"))
+        string(fullfile(projectPaths.root, "runs", "BASELINE", "runs_GA"))
+        string(fullfile(projectPaths.root, "runs_GA"))
+    ];
+    idx = find(isfolder(candidates), 1);
+    if isempty(idx)
+        error("Could not find runs_GA. Expected results/runs/BASELINE/runs_GA, or select an existing runs_GA folder as the current folder.");
+    end
+    rootDir = char(candidates(idx));
 end
 
 fprintf("Using runs_GA folder:\n%s\n", rootDir);
 
 %% ========================= FIND PROJECT DIRECTORY =========================
 
-projectDir = findProjectDir(rootDir);
-addpath(genpath(projectDir));
-
 fprintf("Using project directory:\n%s\n", projectDir);
 
-catalogPath = fullfile(projectDir, "JPL_CR3BP_OrbitCatalog.mat");
+catalogPath = projectPaths.catalog;
 if ~isfile(catalogPath)
-    error("Could not find JPL_CR3BP_OrbitCatalog.mat in projectDir: %s", projectDir);
+    error("Could not find JPL_CR3BP_OrbitCatalog.mat at: %s", catalogPath);
 end
 
 %% ========================= USER SETTINGS =========================
@@ -624,34 +634,6 @@ function makeDir(d)
     end
 end
 
-function projectDir = findProjectDir(rootDir)
-
-    candidates = strings(0,1);
-
-    candidates(end+1) = string(pwd);
-    candidates(end+1) = string(rootDir);
-    candidates(end+1) = string(fileparts(rootDir));
-
-    tmp = string(rootDir);
-    for i = 1:5
-        tmp = string(fileparts(tmp));
-        if strlength(tmp) > 0
-            candidates(end+1) = tmp;
-        end
-    end
-
-    candidates = unique(candidates, "stable");
-
-    for i = 1:numel(candidates)
-        if isfile(fullfile(candidates(i), "JPL_CR3BP_OrbitCatalog.mat"))
-            projectDir = char(candidates(i));
-            return;
-        end
-    end
-
-    error("Could not locate project directory containing JPL_CR3BP_OrbitCatalog.mat.");
-end
-
 function runDir = inferRunDirFromExcel(xlsxPath)
 
     [dataDir, ~, ~] = fileparts(xlsxPath);
@@ -689,6 +671,7 @@ end
 
 function baseCtx = buildBaseCatalogContext(projectDir, catalogPath, cfg)
 
+    projectPaths = setup_project();
     fprintf("\nLoading JPL catalog...\n");
 
     S = load(catalogPath);
@@ -715,7 +698,7 @@ function baseCtx = buildBaseCatalogContext(projectDir, catalogPath, cfg)
     baseCtx.times       = T1.("time");
     baseCtx.stabilities = T1.("Stability index  ");
 
-    OrbitCacheDir = fullfile(projectDir, "orbit_cache");
+    OrbitCacheDir = projectPaths.orbitCache;
     if ~exist(OrbitCacheDir, 'dir')
         mkdir(OrbitCacheDir);
     end
@@ -780,7 +763,7 @@ function baseCtx = buildBaseCatalogContext(projectDir, catalogPath, cfg)
         end
     end
 
-    baseCtx.TransferCacheDir = fullfile(projectDir, "transfer_cache");
+    baseCtx.TransferCacheDir = projectPaths.transferCache;
     if ~exist(baseCtx.TransferCacheDir, 'dir')
         mkdir(baseCtx.TransferCacheDir);
     end
@@ -2502,4 +2485,3 @@ function col = makeMissingColumn(n, exampleCol)
         col(:) = missing;
     end
 end
-

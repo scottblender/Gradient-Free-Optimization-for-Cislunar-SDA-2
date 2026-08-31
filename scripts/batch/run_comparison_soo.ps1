@@ -9,14 +9,16 @@ $ObserverCounts = @(3, 5, 7, 10)
 # Only use 1, 3, 5 periods for Lunar Gateway
 $GatewayPeriods = @(1, 3, 5)
 
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $RunOpt = Join-Path $ProjectRoot "run_opt.m"
 if (-not (Test-Path $RunOpt)) { throw "Cannot find run_opt.m at: $RunOpt" }
+$ProjectRootMatlab = $ProjectRoot.Replace("'", "''")
+$RunOptMatlab = $RunOpt.Replace("'", "''")
 
 $MatlabExe = "C:\Program Files\MATLAB\R2025b\bin\matlab.exe"
 if (-not (Test-Path $MatlabExe)) { throw "Cannot find matlab.exe at: $MatlabExe" }
 
-$RunsRoot = Join-Path $ProjectRoot "runs"
+$RunsRoot = Join-Path (Join-Path $ProjectRoot "results") "runs"
 $ComparisonRoot = Join-Path $RunsRoot "COMPARISON"
 
 New-Item -ItemType Directory -Force -Path $RunsRoot | Out-Null
@@ -82,8 +84,9 @@ function Invoke-MatlabRun {
         $cmd = @"
 try
     cd(getenv('RUN_DIR'));
-    addpath(genpath('$ProjectRoot'));
-    run('$RunOpt');
+    addpath('$ProjectRootMatlab');
+    setup_project;
+    run('$RunOptMatlab');
 catch ME
     disp(getReport(ME,'extended'));
     exit(1);

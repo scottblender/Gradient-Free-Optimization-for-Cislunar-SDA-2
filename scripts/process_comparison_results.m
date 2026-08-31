@@ -17,14 +17,25 @@
 
 clear; clc; close all;
 
+projectDir = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectDir);
+projectPaths = setup_project();
+
 %% ========================= FIND runs =========================
 
-if isfolder(fullfile(pwd, "runs"))
-    rootDir = fullfile(pwd, "runs");
-elseif strcmpi(string(getCurrentFolderName()), "runs")
+if strcmpi(string(getCurrentFolderName()), "runs")
     rootDir = pwd;
 else
-    error("Could not find runs folder. Put this script inside runs or one folder above it, or hard-code rootDir.");
+    candidates = [
+        string(projectPaths.runs)
+        string(fullfile(pwd, "runs"))
+        string(fullfile(projectPaths.root, "runs"))
+    ];
+    idx = find(isfolder(candidates), 1);
+    if isempty(idx)
+        error("Could not find runs. Expected results/runs, or select an existing runs folder as the current folder.");
+    end
+    rootDir = char(candidates(idx));
 end
 
 fprintf("Using comparison-study runs folder:\n%s\n", rootDir);

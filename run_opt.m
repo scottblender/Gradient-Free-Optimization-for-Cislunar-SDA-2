@@ -19,12 +19,13 @@ set(groot, ...
 thisFile = mfilename('fullpath');
 thisDir  = fileparts(thisFile);
 
-% Ensure all project functions are on path (for local + batch runs)
-addpath(genpath(thisDir));
+% Resolve code, input data, and output paths for local and batch runs.
+addpath(thisDir);
+projectPaths = setup_project();
 
-catalogPath = fullfile(thisDir, 'JPL_CR3BP_OrbitCatalog.mat');
+catalogPath = projectPaths.catalog;
 S = load(catalogPath);
-CatalogDir = thisDir;
+CatalogDir = projectPaths.data;
 T1 = S.T;
 t_lg = S.t_lg;
 s_lg = S.s_lg;
@@ -67,7 +68,7 @@ states      = T1.("state");
 times       = T1.("time");
 stabilities = T1.("Stability index  ");
 
-OrbitCacheDir = fullfile(CatalogDir, "orbit_cache");
+OrbitCacheDir = projectPaths.orbitCache;
 if ~exist(OrbitCacheDir,'dir'), mkdir(OrbitCacheDir); end
 
 catalogFile = "JPL_CR3BP_OrbitCatalog.mat";
@@ -324,7 +325,7 @@ if strlength(string(RunDir)) == 0
         caseName = sprintf('run_%s_o%d', char(RUN_TAG), num_obs_local);
     end
 
-    RunsRoot   = fullfile(thisDir, "runs");
+    RunsRoot   = projectPaths.runs;
     BatchDir   = fullfile(RunsRoot, ts);
     MissionDir = fullfile(BatchDir, missionCode);
     RunDir     = fullfile(MissionDir, caseName);
@@ -341,7 +342,7 @@ FigDir  = fullfile(RunDir, "figs");
 DataDir = fullfile(RunDir, "data");
 LogDir  = fullfile(RunDir, "logs");
 
-TransferCacheDir = fullfile(CatalogDir, "transfer_cache");
+TransferCacheDir = projectPaths.transferCache;
 
 if ~exist(FigDir,'dir'), mkdir(FigDir); end
 if ~exist(DataDir,'dir'), mkdir(DataDir); end

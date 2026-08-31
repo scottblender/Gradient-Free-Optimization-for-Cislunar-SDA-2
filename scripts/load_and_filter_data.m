@@ -5,9 +5,13 @@ close all;
 clear;
 clc
 tic
-thisDir = fileparts(mfilename('fullpath'));
-dataPath = fullfile(thisDir, 'JPL_Data');   % project-relative
+projectDir = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectDir);
+projectPaths = setup_project();
+dataPath = projectPaths.rawData;
 files = dir(fullfile(dataPath,'*.csv'));
+assert(~isempty(files), ...
+    'No JPL CSV files found in %s. Use the existing catalog MAT file if available.', dataPath);
 data = cell(length(files),1); % preallocate cell based on size of each file
 parfor i = 1:length(files)
     Ti = readtable(fullfile(dataPath, files(i).name), "VariableNamingRule", "preserve");
@@ -198,7 +202,8 @@ T = T(keepMask,:);
 
 % finally, sort orbits by z-amplitude
 T = sortrows(T, 'zAmplitude');
-save('JPL_CR3BP_OrbitCatalog.mat','T','t_lg','s_lg','dt_lg','-v7.3');
+save(fullfile(projectPaths.data, 'JPL_CR3BP_OrbitCatalog.mat'), ...
+    'T','t_lg','s_lg','dt_lg','-v7.3');
 toc
 
 
