@@ -137,11 +137,13 @@ if ~isempty(runDirEnv)
 end
 
 % ---------------- Visibility parameters ----------------
-sun_min_deg  = 20;
-moon_min_deg = 10;
+sun_min_deg   = 20;
+moon_min_deg  = 10;
+earth_min_deg = 0;     % Initial equivalence check
 
-sun_min  = deg2rad(sun_min_deg);
-moon_min = deg2rad(moon_min_deg);
+sun_min   = deg2rad(sun_min_deg);
+moon_min  = deg2rad(moon_min_deg);
+earth_min = deg2rad(earth_min_deg);
 
 theta0 = 0;
 i_sun  = deg2rad(0);
@@ -232,7 +234,7 @@ switch missionCfg.type
         missionCfg.periodic.Nperiods   = 1;
 
     case "LOW_THRUST_TRANSFER"
-        missionCfg.transfer.depOrbitIndex = 52;
+        missionCfg.transfer.depOrbitIndex = 51;
         missionCfg.transfer.depSlot       = 10;
         missionCfg.transfer.arrOrbitIndex = 400;
         missionCfg.transfer.arrSlot       = 1;
@@ -569,9 +571,12 @@ F_truth = griddedInterpolant(t_unique_truth, s_unique_truth, 'spline');
 s_target_ekf = F_truth(t_target_ekf);
 
 % ---------------- Objective function wrapper ----------------
-ObjFcn = @(x) objective_wrapper(x, orbit_database, stabilities, s_target_ekf, ...
-    t_target_ekf, P_0, Q_k, R_k, mu, LU, sunFcn, sun_min, moon_min, ...
-    opt_flag, OPTIMIZER_MODE, dq, useScreening, costFlags, costCfg, measCfg);
+ObjFcn = @(x) objective_wrapper( ...
+    x, orbit_database, stabilities, s_target_ekf, ...
+    t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
+    sunFcn, sun_min, moon_min, earth_min, ...
+    opt_flag, OPTIMIZER_MODE, dq, useScreening, ...
+    costFlags, costCfg, measCfg);
 
 RunTimer = tic;
 
@@ -797,15 +802,16 @@ for k = 1:num_obs
     observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
 end
 
-availableObsCount = [];
 try
     [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf( ...
-        observer_ICs, s_target_ekf, t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
-        sunFcn, sun_min, moon_min, useScreening, measCfg);
+    observer_ICs, s_target_ekf, t_target_ekf, ...
+    P_0, Q_k, R_k, mu, LU, ...
+    sunFcn, sun_min, moon_min, earth_min, useScreening, measCfg);
 catch
-    [s_ekf, cov, screeningCount_final] = cr3bp_ekf( ...
-        observer_ICs, s_target_ekf, t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
-        sunFcn, sun_min, moon_min, useScreening, measCfg);
+    [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf( ...
+    observer_ICs, s_target_ekf, t_target_ekf, ...
+    P_0, Q_k, R_k, mu, LU, ...
+    sunFcn, sun_min, moon_min, earth_min, useScreening, measCfg);
 end
 
 safe_printf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
@@ -1119,7 +1125,10 @@ try
             'max_iters','max_evals','runtime_s','screeningCount_final', ...
             'rmse_pos_km','rmse_vel_kms','mean_detPpos_km6','mean_stability','min_cost' ...
         });
-
+    summaryRow.visibility_model = "UNIFIED";
+    summaryRow.sun_min_deg       = sun_min_deg;
+    summaryRow.moon_min_deg      = moon_min_deg;
+    summaryRow.earth_min_deg     = earth_min_deg;
     if isfile(EXCEL_FILE)
         writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary', 'WriteMode','append');
     else

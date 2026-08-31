@@ -896,6 +896,13 @@ function ctx = buildObjectiveContextForRun(runInfo, S, baseCtx, cfg)
 
     ctx.sun_min  = deg2rad(20);
     ctx.moon_min = deg2rad(10);
+    earth_min_deg = getNumericVarValue(S, "earth_min_deg");
+
+    if ~isfinite(earth_min_deg)
+        earth_min_deg = 0;
+    end
+
+    ctx.earth_min = deg2rad(earth_min_deg);
 
     theta0 = 0;
     i_sun  = deg2rad(0);
@@ -997,7 +1004,7 @@ function missionCfg = buildMissionCfg(runInfo)
             end
 
         case "LOW_THRUST_TRANSFER"
-            missionCfg.transfer.depOrbitIndex = 52;
+            missionCfg.transfer.depOrbitIndex = 51;
             missionCfg.transfer.depSlot       = 10;
             missionCfg.transfer.arrOrbitIndex = 400;
             missionCfg.transfer.arrSlot       = 1;
@@ -1208,6 +1215,7 @@ function [mcTable, mcSummary] = makeTrueMonteCarloValidationPlot(Teval, Tobs, S,
                 ctx.sunFcn, ...
                 ctx.sun_min, ...
                 ctx.moon_min, ...
+                ctx.earth_min, ...
                 ctx.opt_flag, ...
                 ctx.solverName, ...
                 dq, ...

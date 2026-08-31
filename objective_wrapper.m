@@ -1,33 +1,34 @@
 function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
-    s_target, t_target, P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, ...
+    s_target, t_target, P0, Q, R, mu, LU, ...
+    sunFcn, sun_min, moon_min, earth_min, ...
     opt_flag, solverName, dq, useScreening, costFlags, costCfg, measCfg)
 
     % ---------------- defaults ----------------
-    if nargin < 17 || isempty(useScreening)
+    if nargin < 18 || isempty(useScreening)
         useScreening = true;
     end
-
-    if nargin < 18 || isempty(costFlags)
+    
+    if nargin < 19 || isempty(costFlags)
         costFlags = struct('J1', true, 'J2', true, 'J3', true);
     end
-
-    if nargin < 19 || isempty(costCfg)
+    
+    if nargin < 20 || isempty(costCfg)
         error('objective_wrapper requires costCfg.');
     end
-
-    if nargin < 20 || isempty(measCfg)
+    
+    if nargin < 21 || isempty(measCfg)
         measCfg = struct();
         measCfg.type = "ANGLES_ONLY";
     end
-
+    
     if ~isfield(measCfg, 'type') || isempty(measCfg.type)
         measCfg.type = "ANGLES_ONLY";
     end
     measCfg.type = upper(string(measCfg.type));
-
-    if ~isfield(costFlags,'J1'), costFlags.J1 = true; end
-    if ~isfield(costFlags,'J2'), costFlags.J2 = true; end
-    if ~isfield(costFlags,'J3'), costFlags.J3 = true; end
+    
+    if ~isfield(costFlags, 'J1'), costFlags.J1 = true; end
+    if ~isfield(costFlags, 'J2'), costFlags.J2 = true; end
+    if ~isfield(costFlags, 'J3'), costFlags.J3 = true; end
 
     J_1 = NaN; J_2 = NaN; J_3 = NaN;
     screeningCount = NaN;
@@ -74,8 +75,10 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
             observer_ICs(k,:) = orbit_database{o_idx}(s_idx,:);
         end
 
-        [s_ekf, cov, screeningCount, ~] = cr3bp_ekf(observer_ICs, s_target, t_target, ...
-            P0, Q, R, mu, LU, sunFcn, sun_min, moon_min, useScreening, measCfg);
+        [s_ekf, cov, screeningCount, ~] = cr3bp_ekf( ...
+            observer_ICs, s_target, t_target, ...
+            P0, Q, R, mu, LU, ...
+            sunFcn, sun_min, moon_min, earth_min, useScreening, measCfg);
 
         [J_total, J_1, J_2, J_3] = compute_cost( ...
             s_target, s_ekf, cov, stabilities_vec, opt_flag, costFlags, costCfg);
@@ -89,7 +92,7 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
     end
 
     % ---------------- logging ----------------
-    if nargin >= 16 && ~isempty(dq)
+    if nargin >= 17 && ~isempty(dq)
         entry = struct();
         entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
         entry.solver = char(solverName);
@@ -101,6 +104,9 @@ function J_total = objective_wrapper(inputs, orbit_database_in, stabilities_in, 
         entry.useJ2 = logical(costFlags.J2);
         entry.useJ3 = logical(costFlags.J3);
         entry.meas_model = char(measCfg.type);
+        entry.sun_min_deg   = rad2deg(sun_min);
+        entry.moon_min_deg  = rad2deg(moon_min);
+        entry.earth_min_deg = rad2deg(earth_min);
 
         if strcmpi(opt_flag,"SOO")
             entry.J_total = J_total;

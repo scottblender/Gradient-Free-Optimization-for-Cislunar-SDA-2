@@ -1,19 +1,20 @@
 function [s_ekf, cov, screeningCount, availableObsCount] = cr3bp_ekf( ...
     observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
-    sunFcn, sun_min, moon_min, useScreening, measCfg)
+    sunFcn, sun_min, moon_min, earth_min, useScreening, measCfg)
 
-if nargin < 12 || isempty(useScreening)
+if nargin < 13 || isempty(useScreening)
     useScreening = true;   % default ON
 end
 
-if nargin < 13 || isempty(measCfg)
+if nargin < 14 || isempty(measCfg)
     measCfg = struct();
     measCfg.type = "ANGLES_ONLY";
 end
 
-if ~isfield(measCfg,'type') || isempty(measCfg.type)
+if ~isfield(measCfg, 'type') || isempty(measCfg.type)
     measCfg.type = "ANGLES_ONLY";
 end
+
 measCfg.type = upper(string(measCfg.type));
 
 num_steps = length(t_target);
@@ -72,10 +73,9 @@ for k = 2:num_steps
 
         r_sun = sunFcn(t);
 
-        [occE, occM] = calc_occlusion(r_obs, r_target_truth, mu, LU);
-        [ok_excl, ~, ~] = calc_exclusion(r_target_truth, r_obs, r_sun, mu, sun_min, moon_min);
-
-        ok = ok_excl && ~occE && ~occM;
+        ok = calc_visibility( ...
+            r_target_truth, r_obs, r_sun, ...
+            mu, LU, sun_min, moon_min, earth_min);
 
         % count valid observers for plotting
         if ok
