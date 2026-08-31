@@ -1,6 +1,11 @@
 % ---- run_opt.m ---- %
 clear; close all; clc;
 
+% ---------------- Results output ----------------
+MAKE_PLOTS = strcmp(getenv("MAKE_PLOTS"),"1"); % Display only; never saved.
+STUDY_ID = string(getenv("STUDY_ID"));
+if strlength(STUDY_ID) == 0, STUDY_ID = "reviewer2_pilot_v2"; end
+
 % ---------------- Figure defaults ----------------
 set(groot, ...
     'defaultAxesFontSize',16, ...
@@ -27,6 +32,7 @@ catalogPath = projectPaths.catalog;
 S = load(catalogPath);
 CatalogDir = projectPaths.data;
 T1 = S.T;
+catalogHash = study_hash(catalogPath,"file");
 t_lg = S.t_lg;
 s_lg = S.s_lg;
 
@@ -99,7 +105,11 @@ rebuildOrbitDb = true;
 if isfile(orbitDbCacheFile)
     try
         C = load(orbitDbCacheFile, 'orbit_database', 'cacheMeta');
-        if isfield(C, 'orbit_database') && numel(C.orbit_database) == num_orbits
+        if isfield(C,'orbit_database') && numel(C.orbit_database) == num_orbits && ...
+                isfield(C,'cacheMeta') && isfield(C.cacheMeta,'catalogHash') && ...
+                string(C.cacheMeta.catalogHash) == catalogHash && ...
+                isfield(C.cacheMeta,'slotDefinition') && ...
+                string(C.cacheMeta.slotDefinition) == "equal_time_no_endpoint_v1"
             orbit_database = C.orbit_database;
             rebuildOrbitDb = false;
             safe_printf('Loaded cached orbit database from:\n  %s\n', orbitDbCacheFile);
@@ -134,6 +144,8 @@ if rebuildOrbitDb
     cacheMeta.created         = string(datetime('now'));
     cacheMeta.catalogFile     = string(catalogFile);
     cacheMeta.num_orbits      = num_orbits;
+    cacheMeta.catalogHash = catalogHash;
+    cacheMeta.slotDefinition = "equal_time_no_endpoint_v1";
     cacheMeta.slots_per_orbit = slots_per_orbit;
 
     try
@@ -208,12 +220,6 @@ if ~useFEBudget
     dq = parallel.pool.DataQueue;
     assignin('base', 'OptimizationLog', {});
     afterEach(dq, @(data) append_log(data));
-end
-
-function append_log(data)
-    logCell = evalin('base', 'OptimizationLog');
-    logCell{end+1,1} = data;
-    assignin('base', 'OptimizationLog', logCell);
 end
 
 opt_flag          = 'SOO';
@@ -377,8 +383,13 @@ LogDir  = fullfile(RunDir, "logs");
 
 TransferCacheDir = projectPaths.transferCache;
 
-if ~exist(FigDir,'dir'), mkdir(FigDir); end
+if ~useFEBudget && ~exist(FigDir,'dir'), mkdir(FigDir); end
 if ~exist(DataDir,'dir'), mkdir(DataDir); end
+if useFEBudget
+    assert(~isfile(fullfile(DataDir,'optimization_run.mat')) && ...
+        ~isfile(fullfile(DataDir,'tracking_data.mat')), ...
+        'Run output already exists. Choose a new RUN_DIR; do not overwrite runs.');
+end
 if ~exist(LogDir,'dir'), mkdir(LogDir); end
 if ~exist(TransferCacheDir,'dir'), mkdir(TransferCacheDir); end
 
@@ -494,7 +505,8 @@ UB_common = repmat([num_orbits, slots_per_orbit], 1, num_obs_cfg);
 useTransferCache = true;
 
 if contains(string(missionCfg.type), "TRANSFER") && useTransferCache
-    cacheKey  = make_transfer_cache_key(missionCfg, slots_per_orbit);
+    cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit);
+    cacheKey = cacheKey + "_" + study_hash({catalogHash,missionCfg.transfer,mu,slots_per_orbit});
     cacheFile = fullfile(TransferCacheDir, cacheKey + ".mat");
 
     loadedFromCache = false;
@@ -603,8 +615,11 @@ s_unique_truth = s_truth(idx_u_truth, :);
 
 F_truth = griddedInterpolant(t_unique_truth, s_unique_truth, 'spline');
 s_target_ekf = F_truth(t_target_ekf);
-save(fullfile(DataDir, 'measurement_config.mat'), ...
-    'measCfg', 'R_k', 't_target_ekf', 'seedVal');
+% SOO settings/time grid are saved in optimization_run.mat/tracking_data.mat.
+if ~useFEBudget
+    save(fullfile(DataDir,'measurement_config.mat'), ...
+        'measCfg','R_k','t_target_ekf','seedVal');
+end
 
 % ---------------- Objective function wrapper ----------------
 RawObjFcn = @(x) objective_wrapper( ...
@@ -630,6 +645,72 @@ reset_fe_history();
 history = table();
 actualEvals = NaN;
 solverFunccount = NaN;
+
+% ---------------- Reproducibility metadata ----------------
+solverSettingsText = "";
+objectiveErrorCount = 0;
+x_best = [];
+min_cost = Inf;
+
+if useFEBudget
+    codeFiles = ["run_opt.m"; "scripts/save_tracking_results.m"];
+    srcFiles = dir(fullfile(projectPaths.src,'**','*.m'));
+    for k = 1:numel(srcFiles)
+        absoluteName = fullfile(srcFiles(k).folder,srcFiles(k).name);
+        relativeName = erase(string(absoluteName),string(thisDir)+filesep);
+        codeFiles(end+1,1) = replace(relativeName,filesep,"/");
+    end
+    codeFiles = sort(codeFiles);
+    codeHashes = strings(size(codeFiles));
+    for k = 1:numel(codeFiles)
+        codeHashes(k) = study_hash(fullfile(thisDir,codeFiles(k)),"file");
+    end
+    workerCount = 0;
+    if USE_PARALLEL
+        pool = gcp('nocreate');
+        workerCount = pool.NumWorkers;
+    end
+    settings = struct('mission',missionCfg,'measurements',measCfg, ...
+        'cost',costCfg,'costFlags',costFlags,'P0',P_0,'Q',Q_k,'R',R_k, ...
+        'useScreening',useScreening,'sun_min',sun_min, ...
+        'moon_min',moon_min,'earth_min',earth_min, ...
+        'theta0',theta0,'i_sun',i_sun,'mu',mu,'LU',LU,'TU',TU, ...
+        'EKF_DT',EKF_DT,'slotsPerOrbit',slots_per_orbit, ...
+        'slotDefinition',"equal_time_no_endpoint_v1", ...
+        'odeRelTol',ode_opts.RelTol,'odeAbsTol',ode_opts.AbsTol, ...
+        'useParallel',USE_PARALLEL,'workerCount',workerCount);
+
+    runState = struct();
+    runState.schemaVersion = 2;
+    runState.studyID = STUDY_ID;
+    runState.optimizer = OPTIMIZER_MODE;
+    runState.runTag = string(RUN_TAG);
+    runState.optimizerSeed = seedVal;
+    runState.measurementNoiseSeed = measCfg.noiseSeed;
+    runState.maxEvaluations = FE_BUDGET;
+    runState.settings = settings;
+    runState.truthInfo = truthInfo;
+    runState.catalogHash = catalogHash;
+    runState.truthHash = study_hash({t_target_ekf,s_target_ekf});
+    runState.codeHash = study_hash({codeFiles,codeHashes});
+    runState.matlabVersion = string(version);
+    runState.platform = string(computer);
+    runState.host = string(getenv('COMPUTERNAME'));
+    if runState.host == "", runState.host = string(getenv('HOSTNAME')); end
+    runState.toolboxes = ver;
+    runState.comparison = struct('settings',settings, ...
+        'budget',FE_BUDGET,'catalogHash',catalogHash, ...
+        'truthHash',runState.truthHash,'codeHash',runState.codeHash, ...
+        'matlabVersion',runState.matlabVersion);
+    runState.comparisonKey = study_hash(runState.comparison);
+    runState.status = "running";
+    runState.termination = "running";
+    runState.validationStatus = "not_run";
+    runState.validationEvaluations = 0;
+    runState.created = string(datetime('now','Format','yyyy-MM-dd HH:mm:ss'));
+    runStateFile = fullfile(DataDir,'optimization_run.mat');
+    save(runStateFile,'runState','-v7');
+end
 
 RunTimer = tic;
 solverError = [];
@@ -669,18 +750,23 @@ try
                 'OutputFcn', @(options,state,flag) ...
                     ga_outfun(options,state,flag,FE_BUDGET));
 
+            solverSettingsText = string(evalc('disp(options)'));
             [x_best, min_cost, solverExitFlag, solverOutput] = ga( ...
                 ObjFcn, nVars, [], [], [], [], ...
                 LB, UB, [], IntCon, options);
 
             solverFunccount = solverOutput.funccount;
+            incumbent = getappdata(0,'OPT_GA_BEST');
+            assert(~isempty(incumbent.x) && isfinite(incumbent.J), ...
+                'GA did not record a finite feasible incumbent.');
+            x_best = incumbent.x;
+            min_cost = incumbent.J;
             history = get_fe_history();
             if isempty(history)
                 actualEvals = solverFunccount;
             else
-                % Integer-constrained GA can perform a final bookkeeping
-                % fitness call after the last population has been evaluated.
-                % The search budget is the FE count reached by the GA state.
+                % Keep the final checkpoint count and solver total separately.
+                % A difference is not automatically a nonsearch evaluation.
                 actualEvals = history.fe(end);
             end
 
@@ -709,6 +795,7 @@ try
                 'OutputFcn', @(values,state) ...
                     pso_outfun(values,state,FE_BUDGET));
 
+            solverSettingsText = string(evalc('disp(options)'));
             [x_best, min_cost, solverExitFlag, solverOutput] = ...
                 particleswarm(ObjFcn, nVars, LB, UB, options);
 
@@ -729,6 +816,11 @@ try
                         [1, slots_per_orbit], 'Type','integer')];
             end
 
+            boSettings = struct('UseParallel',USE_PARALLEL, ...
+                'IsObjectiveDeterministic',true, ...
+                'AcquisitionFunctionName',"expected-improvement-plus", ...
+                'MaxObjectiveEvaluations',FE_BUDGET,'PlotFcn',[]);
+            solverSettingsText = string(evalc('disp(boSettings)'));
             results = bayesopt(ObjFcn, vars, ...
                 'UseParallel', USE_PARALLEL, ...
                 'IsObjectiveDeterministic', true, ...
@@ -736,6 +828,7 @@ try
                 'MaxObjectiveEvaluations', FE_BUDGET, ...
                 'PlotFcn', []);
 
+            objectiveErrorCount = nnz(results.ErrorTrace == 1);
             x_best = table2array(results.XAtMinObjective);
             min_cost = results.MinObjective;
             actualEvals = results.NumObjectiveEvaluations;
@@ -796,6 +889,7 @@ try
             abc_opts.UseParallelInit = USE_PARALLEL;
             abc_opts.Logger          = @safe_printf;
 
+            solverSettingsText = string(evalc('disp(abc_opts)'));
             [x_best, min_cost, actualEvals, history] = ...
                 abc_discrete(ObjFcn, LB, UB, abc_opts);
             solverFunccount = actualEvals;
@@ -820,6 +914,7 @@ try
             aco_opts.StallIters         = inf;
             aco_opts.Logger             = @safe_printf;
 
+            solverSettingsText = string(evalc('disp(aco_opts)'));
             [x_best, min_cost, actualEvals, history] = ...
                 aco_discrete(ObjFcn, LB, UB, aco_opts);
             solverFunccount = actualEvals;
@@ -835,59 +930,107 @@ end
 TotalRuntime = toc(RunTimer);
 safe_printf('Total Runtime: %.2f seconds\n', TotalRuntime);
 
-if ~isempty(solverError)
-    rethrow(solverError);
-end
-
 if useFEBudget
-    if actualEvals ~= FE_BUDGET
-        warning('OptimizationBudget:Mismatch', ...
-            '%s used %d function evaluations; requested %d.', ...
-            OPTIMIZER_MODE, actualEvals, FE_BUDGET);
-        termination = "solver_stopped";
-    else
-        termination = "budget_reached";
+    % Preserve a partial callback history when GA/PSO throws.
+    if isempty(history) && ismember(OPTIMIZER_MODE,["GA","PSO"])
+        history = get_fe_history();
+        if ~isempty(history), actualEvals = history.fe(end); end
     end
-
-    runState = struct();
-    runState.optimizer = OPTIMIZER_MODE;
-    runState.runTag = RUN_TAG;
-    runState.optimizerSeed = seedVal;
-    runState.measurementNoiseSeed = measCfg.noiseSeed;
-    runState.maxEvaluations = FE_BUDGET;
     runState.nEvaluations = actualEvals;
     runState.solverFunctionEvaluations = solverFunccount;
-    runState.nonSearchFunctionEvaluations = max(0, solverFunccount - actualEvals);
+    runState.solverCallDifference = solverFunccount-actualEvals;
     runState.bestX = x_best;
     runState.bestJ = min_cost;
     runState.history = history;
     runState.runtime_s = TotalRuntime;
     runState.solverExitFlag = solverExitFlag;
     runState.solverOutput = solverOutput;
-    runState.termination = termination;
+    runState.solverSettingsText = solverSettingsText;
+    runState.objectiveErrorCount = objectiveErrorCount;
 
-    runState.settings = struct( ...
-        'mission',missionCfg, ...
-        'measurements',measCfg, ...
-        'cost',costCfg, ...
-        'costFlags',costFlags, ...
-        'P0',P_0, ...
-        'Q',Q_k, ...
-        'R',R_k, ...
-        'useScreening',useScreening, ...
-        'sun_min',sun_min, ...
-        'moon_min',moon_min, ...
-        'earth_min',earth_min, ...
-        'EKF_DT',EKF_DT, ...
-        'useParallel',USE_PARALLEL);
+    if ~isempty(solverError)
+        runState.status = "solver_failed";
+        runState.termination = "solver_failed";
+        runState.error = string(getReport(solverError,'extended','hyperlinks','off'));
+        save(runStateFile,'runState','-v7');
+        diary off
+        rethrow(solverError);
+    end
+    runState.termination = "solver_stopped";
+    if actualEvals == FE_BUDGET
+        runState.termination = "budget_reached";
+    end
+    runState.status = "optimized";
+    save(runStateFile,'runState','-v7');
+    try
+        assert(objectiveErrorCount == 0, ...
+            'Objective errors occurred; inspect the saved run before comparison.');
+        assert(~isempty(history) && all(isfinite(history.fe)) && ...
+            all(history.fe > 0 & history.fe == round(history.fe)) && ...
+            all(diff(history.fe) > 0) && all(isfinite(history.bestJ)) && ...
+            all(diff(history.bestJ) <= 1e-12*max(1,abs(history.bestJ(1:end-1)))) && ...
+            history.fe(end) == actualEvals && ...
+            abs(history.bestJ(end)-min_cost) <= 1e-9*max(1,abs(min_cost)), ...
+            'Invalid convergence history or inconsistent best solution.');
 
-    save(fullfile(DataDir, 'optimization_run.mat'), 'runState');
-    save(fullfile(DataDir, 'optimization_history.mat'), 'history');
-    writetable(history, fullfile(DataDir, 'optimization_history.csv'));
+        x_best = round(x_best);
+        orbit_indices = x_best(1:2:end);
+        slot_indices = x_best(2:2:end);
+        num_obs = numel(orbit_indices);
+        observer_ICs = zeros(num_obs,6);
+        for k = 1:num_obs
+            observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
+        end
+        observers = table((1:num_obs)',orbit_indices(:),slot_indices(:), ...
+            string(T1.orbitFamily(orbit_indices)), ...
+            tf(orbit_indices),stabilities(orbit_indices),observer_ICs, ...
+            'VariableNames',{'observer_id','orbit_index','slot_index', ...
+            'orbit_family','period_TU','stability_index','initial_state'});
+        if ismember('sourceFile',T1.Properties.VariableNames)
+            observers.source_file = string(T1.sourceFile(orbit_indices));
+        end
+        if ismember('orbitID',T1.Properties.VariableNames)
+            observers.orbit_id = string(T1.orbitID(orbit_indices));
+        end
+
+        % One diagnostic EKF pass, outside the search budget.
+        runState.validationStatus = "running";
+        runState.validationEvaluations = 1;
+        save(runStateFile,'runState','-v7');
+        validationTimer = tic;
+        [s_ekf,cov,screeningCount_final,availableObsCount] = cr3bp_ekf( ...
+            observer_ICs,s_target_ekf,t_target_ekf,P_0,Q_k,R_k,mu,LU, ...
+            sunFcn,sun_min,moon_min,earth_min,useScreening,measCfg);
+        runState.validationRuntime_s = toc(validationTimer);
+        runState.status = "completed";
+        runState = save_tracking_results(DataDir,runState, ...
+            t_target_ekf,s_target_ekf,s_ekf,cov,availableObsCount, ...
+            screeningCount_final,observers);
+    catch ME
+        runState.status = "validation_failed";
+        runState.validationStatus = "failed";
+        runState.error = string(getReport(ME,'extended','hyperlinks','off'));
+        save(runStateFile,'runState','-v7');
+        diary off
+        rethrow(ME);
+    end
 
     safe_printf('Search FE = %d/%d | solver calls = %d | bestJ = %.12g | %s\n', ...
-        actualEvals, FE_BUDGET, solverFunccount, min_cost, termination);
+        actualEvals,FE_BUDGET,solverFunccount,min_cost,runState.termination);
+    safe_printf('Saved data only: %s\n',DataDir);
+    diary off
+    if MAKE_PLOTS
+        try
+            preview_study_run(DataDir); % Display only, after data have been saved.
+        catch ME
+            warning('Study:PreviewFailed','Preview failed: %s',ME.message);
+        end
+    end
+    return; % Skip ALL legacy plots, figure exports, and Excel output for SOO.
 end
+
+% The legacy multiobjective path below is unchanged.
+if ~isempty(solverError), rethrow(solverError); end
 
 if strcmpi(opt_flag, 'SOO')
     safe_printf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
@@ -1679,25 +1822,25 @@ function append_fallback_output(msg)
     end
 end    
 
-function [state,options,optchanged] = ...
-    ga_outfun(options,state,flag,FE_BUDGET)
-
+function [state,options,optchanged] = ga_outfun(options,state,flag,FE_BUDGET)
     optchanged = false;
-
     if strcmp(flag,'init') || strcmp(flag,'iter')
-        if isempty(state.Score)
-            bestJ = Inf;
-        else
-            bestJ = min(state.Score);
+        incumbent = getappdata(0,'OPT_GA_BEST');
+        % Fitness contains objective values and is Inf for infeasible
+        % individuals in this integer GA. Score can contain penalties.
+        values = state.Score(:);
+        if isfield(state,'Fitness'), values = state.Fitness(:); end
+        values(~isfinite(values)) = Inf;
+        [generationBest,k] = min(values);
+        if ~isempty(generationBest) && generationBest < incumbent.J
+            incumbent.J = generationBest;
+            incumbent.x = state.Population(k,:);
+            setappdata(0,'OPT_GA_BEST',incumbent);
         end
-
-        append_fe_history(state.FunEval, bestJ);
-
-        safe_printf( ...
-            'GA gen %3d | FE = %5d | bestJ = %.12g\n', ...
-            state.Generation, state.FunEval, bestJ);
+        append_fe_history(state.FunEval,incumbent.J);
+        safe_printf('GA gen %3d | FE = %5d | bestJ = %.12g\n', ...
+            state.Generation,state.FunEval,incumbent.J);
     end
-
     if state.FunEval >= FE_BUDGET
         state.StopFlag = 'Function evaluation budget reached';
     end
@@ -1718,7 +1861,8 @@ function stop = pso_outfun(values,state,FE_BUDGET)
 end
 
 function reset_fe_history()
-    setappdata(0, 'OPT_FE_HISTORY', zeros(0,2));
+    setappdata(0,'OPT_FE_HISTORY',zeros(0,2));
+    setappdata(0,'OPT_GA_BEST',struct('J',Inf,'x',[]));
 end
 
 function append_fe_history(fe, bestJ)
@@ -1743,4 +1887,11 @@ function T = get_fe_history()
     else
         T = array2table(H, 'VariableNames', {'fe','bestJ'});
     end
+end
+
+
+function append_log(data)
+    logCell = evalin('base', 'OptimizationLog');
+    logCell{end+1,1} = data;
+    assignin('base', 'OptimizationLog', logCell);
 end
