@@ -688,6 +688,7 @@ if useFEBudget
     runState.optimizerSeed = seedVal;
     runState.measurementNoiseSeed = measCfg.noiseSeed;
     runState.maxEvaluations = FE_BUDGET;
+    runState.searchEvaluationBudget = FE_BUDGET;
     runState.settings = settings;
     runState.truthInfo = truthInfo;
     runState.catalogHash = catalogHash;
@@ -937,8 +938,11 @@ if useFEBudget
         if ~isempty(history), actualEvals = history.fe(end); end
     end
     runState.nEvaluations = actualEvals;
+    runState.searchFunctionEvaluations = actualEvals;
     runState.solverFunctionEvaluations = solverFunccount;
     runState.solverCallDifference = solverFunccount-actualEvals;
+    runState.postSearchFunctionEvaluations = ...
+        max(0,solverFunccount-actualEvals);
     runState.bestX = x_best;
     runState.bestJ = min_cost;
     runState.history = history;
@@ -1015,8 +1019,11 @@ if useFEBudget
         rethrow(ME);
     end
 
-    safe_printf('Search FE = %d/%d | solver calls = %d | bestJ = %.12g | %s\n', ...
-        actualEvals,FE_BUDGET,solverFunccount,min_cost,runState.termination);
+    safe_printf(['Search FE = %d/%d | solver calls = %d ' ...
+        '(post-search = %d) | bestJ = %.12g | %s\n'], ...
+        actualEvals,FE_BUDGET,solverFunccount, ...
+        runState.postSearchFunctionEvaluations,min_cost, ...
+        runState.termination);
     safe_printf('Saved data only: %s\n',DataDir);
     diary off
     if MAKE_PLOTS

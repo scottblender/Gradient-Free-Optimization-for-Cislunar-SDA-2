@@ -16,9 +16,12 @@ assert(height(summary) == 2 && all(summary.n_runs == 2));
 assert(all(inventory.valid));
 out = dir(fullfile(caseDir,'FE_DATA_*','convergence_*.mat'));
 D = load(fullfile(out(end).folder,out(end).name),'curves');
-assert(D.curves(1).fe(1) == 60, 'An unobserved early FE was invented.');
-assert(all(D.curves(1).bestJ(1:60,1) == 8));
-assert(all(D.curves(2).bestJ(1:60,1) == 6));
+assert(D.curves(1).fe(1) == 1);
+assert(all(isnan(D.curves(1).bestJ(1:59,1))), ...
+    'An unobserved early GA value was invented.');
+assert(all(D.curves(1).bestJ(60:119,1) == 8));
+assert(D.curves(2).bestJ(1,1) == 9);
+assert(all(D.curves(2).bestJ(30:119,1) == 6));
 assert(D.curves(1).bestJ(end,1) == 3);
 
 % A genuinely single-checkpoint history needs no interpolation.
@@ -112,8 +115,10 @@ for opt = ["GA","BAYESIAN"]
         runState.optimizerSeed = seed;
         runState.maxEvaluations = 120;
         runState.nEvaluations = 120;
-        runState.solverFunctionEvaluations = 120;
-        runState.solverCallDifference = 0;
+        expectedPostSearch = double(opt == "GA");
+        runState.solverFunctionEvaluations = 120+expectedPostSearch;
+        runState.solverCallDifference = expectedPostSearch;
+        runState.postSearchFunctionEvaluations = expectedPostSearch;
         runState.settings = struct('mission',struct('type',"LUNAR_GATEWAY", ...
             'optimization',struct('numObservers',3)), ...
             'measurements',struct('type',"ANGLES_ONLY",'noiseSeed',1001));

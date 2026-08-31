@@ -56,6 +56,11 @@ for k = 1:n
         assert(r.nEvaluations == budget,'Reported search FE does not match budget.');
         assert(isfinite(r.solverFunctionEvaluations) && ...
             r.solverFunctionEvaluations >= budget, 'Invalid solver FE total.');
+        expectedPostSearch = double(string(r.optimizer) == "GA");
+        assert(isfield(r,'postSearchFunctionEvaluations') && ...
+            r.postSearchFunctionEvaluations == expectedPostSearch && ...
+            r.solverFunctionEvaluations == budget+expectedPostSearch, ...
+            'Unexpected native solver-call pattern.');
 
         H = r.history;
         assert(istable(H) && all(ismember({'fe','bestJ'},H.Properties.VariableNames)) ...
@@ -130,8 +135,9 @@ for key = keys'
         'VariableNames',{'comparison_key','complete','reason'})]; %#ok<AGROW>
     if ~complete, continue; end
 
-    firstFE = max(cellfun(@(r) r.history.fe(1),runs(rows)));
-    feGrid = (firstFE:budget)';
+    % Preserve early BO data. Values before another algorithm's first
+    % checkpoint remain NaN; no best value is invented.
+    feGrid = (1:budget)';
     curves = struct([]);
     representative = runs{rows(1)};
     comparison = representative.comparison;
@@ -149,14 +155,17 @@ for key = keys'
         for j = 1:numel(idx)
             r = runs{idx(j)};
             H = r.history;
+            valid = feGrid >= H.fe(1) & feGrid <= H.fe(end);
             if height(H) == 1
-                % All runs share firstFE <= budget; here both equal budget.
-                assert(numel(feGrid) == 1 && H.fe(1) == budget);
-                traces(:,j) = H.bestJ(1);
+                assert(H.fe(1) == budget);
+                traces(valid,j) = H.bestJ(1);
             else
-                traces(:,j) = interp1(H.fe,H.bestJ,feGrid,'previous');
+                traces(valid,j) = interp1( ...
+                    H.fe,H.bestJ,feGrid(valid),'previous');
             end
-            assert(all(isfinite(traces(:,j))),'Alignment would require extrapolation.');
+            assert(all(isfinite(traces(valid,j))) && ...
+                all(isnan(traces(~valid,j))), ...
+                'Alignment would require extrapolation or backfilling.');
             costs(j) = r.bestJ;
             runtimes(j) = r.runtime_s;
             solverCalls(j) = r.solverFunctionEvaluations;
@@ -172,8 +181,10 @@ for key = keys'
         curves(a).seeds = seeds;
         curves(a).fe = feGrid;
         curves(a).bestJ = traces;
-        curves(a).mean = mean(traces,2);
-        curves(a).std = std(traces,0,2);
+        curves(a).firstRecordedFE = min( ...
+            cellfun(@(r) r.history.fe(1),runs(idx)));
+        curves(a).mean = mean(traces,2,'omitnan');
+        curves(a).std = std(traces,0,2,'omitnan');
         if numel(seeds) == 1, curves(a).std(:) = NaN; end
         curves(a).median = median(traces,2);
         curves(a).q25 = prctile(traces,25,2);
