@@ -629,6 +629,7 @@ end
 reset_fe_history();
 history = table();
 actualEvals = NaN;
+solverFunccount = NaN;
 
 RunTimer = tic;
 solverError = [];
@@ -672,8 +673,16 @@ try
                 ObjFcn, nVars, [], [], [], [], ...
                 LB, UB, [], IntCon, options);
 
-            actualEvals = solverOutput.funccount;
+            solverFunccount = solverOutput.funccount;
             history = get_fe_history();
+            if isempty(history)
+                actualEvals = solverFunccount;
+            else
+                % Integer-constrained GA can perform a final bookkeeping
+                % fitness call after the last population has been evaluated.
+                % The search budget is the FE count reached by the GA state.
+                actualEvals = history.fe(end);
+            end
 
         case 'PSO'
             safe_printf('Starting Particle Swarm Optimization...\n');
@@ -705,6 +714,7 @@ try
 
             x_best = round(x_best);
             actualEvals = solverOutput.funccount;
+            solverFunccount = actualEvals;
             history = get_fe_history();
 
         case 'BAYESIAN'
@@ -729,6 +739,7 @@ try
             x_best = table2array(results.XAtMinObjective);
             min_cost = results.MinObjective;
             actualEvals = results.NumObjectiveEvaluations;
+            solverFunccount = actualEvals;
 
             history = table( ...
                 (1:actualEvals)', ...
@@ -787,6 +798,7 @@ try
 
             [x_best, min_cost, actualEvals, history] = ...
                 abc_discrete(ObjFcn, LB, UB, abc_opts);
+            solverFunccount = actualEvals;
 
         case 'ACO'
             safe_printf('Starting Ant Colony Optimization...\n');
@@ -810,6 +822,7 @@ try
 
             [x_best, min_cost, actualEvals, history] = ...
                 aco_discrete(ObjFcn, LB, UB, aco_opts);
+            solverFunccount = actualEvals;
 
         otherwise
             error("Unknown OPTIMIZER_MODE: %s", OPTIMIZER_MODE);
@@ -843,6 +856,8 @@ if useFEBudget
     runState.measurementNoiseSeed = measCfg.noiseSeed;
     runState.maxEvaluations = FE_BUDGET;
     runState.nEvaluations = actualEvals;
+    runState.solverFunctionEvaluations = solverFunccount;
+    runState.nonSearchFunctionEvaluations = max(0, solverFunccount - actualEvals);
     runState.bestX = x_best;
     runState.bestJ = min_cost;
     runState.history = history;
@@ -870,8 +885,8 @@ if useFEBudget
     save(fullfile(DataDir, 'optimization_history.mat'), 'history');
     writetable(history, fullfile(DataDir, 'optimization_history.csv'));
 
-    safe_printf('FE = %d/%d | bestJ = %.12g | %s\n', ...
-        actualEvals, FE_BUDGET, min_cost, termination);
+    safe_printf('Search FE = %d/%d | solver calls = %d | bestJ = %.12g | %s\n', ...
+        actualEvals, FE_BUDGET, solverFunccount, min_cost, termination);
 end
 
 if strcmpi(opt_flag, 'SOO')
@@ -1266,6 +1281,8 @@ try
 
     if useFEBudget
         summaryRow.actual_evals = actualEvals;
+        summaryRow.solver_funccount = solverFunccount;
+        summaryRow.nonsearch_evals = max(0, solverFunccount - actualEvals);
         summaryRow.termination = termination;
     end
 
