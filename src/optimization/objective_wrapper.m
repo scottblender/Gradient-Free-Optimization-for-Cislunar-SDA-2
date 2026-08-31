@@ -81,23 +81,29 @@ function [J_total, entry] = objective_wrapper(inputs, orbit_database_in, stabili
         rethrow(ME);
     end
 
-    % ---------------- logging ----------------
+       % ---------------- Evaluation details ----------------
     entry = struct();
-    entry.t = char(datetime("now","Format","yyyy-MM-dd HH:mm:ss.SSS"));
+
+    entry.t = char(datetime("now", ...
+        "Format","yyyy-MM-dd HH:mm:ss.SSS"));
+
     entry.solver = char(solverName);
     entry.opt_flag = char(opt_flag);
+
     entry.J1_rmse = J_1;
     entry.J2_det  = J_2;
     entry.J3_stab = J_3;
+
     entry.useJ1 = logical(costFlags.J1);
     entry.useJ2 = logical(costFlags.J2);
     entry.useJ3 = logical(costFlags.J3);
+
     entry.meas_model = char(measCfg.type);
     entry.sun_min_deg   = rad2deg(sun_min);
     entry.moon_min_deg  = rad2deg(moon_min);
     entry.earth_min_deg = rad2deg(earth_min);
 
-    if strcmpi(opt_flag,"SOO")
+    if strcmpi(opt_flag, "SOO")
         entry.J_total = J_total;
     else
         entry.J_total1 = J_total(1);
@@ -108,7 +114,9 @@ function [J_total, entry] = objective_wrapper(inputs, orbit_database_in, stabili
     entry.screeningCount = screeningCount;
     entry.x = x(:).';
     entry.orbit_indices = orbit_indices(:).';
-    entry.slot_indices  = slot_indices(:).';
+    entry.slot_indices = slot_indices(:).';
+
+    % Retain queue support for existing callers.
     if nargin >= 17 && ~isempty(dq)
         send(dq, entry);
     end

@@ -40,12 +40,28 @@ if ~isempty(envMode)
 end
 OPTIMIZER_MODE = upper(string(OPTIMIZER_MODE));
 
-% Stopping Criteria (max iterations for all except Bayesian)
-MAX_ITERS = 10;
-v = getenv("MAX_ITERS"); if ~isempty(v), MAX_ITERS = str2double(v); end
+% Stopping Criteria - Iteration limit is a safeguard; SOO comparisons use an FE budget.
+MAX_ITERS = 10000;
+v = getenv("MAX_ITERS");
+if ~isempty(v), MAX_ITERS = str2double(v); end
 
-MAX_EVALS = 10;
-v = getenv("MAX_EVALS"); if ~isempty(v), MAX_EVALS = str2double(v); end
+MAX_EVALS = 300;
+v = getenv("MAX_EVALS");
+if ~isempty(v), MAX_EVALS = str2double(v); end
+
+validateattributes(MAX_EVALS, {'numeric'}, ...
+    {'scalar','real','finite','integer','positive'});
+
+validateattributes(MAX_ITERS, {'numeric'}, ...
+    {'scalar','real','finite','integer','positive'});
+
+useFEBudget = ismember(OPTIMIZER_MODE, ...
+    ["GA","PSO","BAYESIAN","ABC","ACO"]);
+
+if useFEBudget
+    % Prevent an old GUI/batch iteration setting from being too small.
+    MAX_ITERS = max(MAX_ITERS, MAX_EVALS);
+end
 
 % ---------------- JPL constants ----------------
 mu = 1.215058560962404E-2;
@@ -183,9 +199,13 @@ switch measCfg.type
 end
 
 % ---------------- Data logging ----------------
-dq = parallel.pool.DataQueue;
-assignin('base', 'OptimizationLog', {});
-afterEach(dq, @(data) append_log(data));
+dq = [];
+
+if ~useFEBudget
+    dq = parallel.pool.DataQueue;
+    assignin('base', 'OptimizationLog', {});
+    afterEach(dq, @(data) append_log(data));
+end
 
 function append_log(data)
     logCell = evalin('base', 'OptimizationLog');
@@ -584,177 +604,297 @@ save(fullfile(DataDir, 'measurement_config.mat'), ...
     'measCfg', 'R_k', 't_target_ekf', 'seedVal');
 
 % ---------------- Objective function wrapper ----------------
-ObjFcn = @(x) objective_wrapper( ...
+RawObjFcn = @(x) objective_wrapper( ...
     x, orbit_database, stabilities, s_target_ekf, ...
     t_target_ekf, P_0, Q_k, R_k, mu, LU, ...
     sunFcn, sun_min, moon_min, earth_min, ...
     opt_flag, OPTIMIZER_MODE, dq, useScreening, ...
     costFlags, costCfg, measCfg);
 
-RunTimer = tic;
+ObjFcn = RawObjFcn;
 
-% ---------------- Optimization ----------------
-switch upper(OPTIMIZER_MODE)
+if useFEBudget
+    assert(strcmpi(opt_flag, 'SOO'), ...
+        'The FE tracker requires a scalar SOO cost.');
 
-    case 'GA'
-        safe_printf('Starting Genetic Algorithm...\n');
-        nVars = nVars_common;
-        LB = LB_common;
-        UB = UB_common;
-        IntCon = 1:nVars;
+    assert(isfield(measCfg,'noiseSeed') && ...
+           ~isempty(measCfg.noiseSeed), ...
+        'Apply the fixed measurement-noise change before benchmarking.');
 
-        pop = 60;
-
-        options = optimoptions('ga', ...
-            'UseParallel', true, ...
-            'Display', 'iter', ...
-            'PopulationSize', pop, ...
-            'MaxGenerations', MAX_ITERS, ...
-            'MaxStallGenerations', Inf, ...
-            'FunctionTolerance', 0, ...
-            'ConstraintTolerance', 0, ...
-            'FitnessLimit', -Inf, ...
-            'OutputFcn', @ga_outfun);
-
-        [x_best, min_cost, ~, ~, population, scores] = ga(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
-        J_check = ObjFcn(x_best);
-
-        safe_printf('ga returned min_cost = %.12f\n', min_cost);
-        safe_printf('reevaluated J(x_best) = %.12f\n', J_check);
-
-        [bestFinalScore, idxBestFinal] = min(scores);
-        safe_printf('best score in final population = %.12f\n', bestFinalScore);
-        safe_disp('x_best returned by ga:');
-        safe_disp(x_best);
-        safe_disp('best individual in final population:');
-        safe_disp(population(idxBestFinal,:));
-
-    case 'PSO'
-        safe_printf('Starting Particle Swarm Optimization...\n');
-        nVars = nVars_common;
-        LB = LB_common;
-        UB = UB_common;
-
-        swarm = 60;
-
-        options = optimoptions('particleswarm', ...
-            'UseParallel', true, ...
-            'Display', 'off', ...
-            'SwarmSize', swarm, ...
-            'MaxIterations', MAX_ITERS, ...
-            'OutputFcn', @pso_outfun);
-
-        [x_best, min_cost] = particleswarm(ObjFcn, nVars, LB, UB, options);
-        x_best = round(x_best);
-
-    case 'BAYESIAN'
-        safe_printf('Starting Bayesian Optimization...\n');
-
-        vars = [];
-        for i = 1:num_obs_cfg
-            vars = [vars, ...
-                optimizableVariable(['Orbit',num2str(i)], [1, num_orbits], 'Type','integer'), ...
-                optimizableVariable(['Slot', num2str(i)], [1, slots_per_orbit], 'Type','integer')];
-        end
-
-        if isappdata(0, 'BAYES_EVAL_COUNTER'), rmappdata(0, 'BAYES_EVAL_COUNTER'); end
-        if isappdata(0, 'BAYES_BEST_COST'),    rmappdata(0, 'BAYES_BEST_COST');    end
-        setappdata(0, 'BAYES_EVAL_COUNTER', 0);
-        setappdata(0, 'BAYES_BEST_COST', inf);
-        setappdata(0, 'BAYES_OBJFCN', ObjFcn);
-
-        results = bayesopt(@bayes_objective_with_logging, vars, ...
-            'UseParallel', false, ...
-            'IsObjectiveDeterministic', false, ...
-            'MaxObjectiveEvaluations', MAX_EVALS);
-
-        x_best   = table2array(results.XAtMinObjective);
-        min_cost = results.MinObjective;
-
-        if isappdata(0, 'BAYES_OBJFCN'),       rmappdata(0, 'BAYES_OBJFCN');       end
-        if isappdata(0, 'BAYES_EVAL_COUNTER'), rmappdata(0, 'BAYES_EVAL_COUNTER'); end
-        if isappdata(0, 'BAYES_BEST_COST'),    rmappdata(0, 'BAYES_BEST_COST');    end
-
-    case 'GAMULTIOBJ'
-        safe_printf('Starting Multi-Objective Genetic Algorithm (NSGA-II)...\n');
-
-        nVars = nVars_common;
-        LB = double(LB_common);
-        UB = double(UB_common);
-        IntCon = 1:nVars;
-
-        pop = 60;
-
-        options = optimoptions('gamultiobj', ...
-            'PopulationSize', pop, ...
-            'MaxGenerations', MAX_ITERS, ...
-            'ParetoFraction', 0.5, ...
-            'UseParallel', true, ...
-            'Display', 'iter', ...
-            'PlotFcn', @gaplotpareto);
-
-        [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
-
-    case 'DMOPSO'
-        safe_printf('Starting Custom Multi-Objective PSO...\n');
-
-        nVars = nVars_common;
-        LB = double(LB_common);
-        UB = double(UB_common);
-
-        swarmSize  = 60;
-        maxIter    = MAX_ITERS;
-        stallIters = inf;
-
-        [archive_X, archive_F] = dmopso(ObjFcn, nVars, LB, UB, swarmSize, maxIter, stallIters);
-        fval   = archive_F;
-        x_best = archive_X;
-
-    case 'ABC'
-        safe_printf('Starting Artificial Bee Colony Optimization...\n');
-
-        LB = LB_common;
-        UB = UB_common;
-
-        abc_opts.ColonySize      = 60;
-        abc_opts.MaxIters        = MAX_ITERS;
-        abc_opts.Limit           = 20;
-        abc_opts.StallIters      = inf;
-        abc_opts.SlotsPerOrbit   = slots_per_orbit;
-        abc_opts.UseParallel     = true;
-        abc_opts.UseParallelInit = true;
-        abc_opts.Logger          = @safe_printf;
-
-        [x_best, min_cost] = abc_discrete(ObjFcn, LB, UB, abc_opts);
-
-    case 'ACO'
-        safe_printf('Starting Ant Colony Optimization...\n');
-
-        LB = LB_common;
-        UB = UB_common;
-
-        aco_opts.nAnts              = 60;
-        aco_opts.MaxIters           = MAX_ITERS;
-        aco_opts.alpha              = 1.0;
-        aco_opts.beta               = 1.0;
-        aco_opts.rho                = 0.2;
-        aco_opts.Q                  = 1.0;
-        aco_opts.UseParallel        = true;
-        aco_opts.TauMin             = 1e-12;
-        aco_opts.UseIterBestDeposit = true;
-        aco_opts.IterBestWeight     = 1.0;
-        aco_opts.StallIters         = inf;
-        aco_opts.Logger             = @safe_printf;
-
-        [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
-
-    otherwise
-        error("Unknown OPTIMIZER_MODE: %s", OPTIMIZER_MODE);
+    tracker = create_evaluation_tracker(RawObjFcn, MAX_EVALS);
+    ObjFcn = tracker.evaluate;
 end
 
+RunTimer = tic;
+solverError = [];
+solverExitFlag = NaN;
+solverOutput = struct();
+
+% ---------------- Optimization ----------------
+try
+    switch upper(OPTIMIZER_MODE)
+    
+            case 'GA'
+            safe_printf('Starting Genetic Algorithm...\n');
+    
+            nVars = nVars_common;
+            LB = LB_common;
+            UB = UB_common;
+            IntCon = 1:nVars;
+    
+            pop = 60;
+    
+            options = optimoptions('ga', ...
+                'UseParallel', false, ...
+                'UseVectorized', false, ...
+                'Display', 'iter', ...
+                'PopulationSize', pop, ...
+                'MaxGenerations', MAX_ITERS, ...
+                'MaxStallGenerations', Inf, ...
+                'FunctionTolerance', 0, ...
+                'ConstraintTolerance', 0, ...
+                'FitnessLimit', -Inf, ...
+                'OutputFcn', @(options,state,flag) ...
+                    ga_outfun(options,state,flag,tracker.shouldStop));
+    
+            [x_best, min_cost, solverExitFlag, solverOutput] = ga( ...
+                ObjFcn, nVars, [], [], [], [], ...
+                LB, UB, [], IntCon, options);
+    
+            case 'PSO'
+            safe_printf('Starting Particle Swarm Optimization...\n');
+    
+            nVars = nVars_common;
+            LB = LB_common;
+            UB = UB_common;
+    
+            swarm = 60;
+    
+            options = optimoptions('particleswarm', ...
+                'UseParallel', true, ...
+                'UseVectorized', false, ...
+                'Display', 'off', ...
+                'SwarmSize', swarm, ...
+                'MaxIterations', MAX_ITERS, ...
+                'MaxStallIterations', MAX_ITERS + 1, ...
+                'FunctionTolerance', 0, ...
+                'OutputFcn', @(values,state) ...
+                    pso_outfun(values,state,tracker.shouldStop));
+    
+            [x_best, min_cost, solverExitFlag, solverOutput] = ...
+                particleswarm(ObjFcn, nVars, LB, UB, options);
+    
+            x_best = round(x_best);
+    
+            case 'BAYESIAN'
+            safe_printf('Starting Bayesian Optimization...\n');
+    
+            vars = [];
+            for i = 1:num_obs_cfg
+                vars = [vars, ...
+                    optimizableVariable(['Orbit',num2str(i)], ...
+                        [1, num_orbits], 'Type','integer'), ...
+                    optimizableVariable(['Slot',num2str(i)], ...
+                        [1, slots_per_orbit], 'Type','integer')];
+            end
+    
+            results = bayesopt(ObjFcn, vars, ...
+                'UseParallel', true, ...
+                'IsObjectiveDeterministic', true, ...
+                'AcquisitionFunctionName', 'expected-improvement-plus', ...
+                'NumSeedPoints', min(4, MAX_EVALS), ...
+                'MaxObjectiveEvaluations', MAX_EVALS, ...
+                'OutputFcn', @(results,state) tracker.shouldStop(), ...
+                'PlotFcn', []);
+    
+            x_best = table2array(results.XAtMinObjective);
+            min_cost = results.MinObjective;
+    
+        case 'GAMULTIOBJ'
+            safe_printf('Starting Multi-Objective Genetic Algorithm (NSGA-II)...\n');
+    
+            nVars = nVars_common;
+            LB = double(LB_common);
+            UB = double(UB_common);
+            IntCon = 1:nVars;
+    
+            pop = 60;
+    
+            options = optimoptions('gamultiobj', ...
+                'PopulationSize', pop, ...
+                'MaxGenerations', MAX_ITERS, ...
+                'ParetoFraction', 0.5, ...
+                'UseParallel', true, ...
+                'Display', 'iter', ...
+                'PlotFcn', @gaplotpareto);
+    
+            [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], LB, UB, [], IntCon, options);
+    
+        case 'DMOPSO'
+            safe_printf('Starting Custom Multi-Objective PSO...\n');
+    
+            nVars = nVars_common;
+            LB = double(LB_common);
+            UB = double(UB_common);
+    
+            swarmSize  = 60;
+            maxIter    = MAX_ITERS;
+            stallIters = inf;
+    
+            [archive_X, archive_F] = dmopso(ObjFcn, nVars, LB, UB, swarmSize, maxIter, stallIters);
+            fval   = archive_F;
+            x_best = archive_X;
+    
+        case 'ABC'
+            safe_printf('Starting Artificial Bee Colony Optimization...\n');
+    
+            LB = LB_common;
+            UB = UB_common;
+    
+            abc_opts.ColonySize      = 60;
+            abc_opts.MaxIters        = MAX_ITERS;
+            abc_opts.Limit           = 20;
+            abc_opts.StallIters      = inf;
+            abc_opts.SlotsPerOrbit   = slots_per_orbit;
+            abc_opts.UseParallel     = true;
+            abc_opts.UseParallelInit = true;
+            abc_opts.Logger          = @safe_printf;
+    
+            [x_best, min_cost] = abc_discrete(ObjFcn, LB, UB, abc_opts);
+    
+        case 'ACO'
+            safe_printf('Starting Ant Colony Optimization...\n');
+    
+            LB = LB_common;
+            UB = UB_common;
+    
+            aco_opts.nAnts              = 60;
+            aco_opts.MaxIters           = MAX_ITERS;
+            aco_opts.alpha              = 1.0;
+            aco_opts.beta               = 1.0;
+            aco_opts.rho                = 0.2;
+            aco_opts.Q                  = 1.0;
+            aco_opts.UseParallel        = true;
+            aco_opts.TauMin             = 1e-12;
+            aco_opts.UseIterBestDeposit = true;
+            aco_opts.IterBestWeight     = 1.0;
+            aco_opts.StallIters         = inf;
+            aco_opts.Logger             = @safe_printf;
+    
+            [x_best, min_cost] = aco_discrete(ObjFcn, LB, UB, aco_opts);
+    
+        otherwise
+            error("Unknown OPTIMIZER_MODE: %s", OPTIMIZER_MODE);
+    end
+catch ME
+    if ~(useFEBudget && is_budget_stop(ME))
+        solverError = ME;
+    end
+end
 % ---------------- Runtime / final optimization results ----------------
 TotalRuntime = toc(RunTimer);
 safe_printf('Total Runtime: %.2f seconds\n', TotalRuntime);
+
+if useFEBudget
+
+    % Some solvers catch objective errors internally.
+    % Preserve and report the original objective error.
+    objectiveError = tracker.getFailure();
+
+    if ~isempty(objectiveError)
+        solverError = objectiveError;
+    end
+
+    runState = tracker.snapshot();
+
+    if isempty(solverError) && isempty(runState.bestX)
+        solverError = MException( ...
+            'EvaluationTracker:NoValidEvaluation', ...
+            'No finite objective value was obtained.');
+    end
+
+    if ~isempty(solverError)
+
+        runState.termination = "error";
+        runState.failure = struct( ...
+            'identifier',solverError.identifier, ...
+            'message',solverError.message, ...
+            'report',getReport(solverError, ...
+            'extended','hyperlinks','off'));
+
+    elseif runState.nEvaluations >= MAX_EVALS
+
+        runState.termination = "budget_reached";
+
+    else
+
+        runState.termination = "solver_stopped";
+
+    end
+
+    runState.optimizer = OPTIMIZER_MODE;
+    runState.runTag = RUN_TAG;
+    runState.optimizerSeed = seedVal;
+    runState.measurementNoiseSeed = measCfg.noiseSeed;
+
+    runState.runtime_s = TotalRuntime;
+    runState.maxIterations = MAX_ITERS;
+    runState.solverExitFlag = solverExitFlag;
+    runState.solverOutput = solverOutput;
+
+    runState.settings = struct( ...
+        'mission',missionCfg, ...
+        'measurements',measCfg, ...
+        'cost',costCfg, ...
+        'costFlags',costFlags, ...
+        'P0',P_0, ...
+        'Q',Q_k, ...
+        'R',R_k, ...
+        'useScreening',useScreening, ...
+        'sun_min',sun_min, ...
+        'moon_min',moon_min, ...
+        'earth_min',earth_min, ...
+        'EKF_DT',EKF_DT);
+
+    history = runState.history;
+
+    % Save MAT files first, before CSV export or plotting.
+    save(fullfile(DataDir, 'optimization_run.mat'), 'runState');
+    save(fullfile(DataDir, 'optimization_history.mat'), 'history');
+
+    histTbl = table();
+
+    if ~isempty(history)
+        try
+            histTbl = struct2table(history, 'AsArray', true);
+            writetable(histTbl, ...
+                fullfile(DataDir, 'optimization_history.csv'));
+        catch exportError
+            warning('EvaluationTracker:CSVExport', ...
+                'MAT results saved, but CSV export failed: %s', ...
+                exportError.message);
+        end
+    end
+
+    safe_printf('FE = %d/%d | bestJ = %.12g | %s\n', ...
+        runState.nEvaluations, MAX_EVALS, ...
+        runState.bestJ, runState.termination);
+
+    if runState.termination == "solver_stopped"
+        warning('EvaluationTracker:EarlyStop', ...
+            'Solver stopped at %d of %d evaluations.', ...
+            runState.nEvaluations, MAX_EVALS);
+    end
+
+    % These remain available even when a solver was interrupted.
+    x_best = runState.bestX;
+    min_cost = runState.bestJ;
+end
+
+% Unexpected errors remain errors, after saving completed evaluations.
+if ~isempty(solverError)
+    rethrow(solverError);
+end
 
 if strcmpi(opt_flag, 'SOO')
     safe_printf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
@@ -1143,13 +1283,28 @@ try
     summaryRow.moon_min_deg      = moon_min_deg;
     summaryRow.earth_min_deg     = earth_min_deg;
     summaryRow.measurement_noise_seed = measCfg.noiseSeed;
+    if useFEBudget
+        summaryRow.actual_evals = runState.nEvaluations;
+        summaryRow.termination = runState.termination;
+    end
     if isfile(EXCEL_FILE)
         writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary', 'WriteMode','append');
     else
         writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary');
     end
 
-    logCell = evalin('base','OptimizationLog');
+   % SOO history was already constructed from the tracker.
+    % Other modes retain the existing queue-based history.
+    if ~useFEBudget
+        logCell = evalin('base','OptimizationLog');
+    
+        if iscell(logCell) && ~isempty(logCell)
+            logStruct = vertcat(logCell{:});
+            histTbl = struct2table(logStruct, "AsArray", true);
+        else
+            histTbl = table();
+        end
+    end
     if iscell(logCell) && ~isempty(logCell)
         logStruct = vertcat(logCell{:});
         histTbl = struct2table(logStruct, "AsArray", true);
@@ -1531,36 +1686,57 @@ function append_fallback_output(msg)
     end
 end    
 
-function [state, options, optchanged] = ga_outfun(options, state, flag)
+function [state, options, optchanged] = ...
+    ga_outfun(options, state, flag, stopFcn)
+
     optchanged = false;
-    try
-        if strcmp(flag, 'iter')
-            if ~isempty(state.Score)
-                bestScore = min(state.Score);
-            else
-                bestScore = NaN;
-            end
-            safe_printf('GA gen %3d | bestJ = %.12g\n', state.Generation, bestScore);
-        elseif strcmp(flag, 'done')
-            safe_printf('GA finished.\n');
+
+    if strcmp(flag, 'iter')
+        if isempty(state.Score)
+            bestScore = NaN;
+        else
+            bestScore = min(state.Score);
         end
-    catch
+
+        safe_printf('GA gen %3d | bestJ = %.12g\n', ...
+            state.Generation, bestScore);
+
+    elseif strcmp(flag, 'done')
+        safe_printf('GA finished.\n');
+    end
+
+    if nargin >= 4 && stopFcn()
+        state.StopFlag = ...
+            'Evaluation budget reached or objective failed.';
     end
 end
 
-function stop = pso_outfun(optimValues, state)
+function stop = pso_outfun(optimValues, state, stopFcn)
+
     stop = false;
-    try
-        if strcmp(state, 'iter')
-            safe_printf('PSO iter %3d | bestJ = %.12g\n', ...
-                optimValues.iteration, optimValues.bestfval);
-        elseif strcmp(state, 'done')
-            safe_printf('PSO finished.\n');
-        end
-    catch
+
+    if strcmp(state, 'iter')
+        safe_printf('PSO iter %3d | bestJ = %.12g\n', ...
+            optimValues.iteration, optimValues.bestfval);
+
+    elseif strcmp(state, 'done')
+        safe_printf('PSO finished.\n');
+    end
+
+    if nargin >= 3
+        stop = stopFcn();
     end
 end
 
+function tf = is_budget_stop(ME)
+
+    tf = strcmp(ME.identifier, ...
+        'EvaluationTracker:BudgetReached');
+
+    for k = 1:numel(ME.cause)
+        tf = tf || is_budget_stop(ME.cause{k});
+    end
+end
 function J = bayes_objective_with_logging(T)
     ObjFcn = getappdata(0, 'BAYES_OBJFCN');
 
