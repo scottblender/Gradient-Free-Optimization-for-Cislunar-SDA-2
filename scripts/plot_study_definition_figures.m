@@ -618,7 +618,7 @@ targetArcPoint = observer + ...
 
 occLabel = observer + [1.05,-0.62];
 keepoutLabel = observer + [1.15,1.10];
-targetAngleLabel = observer + [2.72,1.42];
+targetAngleLabel = observer + [2.35,1.18];
 
 draw_text_callout(ax,occLabel,occArcPoint, ...
     '\theta_{occ,b}',cOcc,16);
