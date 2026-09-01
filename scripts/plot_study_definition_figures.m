@@ -174,29 +174,31 @@ cL2 = [0.90,0.16,0.12];
 cMoon = [0.70,0.70,0.70];
 cPoint = [0.85,0.85,0.85];
 
-numPairOrbits = 16;
+numPairOrbitsPerFamily = 16;
 numDroOrbits = 16;
 maxPointsPerOrbit = 300;
 figureFiles = strings(numel(familyGroups),1);
 
 for groupIndex = 1:numel(familyGroups)
-    fig = publication_figure(8.0,6.8);
+    fig = publication_figure(6.5,5.4);
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
+    grid(ax,'on');
     axis(ax,'equal');
-    set(ax,'TickLabelInterpreter','tex','Layer','top');
+    set(ax,'TickLabelInterpreter','tex','Layer','top', ...
+        'GridAlpha',0.16,'MinorGridAlpha',0.08);
 
     group = familyGroups{groupIndex};
 
     if numel(group)==2
-        ax.Projection = 'orthographic';
-        view(ax,-36,24);
+        ax.Projection = 'perspective';
+        view(ax,-37.5,30);
 
         familyHandles = gobjects(2,1);
         familyLabels = strings(2,1);
         colors = [cL1;cL2];
-        perFamily = ceil(numPairOrbits/2);
+        perFamily = numPairOrbitsPerFamily;
 
         for member = 1:2
             use = family==group(member);
@@ -205,31 +207,26 @@ for groupIndex = 1:numel(familyGroups)
                 'No selected orbits found for %s.',group(member));
 
             selectedRows = select_evenly_spaced_rows( ...
-                familyRows,outOfPlaneAmplitude_km(familyRows),perFamily);
+                familyRows,T.zAmplitude(familyRows),perFamily);
 
             for plotted = 1:numel(selectedRows)
                 state = T.state{selectedRows(plotted)};
                 step = max(1,round(size(state,1)/maxPointsPerOrbit));
                 handle = plot3(ax,state(1:step:end,1), ...
                     state(1:step:end,2),state(1:step:end,3),'-', ...
-                    'Color',colors(member,:),'LineWidth',1.45);
+                    'Color',colors(member,:),'LineWidth',0.85);
                 if plotted==1
                     familyHandles(member) = handle;
                 end
             end
-            familyLabels(member) = group(member);
+            familyLabels(member) = "L"+string(member);
         end
 
-        moonHandle = draw_moon(ax,mu,LU);
-        l1Handle = plot3(ax,xL1,0,0,'^', ...
-            'MarkerSize',13,'MarkerFaceColor',cPoint, ...
-            'MarkerEdgeColor',[0.60,0.60,0.60],'LineWidth',1.8);
-        l2Handle = plot3(ax,xL2,0,0,'v', ...
-            'MarkerSize',13,'MarkerFaceColor',cPoint, ...
-            'MarkerEdgeColor',[0.60,0.60,0.60],'LineWidth',1.8);
+        moonHandle = plot3(ax,1-mu,0,0,'ko', ...
+            'MarkerSize',5,'MarkerFaceColor','k');
 
-        legendHandles = [familyHandles;moonHandle;l1Handle;l2Handle];
-        legendLabels = [familyLabels;"Moon";"L1 point";"L2 point"];
+        legendHandles = [familyHandles;moonHandle];
+        legendLabels = [familyLabels;"Moon"];
         zlabel(ax,'Z (LU)');
         axis(ax,'tight');
         axis(ax,'vis3d');
@@ -277,22 +274,20 @@ for groupIndex = 1:numel(familyGroups)
 
     xlabel(ax,'X (LU)');
     ylabel(ax,'Y (LU)');
-    format_publication_axes(ax,17);
+    format_publication_axes(ax,13);
 
     legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
-        'Location','northoutside','Orientation','horizontal');
+        'Location','northeast','Orientation','vertical');
     legendHandle.Box = 'on';
     legendHandle.FontName = 'Times New Roman';
-    legendHandle.FontSize = 14;
-    legendHandle.FontWeight = 'bold';
-    legendHandle.ItemTokenSize = [20,12];
-    legendHandle.NumColumns = min(3,numel(legendLabels));
-    place_legend_above(legendHandle, ...
-        min(3,numel(legendLabels)),14);
+    legendHandle.FontSize = 10;
+    legendHandle.FontWeight = 'normal';
+    legendHandle.ItemTokenSize = [14,8];
+    legendHandle.NumColumns = 1;
 
     ax.Units = 'normalized';
-    ax.Position = [0.13,0.14,0.74,0.66];
-    ax.LooseInset = max(ax.TightInset,0.02);
+    ax.Position = [0.12,0.13,0.80,0.80];
+    ax.LooseInset = max(ax.TightInset,0.015);
 
     figureFiles(groupIndex) = fullfile( ...
         outputDir,figureNames(groupIndex)+".eps");
@@ -371,7 +366,7 @@ LU = 384400;
 [xL1,~] = cr3bp_L1L2(mu);
 
 % Figure 1: the orbit and its 50 equal-time candidate states.
-figGeometry = publication_figure(7.2,6.2);
+figGeometry = publication_figure(6.5,6.5);
 ax = axes(figGeometry);
 prepare_axes(ax);
 
@@ -677,13 +672,12 @@ figureFiles = strings(3,1);
 cGateway = [0.85,0.27,0.22];
 cTransfer = [0.27,0.31,0.86];
 cImpulse = [0.55,0.30,0.72];
-cDeparture = [0.20,0.58,0.88];
-cArrival = [0.93,0.52,0.13];
+cReference = [0.47,0.78,0.94];
 cNominal = [0.35,0.35,0.35];
 cPoint = [0.80,0.80,0.80];
 
 % Case 1: nominal Lunar Gateway.
-figGateway = publication_figure(7.2,6.2);
+figGateway = publication_figure(6.5,6.5);
 ax = axes(figGateway);
 prepare_axes(ax);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
@@ -707,13 +701,13 @@ export_publication_eps(figGateway,figureFiles(1));
 close(figGateway);
 
 % Case 2: low-thrust transfer with both endpoint orbits and Gateway context.
-figTransfer = publication_figure(7.2,6.2);
+figTransfer = publication_figure(6.5,6.5);
 ax = axes(figTransfer);
 prepare_axes(ax);
 hDeparture = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
-    departureOrbit(:,3),'-','Color',cDeparture,'LineWidth',1.8);
+    departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
 hArrival = plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2), ...
-    arrivalOrbit(:,3),'-','Color',cArrival,'LineWidth',1.8);
+    arrivalOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
 hGatewayContext = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
     '-','Color',cGateway,'LineWidth',2.2);
 hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3), ...
@@ -725,19 +719,16 @@ hEnd = plot3(ax,sTransfer(end,1),sTransfer(end,2),sTransfer(end,3), ...
     's','MarkerSize',9,'MarkerFaceColor',cTransfer, ...
     'MarkerEdgeColor','k','LineWidth',1.2);
 hMoon = draw_moon(ax,mu,LU);
-plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
-plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
+hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
 format_case_axes(ax);
-transferLegendLabels = [ ...
-    departureFamily+" departure",arrivalFamily+" arrival", ...
-    "Gateway","Transfer","Start","End","Moon"];
 legendHandle = legend(ax, ...
-    [hDeparture,hArrival,hGatewayContext,hTransfer,hStart,hEnd,hMoon], ...
-    cellstr(transferLegendLabels), ...
+    [hGatewayContext,hTransfer,hStart,hEnd,hMoon,hL1,hL2], ...
+    {'Coasting','Transfer','Start','End','Moon','L1','L2'}, ...
     'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,3);
+format_case_legend(legendHandle,4);
 format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
@@ -747,7 +738,7 @@ export_publication_eps(figTransfer,figureFiles(2));
 close(figTransfer);
 
 % Case 3: Gateway perilune impulse and nominal continuation.
-figImpulse = publication_figure(7.2,6.2);
+figImpulse = publication_figure(6.5,6.5);
 ax = axes(figImpulse);
 prepare_axes(ax);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1), ...
@@ -952,8 +943,8 @@ function prepare_axes(ax)
 hold(ax,'on');
 box(ax,'on');
 axis(ax,'equal');
-view(ax,-36,24);
-ax.Projection = 'orthographic';
+view(ax,32,24);
+ax.Projection = 'perspective';
 xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
 zlabel(ax,'z (LU)');
@@ -1031,10 +1022,10 @@ end
 
 function format_case_axes(ax)
 
-format_publication_axes(ax,16);
+format_publication_axes(ax,14);
 ax.Units = 'normalized';
-ax.Position = [0.13,0.14,0.74,0.66];
-ax.LooseInset = max(ax.TightInset,0.02);
+ax.Position = [0.13,0.13,0.74,0.70];
+ax.LooseInset = max(ax.TightInset,0.015);
 end
 
 
@@ -1042,11 +1033,11 @@ function format_case_legend(legendHandle,numColumns)
 
 legendHandle.Box = 'on';
 legendHandle.FontName = 'Times New Roman';
-legendHandle.FontSize = 13;
+legendHandle.FontSize = 11;
 legendHandle.FontWeight = 'bold';
-legendHandle.ItemTokenSize = [18,11];
+legendHandle.ItemTokenSize = [16,9];
 legendHandle.NumColumns = numColumns;
-place_legend_above(legendHandle,numColumns,13);
+place_legend_above(legendHandle,numColumns,11);
 end
 
 
