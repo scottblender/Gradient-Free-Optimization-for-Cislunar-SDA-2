@@ -348,15 +348,17 @@ outputs.measurementType = "ANGLES_ONLY";
 fprintf('Saved RA/Dec measurement geometry to:\n  %s\n',figureFile);
 end'''
 
-helper = r'''function [fig,ax,textAx] = schematic_figure_layout(numPanels,geometryHeightInches,textRows)
+helper = r'''function [fig,axesHandles,textAx] = schematic_figure_layout( ...
+    numPanels,geometryHeightInches,textLineCount)
 %SCHEMATIC_FIGURE_LAYOUT Create non-overlapping geometry and text regions.
-% Figure width grows with the number of geometry panels. Figure height grows
-% with both geometry height and the number of explanatory text rows.
+% Width grows with panel count. Height grows with geometry plus a footer
+% whose physical height is proportional to the requested text-row count.
 
 validateattributes(numPanels,{'numeric'},{'scalar','integer','positive'});
 validateattributes(geometryHeightInches,{'numeric'}, ...
     {'scalar','real','finite','positive'});
-validateattributes(textRows,{'numeric'},{'scalar','integer','nonnegative'});
+validateattributes(textLineCount,{'numeric'}, ...
+    {'scalar','integer','nonnegative'});
 
 panelWidthInches = 4.35;
 sideMarginInches = 0.42;
@@ -366,9 +368,9 @@ bottomMarginInches = 0.18;
 footerLineInches = 0.42;
 footerPaddingInches = 0.28;
 
-if textRows > 0
+if textLineCount > 0
     footerHeightInches = footerPaddingInches + ...
-        textRows*footerLineInches;
+        textLineCount*footerLineInches;
 else
     footerHeightInches = 0;
 end
@@ -381,18 +383,19 @@ heightInches = bottomMarginInches + footerHeightInches + ...
 fig = publication_figure(widthInches,heightInches);
 
 geometryBottomInches = bottomMarginInches + footerHeightInches;
-ax = gobjects(numPanels,1);
+axesHandles = gobjects(numPanels,1);
 for k = 1:numPanels
-    leftInches = sideMarginInches + (k-1)*(panelWidthInches+panelGapInches);
-    ax(k) = axes(fig,'Units','normalized','Position',[ ...
+    leftInches = sideMarginInches + ...
+        (k-1)*(panelWidthInches+panelGapInches);
+    axesHandles(k) = axes(fig,'Units','normalized','Position',[ ...
         leftInches/widthInches, ...
         geometryBottomInches/heightInches, ...
         panelWidthInches/widthInches, ...
         geometryHeightInches/heightInches]);
-    ax(k).PositionConstraint = 'innerposition';
+    axesHandles(k).PositionConstraint = 'innerposition';
 end
 
-if textRows > 0
+if textLineCount > 0
     textAx = axes(fig,'Units','normalized','Position',[ ...
         sideMarginInches/widthInches, ...
         bottomMarginInches/heightInches, ...
@@ -411,10 +414,10 @@ pattern_visibility = re.compile(
     r'function outputs = create_visibility_keepout_figure\(inspectFigure\).*?(?=\nfunction outputs = create_measurement_model_figure\(inspectFigure\))',
     re.S)
 pattern_measurement = re.compile(
-    r'function outputs = create_measurement_model_figure\(inspectFigure\).*?(?=\nfunction draw_angle_arc_2d\()',
+    r'function outputs = create_measurement_model_figure\(inspectFigure\).*?(?=\nfunction \[fig,axesHandles,textAx\] = schematic_figure_layout\()',
     re.S)
 pattern_helper = re.compile(
-    r'function \[fig,ax,textAx\] = schematic_figure_layout\(numPanels,geometryHeightInches,textRows\).*?(?=\nfunction )',
+    r'function \[fig,axesHandles,textAx\] = schematic_figure_layout\(.*?(?=\nfunction draw_angle_arc_2d\()',
     re.S)
 
 text, n1 = pattern_visibility.subn(lambda m: visibility + '\n\n', text, count=1)
@@ -428,9 +431,8 @@ if n2 != 1:
 if n3 != 1:
     raise SystemExit(f'Expected one schematic helper replacement, got {n3}.')
 
-# Static guards for the requested separation of concerns.
 measurement_block = text.split('function outputs = create_measurement_model_figure',1)[1]
-measurement_block = measurement_block.split('function draw_angle_arc_2d',1)[0]
+measurement_block = measurement_block.split('function [fig,axesHandles,textAx] = schematic_figure_layout',1)[0]
 for forbidden in ['theta_{keepout', 'Earth, Moon, Sun', 'Visibility gate', 'visibility gate']:
     if forbidden in measurement_block:
         raise SystemExit(f'Visibility text leaked into measurement figure: {forbidden}')
@@ -451,6 +453,5 @@ for item in required:
 
 path.write_text(text)
 
-# Self-cleanup so only production code remains in the final commit.
 Path('scripts/_patch_schematic_layout_v2.py').unlink(missing_ok=True)
 Path('.github/workflows/one-time-schematic-layout-v2.yml').unlink(missing_ok=True)
