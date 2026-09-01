@@ -206,11 +206,11 @@ for groupIndex = 1:numel(familyGroups)
             assert(~isempty(familyRows), ...
                 'No selected orbits found for %s.',group(member));
 
-            selectedRows = unique(round(linspace( ...
-                1,numel(familyRows),min(perFamily,numel(familyRows)))));
+            selectedRows = select_evenly_spaced_rows( ...
+                familyRows,outOfPlaneAmplitude_km(familyRows),perFamily);
 
             for plotted = 1:numel(selectedRows)
-                state = T.state{familyRows(selectedRows(plotted))};
+                state = T.state{selectedRows(plotted)};
                 step = max(1,round(size(state,1)/maxPointsPerOrbit));
                 handle = plot3(ax,state(1:step:end,1), ...
                     state(1:step:end,2),state(1:step:end,3),'-', ...
@@ -314,7 +314,7 @@ fprintf('Saved orbit-family figures and catalog tables to:\n  %s\n',outputDir);
 end
 
 function outputs = create_slot_definition(inspectFigure)
-% Illustrate the exact equal-time, endpoint-excluded 50-slot definition.
+% Export two complementary illustrations of the exact 50-slot convention.
 
 if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 
@@ -367,84 +367,106 @@ selectedColor = [0.85,0.25,0.20];
 nextColor = [0.20,0.50,0.80];
 orbitColor = [0.27,0.31,0.86];
 neutralColor = [0.25,0.25,0.25];
+mu = 1.215058560962404E-2;
+LU = 384400;
+[xL1,~] = cr3bp_L1L2(mu);
 
-fig = figure('Color','w','Units','inches', ...
-    'Position',[1,1,12,4.2], ...
-    'PaperUnits','inches','PaperPosition',[0,0,12,4.2]);
-layout = tiledlayout(fig,1,3,'TileSpacing','compact','Padding','compact');
+% Figure 1: the orbit and its 50 equal-time candidate states.
+figGeometry = figure('Color','w','Units','inches', ...
+    'Position',[1,1,6.5,6.5], ...
+    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+ax = axes(figGeometry);
+prepare_axes(ax);
 
-% (a) Geometric placement of all 50 equal-time samples.
-ax1 = nexttile(layout);
-hold(ax1,'on'); box(ax1,'on'); axis(ax1,'equal');
 plotStep = max(1,round(size(rawState,1)/500));
-hOrbit = plot3(ax1,rawState(1:plotStep:end,1), ...
+hOrbit = plot3(ax,rawState(1:plotStep:end,1), ...
     rawState(1:plotStep:end,2),rawState(1:plotStep:end,3), ...
-    '-','Color',orbitColor,'LineWidth',1.8);
-hSlots = plot3(ax1,slotState(:,1),slotState(:,2),slotState(:,3), ...
-    'o','MarkerSize',4.5,'MarkerFaceColor','w', ...
-    'MarkerEdgeColor',neutralColor,'LineWidth',0.9);
-hSelected = plot3(ax1,slotState(selectedSlot,1),slotState(selectedSlot,2), ...
-    slotState(selectedSlot,3),'o','MarkerSize',8, ...
-    'MarkerFaceColor',selectedColor,'MarkerEdgeColor','k');
-hNext = plot3(ax1,slotState(nextSlot,1),slotState(nextSlot,2), ...
-    slotState(nextSlot,3),'s','MarkerSize',8, ...
-    'MarkerFaceColor',nextColor,'MarkerEdgeColor','k');
-xlabel(ax1,'x (LU)'); ylabel(ax1,'y (LU)'); zlabel(ax1,'z (LU)');
-title(ax1,'(a) Equal-time states');
-view(ax1,32,24);
-legend(ax1,[hOrbit,hSlots,hSelected,hNext], ...
-    {'Orbit','Candidate slots','Slot j','Slot j+1'}, ...
-    'Location','northoutside','Orientation','horizontal','FontSize',10);
+    '-','Color',orbitColor,'LineWidth',2.5);
+hSlots = plot3(ax,slotState(:,1),slotState(:,2),slotState(:,3), ...
+    'o','MarkerSize',5,'MarkerFaceColor','w', ...
+    'MarkerEdgeColor',neutralColor,'LineWidth',1.0);
+hSelected = plot3(ax,slotState(selectedSlot,1), ...
+    slotState(selectedSlot,2),slotState(selectedSlot,3), ...
+    'o','MarkerSize',9,'MarkerFaceColor',selectedColor, ...
+    'MarkerEdgeColor','k','LineWidth',1.2);
+hNext = plot3(ax,slotState(nextSlot,1), ...
+    slotState(nextSlot,2),slotState(nextSlot,3), ...
+    's','MarkerSize',9,'MarkerFaceColor',nextColor, ...
+    'MarkerEdgeColor','k','LineWidth',1.2);
+hMoon = draw_moon(ax,mu,LU);
+hL1 = plot3(ax,xL1,0,0,'^','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80,0.80,0.80], ...
+    'MarkerEdgeColor','k','LineWidth',1.2);
 
-% (b) Exact normalized phase convention, including endpoint exclusion.
-ax2 = nexttile(layout);
-hold(ax2,'on'); box(ax2,'on');
+set(ax,'FontName','Times New Roman','FontSize',18, ...
+    'FontWeight','bold','LineWidth',1.8);
+legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hMoon,hL1], ...
+    {'Orbit','Candidate slots','Slot j','Slot j+1','Moon','L1'}, ...
+    'Location','northoutside','Orientation','horizontal', ...
+    'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
+legendHandle.NumColumns = 3;
+legendHandle.Box = 'on';
+axis(ax,'tight');
+axis(ax,'vis3d');
+
+geometryFile = fullfile(outputDir,'slot_geometry_equal_time.eps');
+inspect_before_export(figGeometry,inspectFigure, ...
+    'equal-time slot geometry');
+exportgraphics(figGeometry,geometryFile, ...
+    'ContentType','image','Resolution',600);
+close(figGeometry);
+
+% Figure 2: the exact normalized phase grid and excluded endpoint.
+figPhase = figure('Color','w','Units','inches', ...
+    'Position',[1,1,6.5,3.6], ...
+    'PaperUnits','inches','PaperPosition',[0,0,6.5,3.6]);
+ax = axes(figPhase);
+hold(ax,'on');
+box(ax,'on');
+
 phase = slotTime/period;
-plot(ax2,[0,1],[0,0],'-','Color',0.65*[1,1,1],'LineWidth',1.2);
-scatter(ax2,phase,zeros(size(phase)),24,'w','filled', ...
-    'MarkerEdgeColor',neutralColor,'LineWidth',0.8);
-scatter(ax2,phase(selectedSlot),0,70,selectedColor,'filled', ...
-    'MarkerEdgeColor','k');
-scatter(ax2,phase(nextSlot),0,70,nextColor,'s','filled', ...
-    'MarkerEdgeColor','k');
-plot(ax2,1,0,'o','MarkerSize',7,'MarkerFaceColor','w', ...
-    'MarkerEdgeColor',[0.75,0.20,0.20],'LineWidth',1.5);
-plot(ax2,phase([selectedSlot,nextSlot]),[0.13,0.13],'-k','LineWidth',1.2);
-plot(ax2,phase([selectedSlot,selectedSlot]),[0,0.13],':k');
-plot(ax2,phase([nextSlot,nextSlot]),[0,0.13],':k');
-text(ax2,mean(phase([selectedSlot,nextSlot])),0.16, ...
+plot(ax,[0,1],[0,0],'-','Color',0.65*[1,1,1], ...
+    'LineWidth',1.5);
+hCandidate = scatter(ax,phase,zeros(size(phase)),32,'w','filled', ...
+    'MarkerEdgeColor',neutralColor,'LineWidth',0.9);
+hSelectedPhase = scatter(ax,phase(selectedSlot),0,90, ...
+    selectedColor,'filled','MarkerEdgeColor','k','LineWidth',1.1);
+hNextPhase = scatter(ax,phase(nextSlot),0,90,nextColor,'s','filled', ...
+    'MarkerEdgeColor','k','LineWidth',1.1);
+hEndpoint = plot(ax,1,0,'o','MarkerSize',9,'MarkerFaceColor','w', ...
+    'MarkerEdgeColor',[0.75,0.20,0.20],'LineWidth',1.8);
+
+plot(ax,phase([selectedSlot,nextSlot]),[0.16,0.16], ...
+    '-k','LineWidth',1.5);
+plot(ax,phase([selectedSlot,selectedSlot]),[0,0.16],':k');
+plot(ax,phase([nextSlot,nextSlot]),[0,0.16],':k');
+text(ax,mean(phase([selectedSlot,nextSlot])),0.20, ...
     '\Delta t/T=1/50','HorizontalAlignment','center', ...
-    'FontName','Times New Roman','FontWeight','bold');
-text(ax2,0.99,-0.15,{'t=T','not stored'}, ...
+    'FontName','Times New Roman','FontSize',16,'FontWeight','bold');
+text(ax,0.99,-0.18,{'t=T','not stored'}, ...
     'HorizontalAlignment','right','VerticalAlignment','top', ...
-    'FontName','Times New Roman','FontWeight','bold');
-xlabel(ax2,'Normalized epoch, t/T');
-yticks(ax2,[]); ylim(ax2,[-0.28,0.28]); xlim(ax2,[-0.02,1.02]);
-title(ax2,'(b) Endpoint-excluded phase grid');
+    'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
 
-% (c) Equal time does not imply equal arc length.
-ax3 = nexttile(layout);
-hold(ax3,'on'); box(ax3,'on'); grid(ax3,'on');
-plot(ax3,slotNumber,adjacentChord_km,'-o', ...
-    'Color',orbitColor,'MarkerFaceColor',orbitColor, ...
-    'MarkerSize',3.5,'LineWidth',1.5);
-plot(ax3,selectedSlot,adjacentChord_km(selectedSlot),'o', ...
-    'MarkerSize',8,'MarkerFaceColor',selectedColor,'MarkerEdgeColor','k');
-yline(ax3,median(adjacentChord_km),'--','Median', ...
-    'Color',0.35*[1,1,1],'LabelHorizontalAlignment','left');
-xlabel(ax3,'Slot j');
-ylabel(ax3,'Chord distance j to j+1 (km)');
-xlim(ax3,[1,numSlots]);
-title(ax3,'(c) Unequal spatial separation');
+xlabel(ax,'Normalized epoch, t/T');
+yticks(ax,[]);
+ylim(ax,[-0.30,0.30]);
+xlim(ax,[-0.02,1.02]);
+set(ax,'FontName','Times New Roman','FontSize',18, ...
+    'FontWeight','bold','LineWidth',1.8,'TickLabelInterpreter','tex');
 
-allAxes = [ax1,ax2,ax3];
-set(allAxes,'FontName','Times New Roman','FontSize',11, ...
-    'FontWeight','bold','LineWidth',1.2,'TickLabelInterpreter','tex');
+legendHandle = legend(ax, ...
+    [hCandidate,hSelectedPhase,hNextPhase,hEndpoint], ...
+    {'Candidate slots','Slot j','Slot j+1','Excluded endpoint'}, ...
+    'Location','northoutside','Orientation','horizontal', ...
+    'FontName','Times New Roman','FontSize',14,'FontWeight','bold');
+legendHandle.Box = 'on';
 
-figureFile = fullfile(outputDir,'equal_time_slot_definition.eps');
-inspect_before_export(fig,inspectFigure,'equal-time slot-definition');
-exportgraphics(fig,figureFile,'ContentType','image','Resolution',600);
-close(fig);
+phaseFile = fullfile(outputDir,'slot_phase_grid.eps');
+inspect_before_export(figPhase,inspectFigure, ...
+    'endpoint-excluded phase grid');
+exportgraphics(figPhase,phaseFile, ...
+    'ContentType','image','Resolution',600);
+close(figPhase);
 
 orbitID = "";
 if ismember('orbitID',T.Properties.VariableNames)
@@ -462,11 +484,13 @@ summaryFile = fullfile(outputDir,'slot_definition_summary.csv');
 writetable(slotSummary,summaryFile);
 
 outputs = struct();
-outputs.figure = string(figureFile);
+outputs.figures = [string(geometryFile);string(phaseFile)];
+outputs.geometryFigure = string(geometryFile);
+outputs.phaseFigure = string(phaseFile);
 outputs.summary = string(summaryFile);
 outputs.slotSummary = slotSummary;
 
-fprintf('Saved equal-time slot-definition figure to:\n  %s\n',figureFile);
+fprintf('Saved the two slot-definition figures to:\n  %s\n',outputDir);
 end
 
 
@@ -604,75 +628,110 @@ impulseCfg.periluneSearchSamples = 4001;
 
 [xL1,xL2] = cr3bp_L1L2(mu);
 
-fig = figure('Color','w','Units','inches', ...
-    'Position',[1,1,12,4.6], ...
-    'PaperUnits','inches','PaperPosition',[0,0,12,4.6]);
-layout = tiledlayout(fig,1,3,'TileSpacing','compact','Padding','compact');
-
+figureFiles = strings(3,1);
 cGateway = [0.85,0.27,0.22];
 cTransfer = [0.27,0.31,0.86];
 cImpulse = [0.55,0.30,0.72];
-cReference = [0.50,0.72,0.84];
+cReference = [0.47,0.78,0.94];
 cNominal = [0.35,0.35,0.35];
+cPoint = [0.80,0.80,0.80];
 
-% Nominal Gateway case.
-ax1 = nexttile(layout);
-prepare_axes(ax1);
-hGateway = plot3(ax1,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
-    '-','Color',cGateway,'LineWidth',2.0);
-hMoon1 = draw_moon(ax1,mu,LU);
-plot3(ax1,xL1,0,0,'^','MarkerFaceColor',[0.75,0.75,0.75], ...
-    'MarkerEdgeColor','k','MarkerSize',6);
-plot3(ax1,xL2,0,0,'v','MarkerFaceColor',[0.75,0.75,0.75], ...
-    'MarkerEdgeColor','k','MarkerSize',6);
-title(ax1,'(a) Lunar Gateway');
-legend(ax1,[hGateway,hMoon1],{'Nominal target','Moon'}, ...
-    'Location','northoutside','Orientation','horizontal','FontSize',10);
+% Case 1: nominal Lunar Gateway.
+figGateway = figure('Color','w','Units','inches', ...
+    'Position',[1,1,6.5,6.5], ...
+    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+ax = axes(figGateway);
+prepare_axes(ax);
+hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
+    '-','Color',cGateway,'LineWidth',2.8);
+hMoon = draw_moon(ax,mu,LU);
+plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+format_case_axes(ax);
+legendHandle = legend(ax,[hGateway,hMoon], ...
+    {'Nominal target','Moon'}, ...
+    'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,2);
+axis(ax,'tight');
+axis(ax,'vis3d');
+figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
+inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
+exportgraphics(figGateway,figureFiles(1), ...
+    'ContentType','image','Resolution',600);
+close(figGateway);
 
-% Low-thrust transfer case.
-ax2 = nexttile(layout);
-prepare_axes(ax2);
-plot3(ax2,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3), ...
-    '-','Color',cReference,'LineWidth',1.1);
-plot3(ax2,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3), ...
-    '-','Color',cReference,'LineWidth',1.1);
-hTransfer = plot3(ax2,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3), ...
-    '-','Color',cTransfer,'LineWidth',2.0);
-hStart = plot3(ax2,sTransfer(1,1),sTransfer(1,2),sTransfer(1,3), ...
-    'o','MarkerSize',6,'MarkerFaceColor',cGateway,'MarkerEdgeColor','k');
-hEnd = plot3(ax2,sTransfer(end,1),sTransfer(end,2),sTransfer(end,3), ...
-    's','MarkerSize',6,'MarkerFaceColor',cTransfer,'MarkerEdgeColor','k');
-hMoon2 = draw_moon(ax2,mu,LU);
-title(ax2,'(b) Low-thrust transfer');
-legend(ax2,[hTransfer,hStart,hEnd,hMoon2], ...
-    {'Transfer','Start','End','Moon'}, ...
-    'Location','northoutside','Orientation','horizontal','FontSize',10);
+% Case 2: low-thrust transfer with both endpoint orbits and Gateway context.
+figTransfer = figure('Color','w','Units','inches', ...
+    'Position',[1,1,6.5,6.5], ...
+    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+ax = axes(figTransfer);
+prepare_axes(ax);
+plot3(ax,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3), ...
+    '-','Color',cReference,'LineWidth',1.8);
+plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3), ...
+    '-','Color',cReference,'LineWidth',1.8);
+hGatewayContext = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
+    '-','Color',cGateway,'LineWidth',2.2);
+hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3), ...
+    '-','Color',cTransfer,'LineWidth',3.0);
+hStart = plot3(ax,sTransfer(1,1),sTransfer(1,2),sTransfer(1,3), ...
+    'o','MarkerSize',9,'MarkerFaceColor',cGateway, ...
+    'MarkerEdgeColor','k','LineWidth',1.2);
+hEnd = plot3(ax,sTransfer(end,1),sTransfer(end,2),sTransfer(end,3), ...
+    's','MarkerSize',9,'MarkerFaceColor',cTransfer, ...
+    'MarkerEdgeColor','k','LineWidth',1.2);
+hMoon = draw_moon(ax,mu,LU);
+plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+format_case_axes(ax);
+legendHandle = legend(ax, ...
+    [hGatewayContext,hTransfer,hStart,hEnd,hMoon], ...
+    {'Gateway','Transfer','Start','End','Moon'}, ...
+    'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,3);
+axis(ax,'tight');
+axis(ax,'vis3d');
+figureFiles(2) = fullfile(outputDir,'case_low_thrust_transfer.eps');
+inspect_before_export(figTransfer,inspectFigure,'low-thrust transfer case');
+exportgraphics(figTransfer,figureFiles(2), ...
+    'ContentType','image','Resolution',600);
+close(figTransfer);
 
-% Gateway perilune-impulse case.
-ax3 = nexttile(layout);
-prepare_axes(ax3);
-hNominal = plot3(ax3,sNominalAfterPerilune(:,1), ...
+% Case 3: Gateway perilune impulse and nominal continuation.
+figImpulse = figure('Color','w','Units','inches', ...
+    'Position',[1,1,6.5,6.5], ...
+    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+ax = axes(figImpulse);
+prepare_axes(ax);
+hNominal = plot3(ax,sNominalAfterPerilune(:,1), ...
     sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3), ...
-    '--','Color',cNominal,'LineWidth',1.5);
-hImpulse = plot3(ax3,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3), ...
-    '-','Color',cImpulse,'LineWidth',2.0);
-hBurn = plot3(ax3,sImpulse(1,1),sImpulse(1,2),sImpulse(1,3), ...
-    'p','MarkerSize',9,'MarkerFaceColor',[0.95,0.65,0.15], ...
-    'MarkerEdgeColor','k');
-hMoon3 = draw_moon(ax3,mu,LU);
-title(ax3,'(c) Perilune impulse');
-legend(ax3,[hNominal,hImpulse,hBurn,hMoon3], ...
+    '--','Color',cNominal,'LineWidth',2.2);
+hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3), ...
+    '-','Color',cImpulse,'LineWidth',3.0);
+hBurn = plot3(ax,sImpulse(1,1),sImpulse(1,2),sImpulse(1,3), ...
+    'p','MarkerSize',12,'MarkerFaceColor',[0.95,0.65,0.15], ...
+    'MarkerEdgeColor','k','LineWidth',1.2);
+hMoon = draw_moon(ax,mu,LU);
+plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+format_case_axes(ax);
+legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon], ...
     {'Nominal','Post-impulse','10 m/s burn','Moon'}, ...
-    'Location','northoutside','Orientation','horizontal','FontSize',10);
-
-allAxes = [ax1,ax2,ax3];
-set(allAxes,'FontName','Times New Roman','FontSize',12, ...
-    'FontWeight','bold','LineWidth',1.1,'TickLabelInterpreter','tex');
-
-figureFile = fullfile(outputDir,'tracking_cases.eps');
-inspect_before_export(fig,inspectFigure,'tracking cases');
-exportgraphics(fig,figureFile,'ContentType','image','Resolution',600);
-close(fig);
+    'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,2);
+axis(ax,'tight');
+axis(ax,'vis3d');
+figureFiles(3) = fullfile(outputDir,'case_gateway_perilune_impulse.eps');
+inspect_before_export(figImpulse,inspectFigure,'Gateway impulse case');
+exportgraphics(figImpulse,figureFiles(3), ...
+    'ContentType','image','Resolution',600);
+close(figImpulse);
 
 caseName = ["Lunar Gateway";"Low-thrust transfer";"Perilune impulse"];
 duration_TU = [tGateway(end);tTransfer(end);tImpulse(end)];
@@ -804,7 +863,10 @@ reproductionFile = fullfile( ...
 save(reproductionFile,'reproduction','-v7');
 
 outputs = struct();
-outputs.figure = string(figureFile);
+outputs.figures = figureFiles;
+outputs.gatewayFigure = figureFiles(1);
+outputs.lowThrustFigure = figureFiles(2);
+outputs.impulseFigure = figureFiles(3);
 outputs.metadata = string(metadataFile);
 outputs.endpointAuditFile = string(endpointAuditFile);
 outputs.endpointAudit = endpointAudit;
@@ -820,7 +882,7 @@ outputs.impulseInfo = impulseInfo;
 outputs.departureIndex = departureIndex;
 outputs.arrivalIndex = arrivalIndex;
 
-fprintf('Saved three-case tracking figure to:\n  %s\n',figureFile);
+fprintf('Saved the three separate tracking-case figures to:\n  %s\n',outputDir);
 fprintf('Transfer reference resolved to catalog rows %d and %d.\n', ...
     departureIndex,arrivalIndex);
 fprintf('\nNormalized initial, maneuver, and final conditions:\n');
@@ -897,6 +959,48 @@ for k = 1:height(stateTable)
         char(stateTable.caseName(k)),char(stateTable.condition(k)), ...
         stateTable.caseEpoch_TU(k),char(stateText));
 end
+end
+
+
+function selectedRows = select_evenly_spaced_rows( ...
+    candidateRows,spacingValue,numberToSelect)
+
+candidateRows = candidateRows(:);
+spacingValue = spacingValue(:);
+numberToSelect = min(numberToSelect,numel(candidateRows));
+
+[spacingValue,order] = sort(spacingValue);
+candidateRows = candidateRows(order);
+targets = linspace(spacingValue(1),spacingValue(end),numberToSelect);
+
+available = true(numel(candidateRows),1);
+selectedRows = zeros(numberToSelect,1);
+
+for index = 1:numberToSelect
+    distance = abs(spacingValue-targets(index));
+    distance(~available) = inf;
+    [~,selected] = min(distance);
+    selectedRows(index) = candidateRows(selected);
+    available(selected) = false;
+end
+end
+
+
+function format_case_axes(ax)
+
+set(ax,'FontName','Times New Roman','FontSize',20, ...
+    'FontWeight','bold','LineWidth',1.8,'TickLabelInterpreter','tex');
+end
+
+
+function format_case_legend(legendHandle,numColumns)
+
+legendHandle.Box = 'on';
+legendHandle.FontName = 'Times New Roman';
+legendHandle.FontSize = 16;
+legendHandle.FontWeight = 'bold';
+legendHandle.ItemTokenSize = [22,14];
+legendHandle.NumColumns = numColumns;
 end
 
 
