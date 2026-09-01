@@ -271,15 +271,13 @@ for f = 1:numel(families)
         sampleValue, K, LHS_SEED_BASE + f);
     take = familyIdx(localTake);
 
-    fprintf('%s candidates: %d eligible; selected %d by LHS over %s.
-', ...
+    fprintf('%s candidates: %d eligible; selected %d by LHS over %s.\n', ...
         familyName, numel(familyIdx), numel(take), sampleCoordinate);
 
     keepMask(take) = true;
 end
 
-fprintf("Keeping %d total orbits after all-family LHS selection.
-", ...
+fprintf("Keeping %d total orbits after all-family LHS selection.\n", ...
     nnz(keepMask));
 
 T = T(keepMask,:);
