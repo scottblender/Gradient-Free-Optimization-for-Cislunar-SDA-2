@@ -159,7 +159,17 @@ if any(tableNames == "nearLG")
         "The selected catalog contains an orbit marked near the Gateway.");
 end
 
-fprintf("Catalog structure checks passed.\n");
+gatewayLikeIDs = [ ...
+    "northern_halo_l2:742"
+    "southern_halo_l2:742"
+    "northern_halo_l2:748"
+    "southern_halo_l2:748"];
+
+assert(~any(ismember(lower(orbitIDs),gatewayLikeIDs)), ...
+    ['The selected catalog still contains a nominal or mirrored ' ...
+     'Gateway-like observer orbit.']);
+
+fprintf("Catalog structure and Gateway-exclusion checks passed.\n");
 fprintf("Unique orbit IDs: %d/%d\n\n", ...
     numel(unique(orbitIDs)), height(T));
 
