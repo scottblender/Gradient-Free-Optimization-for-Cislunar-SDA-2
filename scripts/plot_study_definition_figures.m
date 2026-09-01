@@ -434,7 +434,7 @@ plot(ax,phase([nextSlot,nextSlot]),[0,0.16],':k');
 text(ax,mean(phase([selectedSlot,nextSlot])),0.20, ...
     '\Delta t/T=1/50','HorizontalAlignment','center', ...
     'FontName','Times New Roman','FontSize',16,'FontWeight','bold');
-text(ax,0.99,-0.18,{'t=T','not stored'}, ...
+text(ax,0.99,-0.07,{'t=T','not stored'}, ...
     'HorizontalAlignment','right','VerticalAlignment','top', ...
     'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
 
@@ -524,73 +524,54 @@ gatewayCfg.Nperiods = 1;
 [tGateway,sGateway,gatewayInfo] = build_truth_gateway( ...
     gatewayCfg,mu,odeOptions);
 
-% Case 2: low-thrust transfer. Resolve the published endpoint identities
-% directly so a stale transfer_reference.mat cannot silently change the plot.
-departureID = "northern_halo_l1:1015";
-arrivalID = "southern_halo_l2:97";
-departureSlot = 10;
-arrivalSlot = 1;
+% Case 2: low-thrust transfer. Resolve both endpoints by matching the
+% exact initial states captured from the old catalog. Row ordering and IDs
+% are used only as reported metadata, never as the matching mechanism.
+referenceFile = fullfile(projectPaths.data,'transfer_reference.mat');
+assert(isfile(referenceFile), ...
+    'Transfer reference was not found: %s',referenceFile);
+referenceData = load(referenceFile,'transferRef');
+transferRef = referenceData.transferRef;
 
-% Exact initial state of old catalog row 51. Old row 52 is its southern
-% mirror and has the opposite z and vz signs.
-expectedDepartureState0 = [ ...
-     0.8402957900765589,  6.021304054218165e-28, ...
-     0.1583034195863712, -7.135606147838344e-16, ...
-     0.2616335345519606, -9.179544887747458e-16];
+[departureIndex,departureInitialStateError] = ...
+    find_state_match(rawStates,transferRef.dep.state0);
+[arrivalIndex,arrivalInitialStateError] = ...
+    find_state_match(rawStates,transferRef.arr.state0);
 
-assert(ismember('orbitID',T.Properties.VariableNames), ...
-    'The catalog does not contain stable orbitID values.');
-catalogIDs = lower(strtrim(string(T.orbitID)));
-
-departureIndex = find(catalogIDs==departureID);
-arrivalIndex = find(catalogIDs==arrivalID);
-assert(numel(departureIndex)==1, ...
-    'Northern L1 departure ID %s resolved to %d rows.', ...
-    departureID,numel(departureIndex));
-assert(numel(arrivalIndex)==1, ...
-    'Arrival ID %s resolved to %d rows.', ...
-    arrivalID,numel(arrivalIndex));
+departureSlot = double(transferRef.dep.slot);
+arrivalSlot = double(transferRef.arr.slot);
+departureID = string(T.orbitID(departureIndex));
+arrivalID = string(T.orbitID(arrivalIndex));
 
 departureFamily = string(T.orbitFamily(departureIndex));
 arrivalFamily = string(T.orbitFamily(arrivalIndex));
 departureInitialState = rawStates{departureIndex}(1,:);
-departureInitialStateError = norm( ...
-    departureInitialState-expectedDepartureState0);
 departureInitialZ = departureInitialState(3);
 departureMeanZ = mean(rawStates{departureIndex}(:,3));
 departureSlotState = orbitDatabase{departureIndex}(departureSlot,:);
 arrivalSlotState = orbitDatabase{arrivalIndex}(arrivalSlot,:);
 
-assert(departureFamily=="NHL1", ...
-    'Departure orbit must be NHL1, but catalog reports %s.', ...
-    departureFamily);
 assert(departureInitialStateError <= 1e-12, ...
-    ['Departure does not match old catalog row 51. ' ...
+    ['Old-catalog departure did not match the rebuilt catalog. ' ...
      'Initial-state error = %.6e.'],departureInitialStateError);
+assert(arrivalInitialStateError <= 1e-12, ...
+    ['Old-catalog arrival did not match the rebuilt catalog. ' ...
+     'Initial-state error = %.6e.'],arrivalInitialStateError);
+assert(departureFamily=="NHL1", ...
+    'Matched departure must be NHL1, but catalog reports %s.', ...
+    departureFamily);
 assert(departureInitialZ>0 && departureMeanZ>0, ...
-    ['Departure orbit is not the northern branch: ' ...
+    ['Matched departure is not the northern branch: ' ...
      'initial z = %.12g, mean z = %.12g.'], ...
     departureInitialZ,departureMeanZ);
 assert(departureSlotState(3)>0, ...
     ['Corrected slot 10 must start above the rotating x-y plane. ' ...
      'Resolved z = %.12g LU.'],departureSlotState(3));
+
 validArrivalFamilies = ["SHL2","SNRHL2"];
 assert(ismember(arrivalFamily,validArrivalFamilies), ...
-    ['Arrival orbit must be a southern L2 halo or near-rectilinear ' ...
+    ['Matched arrival must be a southern L2 halo or near-rectilinear ' ...
      'halo, but catalog reports %s.'],arrivalFamily);
-
-% Construct the reference structure used by metadata/reproduction exports.
-transferRef = struct();
-transferRef.dep.orbitID = departureID;
-transferRef.dep.slot = departureSlot;
-transferRef.dep.state0 = rawStates{departureIndex}(1,:);
-transferRef.dep.period = periodAll(departureIndex);
-transferRef.dep.newIndex = departureIndex;
-transferRef.arr.orbitID = arrivalID;
-transferRef.arr.slot = arrivalSlot;
-transferRef.arr.state0 = rawStates{arrivalIndex}(1,:);
-transferRef.arr.period = periodAll(arrivalIndex);
-transferRef.arr.newIndex = arrivalIndex;
 
 endpoint = ["Departure";"Arrival"];
 resolvedCatalogRow = [departureIndex;arrivalIndex];
@@ -938,6 +919,24 @@ end
 end
 
 
+function [index,minimumDistance] = ...
+    find_state_match(stateHistories,referenceState)
+
+initialStates = zeros(numel(stateHistories),6);
+
+for k = 1:numel(stateHistories)
+    initialStates(k,:) = stateHistories{k}(1,:);
+end
+
+distance = vecnorm(initialStates-referenceState,2,2);
+[minimumDistance,index] = min(distance);
+
+assert(minimumDistance < 1e-10, ...
+    ['An old-catalog transfer endpoint was not retained in the rebuilt ' ...
+     'catalog. Minimum initial-state difference = %.6e.'],minimumDistance);
+end
+
+
 function prepare_axes(ax)
 
 hold(ax,'on');
@@ -1022,10 +1021,10 @@ end
 
 function format_case_axes(ax)
 
-format_publication_axes(ax,14);
+format_publication_axes(ax,13);
 ax.Units = 'normalized';
-ax.Position = [0.13,0.13,0.74,0.70];
-ax.LooseInset = max(ax.TightInset,0.015);
+ax.Position = [0.16,0.16,0.68,0.67];
+ax.LooseInset = max(ax.TightInset,0.025);
 end
 
 
