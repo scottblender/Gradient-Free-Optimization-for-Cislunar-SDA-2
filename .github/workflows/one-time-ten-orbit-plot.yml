@@ -1,0 +1,31 @@
+name: One-time ten-orbit plotting update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-ten-orbit-plot.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch orbit-family plotting subset
+        run: python .github/one_time_ten_orbit_plot.py
+      - name: Commit plotting update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Plot every fifth orbit in family figures"
+          git push
