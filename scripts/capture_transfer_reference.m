@@ -22,9 +22,16 @@ assert(numel(idMatch) == 1, ...
     'Expected exactly one catalog Id column, but found %d.', ...
     numel(idMatch));
 
-catalogIds = string(T.(tableNames(idMatch)));
+sourceIds = strtrim(string(T.(tableNames(idMatch))));
+
+assert(ismember("sourceFile", string(T.Properties.VariableNames)), ...
+    "The catalog does not contain sourceFile.");
+
+sourceStem = erase(lower(strtrim(string(T.sourceFile))), ".csv");
+catalogIds = sourceStem + ":" + sourceIds;
+
 assert(numel(unique(catalogIds)) == height(T), ...
-    "The catalog contains duplicate Id values.");
+    "The composite sourceFile + Id identifiers are not unique.");
 
 transferRef = struct();
 
@@ -33,14 +40,14 @@ transferRef.dep.slot        = 10;
 transferRef.dep.state0      = T.state{depIndex}(1,:);
 transferRef.dep.period      = periods(depIndex);
 transferRef.dep.family      = T.orbitFamily(depIndex);
-transferRef.dep.Id          = catalogIds(depIndex);
+transferRef.dep.orbitID     = catalogIds(depIndex);
 
 transferRef.arr.legacyIndex = arrIndex;
 transferRef.arr.slot        = 1;
 transferRef.arr.state0      = T.state{arrIndex}(1,:);
 transferRef.arr.period      = periods(arrIndex);
 transferRef.arr.family      = T.orbitFamily(arrIndex);
-transferRef.arr.Id          = catalogIds(arrIndex);
+transferRef.arr.orbitID     = catalogIds(arrIndex);
 
 save(referencePath, "transferRef");
 

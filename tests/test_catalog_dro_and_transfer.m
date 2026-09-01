@@ -70,6 +70,7 @@ fprintf("Selected catalog orbits: %d\n\n", height(T));
 requiredColumns = [
     "orbitFamily"
     "Id"
+    "orbitID"
     "state"
     "time"
     "periluneAltitude_km"
@@ -97,11 +98,11 @@ stability = get_table_column(T, [
 ]);
 
 families = string(T.orbitFamily);
-orbitIDs = string(T.Id);
+orbitIDs = string(T.orbitID);
 
 % ---------------- General catalog checks ----------------
 assert(all(strlength(orbitIDs) > 0), ...
-    "One or more catalog orbits have an empty Id.");
+    "One or more catalog orbits have an empty orbitID.");
 
 assert(numel(unique(orbitIDs)) == height(T), ...
     "The catalog contains duplicate orbit identifiers.");
@@ -472,7 +473,7 @@ function orbitIndex = validate_transfer_reference( ...
     stateTolerance, periodTolerance)
 
     requiredFields = [
-        "Id"
+        "orbitID"
         "state0"
         "period"
         "slot"
@@ -484,7 +485,7 @@ function orbitIndex = validate_transfer_reference( ...
             label, requiredFields(i));
     end
 
-    referenceID = string(reference.Id);
+    referenceID = string(reference.orbitID);
     matches = find(orbitIDs == referenceID);
 
     assert(numel(matches) == 1, ...
@@ -497,7 +498,7 @@ function orbitIndex = validate_transfer_reference( ...
     if isfield(reference, "newIndex")
 
         assert(reference.newIndex == orbitIndex, ...
-            ['%s stored newIndex is %d, but Id resolves ' ...
+            ['%s stored newIndex is %d, but orbitID resolves ' ...
              'to row %d.'], ...
             label, reference.newIndex, orbitIndex);
     end

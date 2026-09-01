@@ -33,6 +33,16 @@ if sourceIdName ~= "Id"
     T.Id = T.(sourceIdName);
 end
 
+% JPL Id values restart in each CSV, so use source file + Id globally.
+sourceStem = erase(lower(strtrim(string(T.sourceFile))), ".csv");
+sourceIds = strtrim(string(T.Id));
+T.orbitID = sourceStem + ":" + sourceIds;
+
+assert(all(strlength(sourceIds) > 0), ...
+    'One or more source Id values are empty.');
+assert(numel(unique(T.orbitID)) == height(T), ...
+    'The composite sourceFile + Id identifiers are not unique.');
+
 % JPL Constants
 mu = 1.215058560962404E-2;
 LU = 384400;     % km
@@ -267,19 +277,19 @@ fprintf("Keeping %d total orbits after family selection.\n", ...
 
 T = T(keepMask,:);
 
-assert(ismember("Id", string(T.Properties.VariableNames)), ...
-    "The selected catalog does not contain the JPL Id column.");
+assert(ismember("orbitID", string(T.Properties.VariableNames)), ...
+    "The selected catalog does not contain orbitID.");
 
-catalogIds = string(T.Id);
+catalogIds = string(T.orbitID);
 assert(all(strlength(catalogIds) > 0), ...
-    "One or more selected orbits have an empty Id.");
+    "One or more selected orbits have an empty orbitID.");
 assert(numel(unique(catalogIds)) == height(T), ...
-    "The selected catalog contains duplicate Id values.");
+    "The selected catalog contains duplicate orbitID values.");
 
-% Deterministic final ordering. Id remains attached to the physical orbit.
+% Deterministic final ordering. orbitID remains attached to the orbit.
 T = sortrows(T, ...
     ["orbitFamily", "apoluneAltitude_km", ...
-     "period_TU", "Id"]);
+     "period_TU", "orbitID"]);
 
 referencePath = fullfile(projectPaths.data, ...
     "transfer_reference.mat");
@@ -295,11 +305,11 @@ if isfile(referencePath)
     transferRef.arr.newIndex = ...
         find_reference_orbit(T, transferRef.arr.state0);
 
-    transferRef.dep.Id = ...
-        string(T.Id(transferRef.dep.newIndex));
+    transferRef.dep.orbitID = ...
+        string(T.orbitID(transferRef.dep.newIndex));
 
-    transferRef.arr.Id = ...
-        string(T.Id(transferRef.arr.newIndex));
+    transferRef.arr.orbitID = ...
+        string(T.orbitID(transferRef.arr.newIndex));
 
     save(referencePath, "transferRef");
 

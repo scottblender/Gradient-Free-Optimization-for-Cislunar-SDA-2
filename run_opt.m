@@ -271,19 +271,19 @@ switch missionCfg.type
         Sref = load(referencePath, "transferRef");
         transferRef = Sref.transferRef;
 
-        assert(ismember("Id", string(T1.Properties.VariableNames)), ...
-            "The orbit catalog does not contain the JPL Id column.");
-        catalogIds = string(T1.Id);
+        assert(ismember("orbitID", string(T1.Properties.VariableNames)), ...
+            "The orbit catalog does not contain orbitID.");
+        catalogIds = string(T1.orbitID);
 
         missionCfg.transfer.depOrbitID = ...
-            string(transferRef.dep.Id);
+            string(transferRef.dep.orbitID);
         missionCfg.transfer.depOrbitIndex = find( ...
             catalogIds == missionCfg.transfer.depOrbitID, 1);
         missionCfg.transfer.depSlot = ...
             transferRef.dep.slot;
 
         missionCfg.transfer.arrOrbitID = ...
-            string(transferRef.arr.Id);
+            string(transferRef.arr.orbitID);
         missionCfg.transfer.arrOrbitIndex = find( ...
             catalogIds == missionCfg.transfer.arrOrbitID, 1);
         missionCfg.transfer.arrSlot = ...
@@ -1018,8 +1018,8 @@ if useFEBudget
         if ismember('sourceFile',T1.Properties.VariableNames)
             observers.source_file = string(T1.sourceFile(orbit_indices));
         end
-        if ismember('Id',T1.Properties.VariableNames)
-            observers.orbit_id = string(T1.Id(orbit_indices));
+        if ismember('orbitID',T1.Properties.VariableNames)
+            observers.orbit_id = string(T1.orbitID(orbit_indices));
         end
 
         % One diagnostic EKF pass, outside the search budget.
