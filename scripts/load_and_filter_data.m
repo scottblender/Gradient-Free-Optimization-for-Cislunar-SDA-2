@@ -306,35 +306,6 @@ droCatalog = sortrows(T(isDROFinal,:), ...
 
 T = [haloCatalog; droCatalog];
 
-referencePath = fullfile(projectPaths.data, ...
-    "transfer_reference.mat");
-
-if isfile(referencePath)
-
-    Sref = load(referencePath, "transferRef");
-    transferRef = Sref.transferRef;
-
-    transferRef.dep.newIndex = ...
-        find_reference_orbit(T, transferRef.dep.state0);
-
-    transferRef.arr.newIndex = ...
-        find_reference_orbit(T, transferRef.arr.state0);
-
-    transferRef.dep.orbitID = ...
-        string(T.orbitID(transferRef.dep.newIndex));
-
-    transferRef.arr.orbitID = ...
-        string(T.orbitID(transferRef.arr.newIndex));
-
-    save(referencePath, "transferRef");
-
-    fprintf("Remapped transfer endpoints:\n");
-    fprintf("  Departure: row %d, slot %d\n", ...
-        transferRef.dep.newIndex, transferRef.dep.slot);
-    fprintf("  Arrival:   row %d, slot %d\n", ...
-        transferRef.arr.newIndex, transferRef.arr.slot);
-end
-
 catalogPath = fullfile(projectPaths.data, ...
     "JPL_CR3BP_OrbitCatalog.mat");
 
@@ -423,23 +394,4 @@ for k = 1:K
     take(k) = selected;
     available(selected) = false;
 end
-end
-
-function index = find_reference_orbit(T, referenceState)
-
-initialStates = zeros(height(T),6);
-
-for i = 1:height(T)
-    initialStates(i,:) = T.state{i}(1,:);
-end
-
-distance = vecnorm( ...
-    initialStates - referenceState, 2, 2);
-
-[minimumDistance, index] = min(distance);
-
-assert(minimumDistance < 1e-10, ...
-    ['The original transfer orbit was not retained in the ' ...
-     'new catalog. Minimum state difference: %.3e'], ...
-    minimumDistance);
 end
