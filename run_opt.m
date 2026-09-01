@@ -1842,12 +1842,17 @@ function [index, stateError] = find_transfer_state_match(T, referenceState)
     referenceState = reshape(double(referenceState), 1, []);
     stateVariable = T.state;
     if iscell(stateVariable)
-        catalogStates = vertcat(stateVariable{:});
+        catalogStates = zeros(height(T),numel(referenceState));
+        for orbitIndex = 1:height(T)
+            catalogStates(orbitIndex,:) = ...
+                reshape(double(stateVariable{orbitIndex}(1,:)),1,[]);
+        end
     else
         catalogStates = double(stateVariable);
     end
 
-    assert(size(catalogStates,2) == numel(referenceState), ...
+    assert(size(catalogStates,1) == height(T) && ...
+        size(catalogStates,2) == numel(referenceState), ...
         "Catalog and reference states have different dimensions.");
 
     stateErrors = vecnorm(catalogStates - referenceState, 2, 2);
