@@ -686,8 +686,6 @@ projectPaths = setup_project();
 outputDir = fullfile(projectPaths.results,'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
 
-fig = publication_figure(8.9,4.55);
-
 cObserver = [0.90,0.12,0.10];
 cTarget = [0.00,0.39,0.72];
 cProjection = [0.42,0.42,0.42];
@@ -699,7 +697,8 @@ alpha = atan2(rho(2),rho(1));
 delta = asin(rho(3)/norm(rho));
 
 % ---------------- (a) Right ascension ----------------
-ax1 = axes(fig,'Units','normalized','Position',[0.06,0.12,0.39,0.80]);
+figRa = publication_figure(4.45,4.55);
+ax1 = axes(figRa,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax1,'on');
 axis(ax1,'equal');
 axis(ax1,'off');
@@ -733,9 +732,18 @@ title(ax1,'(a) Right ascension, \alpha', ...
     'FontSize',16,'FontWeight','bold');
 xlim(ax1,[-0.72,4.65]);
 ylim(ax1,[-0.72,3.85]);
+set(findall(figRa,'Type','text'),'FontName','Times New Roman');
+
+raFigureFile = fullfile(outputDir, ...
+    'measurement_model_right_ascension.eps');
+inspect_before_export(figRa,inspectFigure, ...
+    'right-ascension measurement geometry');
+export_publication_eps(figRa,raFigureFile);
+close(figRa);
 
 % ---------------- (b) Declination ----------------
-ax2 = axes(fig,'Units','normalized','Position',[0.55,0.12,0.39,0.80]);
+figDec = publication_figure(4.45,4.55);
+ax2 = axes(figDec,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax2,'on');
 axis(ax2,'equal');
 axis(ax2,'off');
@@ -772,20 +780,26 @@ title(ax2,'(b) Declination, \delta', ...
     'FontSize',16,'FontWeight','bold');
 xlim(ax2,[-0.72,4.75]);
 ylim(ax2,[-0.72,3.60]);
+set(findall(figDec,'Type','text'),'FontName','Times New Roman');
 
-set(findall(fig,'Type','text'),'FontName','Times New Roman');
-
-figureFile = fullfile(outputDir,'measurement_model_radec_geometry.eps');
-inspect_before_export(fig,inspectFigure,'RA/Dec measurement geometry');
-export_publication_eps(fig,figureFile);
-close(fig);
+decFigureFile = fullfile(outputDir, ...
+    'measurement_model_declination.eps');
+inspect_before_export(figDec,inspectFigure, ...
+    'declination measurement geometry');
+export_publication_eps(figDec,decFigureFile);
+close(figDec);
 
 outputs = struct();
-outputs.figure = string(figureFile);
+outputs.figures = [string(raFigureFile);string(decFigureFile)];
+outputs.rightAscensionFigure = string(raFigureFile);
+outputs.declinationFigure = string(decFigureFile);
 outputs.measurementType = "ANGLES_ONLY";
-fprintf('Saved RA/Dec measurement geometry to:\n  %s\n',figureFile);
-end
 
+fprintf('Saved right-ascension measurement geometry to:\n  %s\n', ...
+    raFigureFile);
+fprintf('Saved declination measurement geometry to:\n  %s\n', ...
+    decFigureFile);
+end
 
 function [fig,axesHandles,textAx] = schematic_figure_layout( ...
     numPanels,geometryHeightInches,textLineCount)
