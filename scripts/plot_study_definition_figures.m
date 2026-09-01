@@ -9,8 +9,8 @@ setup_project();
 
 fprintf('\n--- Study-definition figures ---\n');
 
-fprintf('\n1/3 Orbit catalog characteristics\n');
-outputs.catalog = create_orbit_catalog_characteristics(inspectFigures);
+fprintf('\n1/3 Orbit-family catalog figures\n');
+outputs.catalog = create_orbit_catalog_figures(inspectFigures);
 
 fprintf('\n2/3 Equal-time slot definition\n');
 outputs.slots = create_slot_definition(inspectFigures);
@@ -23,9 +23,10 @@ fprintf('\nAll study-definition figures were generated.\n');
 end
 
 
-function outputs = create_orbit_catalog_characteristics(inspectFigure)
-% Plot quantitative characteristics of all 450 selected catalog orbits.
-% The accompanying CSV provides the values needed for the family table.
+
+function outputs = create_orbit_catalog_figures(inspectFigure)
+% Plot the selected orbit families in the original study style.
+% The accompanying CSV files provide the quantitative family table data.
 
 if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 
@@ -150,57 +151,167 @@ writetable(familySummary,summaryFile);
 metricFile = fullfile(outputDir,'orbit_catalog_metrics.csv');
 writetable(orbitMetrics,metricFile);
 
-familyCategory = categorical(family,familyOrder,familyOrder);
 
-fig = figure('Color','w','Units','inches', ...
-    'Position',[1,1,12,7.4], ...
-    'PaperUnits','inches','PaperPosition',[0,0,12,7.4]);
+% Preserve the original family-trajectory presentation while using the
+% rebuilt catalog directly. Each legend uses the same position and layout.
+familyGroups = { ...
+    ["NHL1","NHL2"], ...
+    ["SHL1","SHL2"], ...
+    ["NNRHL1","NNRHL2"], ...
+    ["SNRHL1","SNRHL2"], ...
+    ["DRO"]};
+figureNames = [ ...
+    "northern_halo", ...
+    "southern_halo", ...
+    "northern_rectilinear", ...
+    "southern_rectilinear", ...
+    "dro_family"];
 
-layout = tiledlayout(fig,2,3,'TileSpacing','compact','Padding','compact');
+[xL1,xL2] = cr3bp_L1L2(mu);
 
-plot_metric(nexttile(layout),familyCategory,periluneAltitude_km, ...
-    'Perilune altitude (km)',[0.18,0.45,0.75]);
-plot_metric(nexttile(layout),familyCategory,apoluneAltitude_km, ...
-    'Apolune altitude (km)',[0.85,0.33,0.25]);
-plot_metric(nexttile(layout),familyCategory,period_days, ...
-    'Orbital period (days)',[0.30,0.65,0.40]);
-plot_metric(nexttile(layout),familyCategory,stabilityIndex, ...
-    'Stability index',[0.55,0.40,0.75]);
-plot_metric(nexttile(layout),familyCategory,inPlaneAmplitude_km, ...
-    'In-plane amplitude, A_{xy} (km)',[0.90,0.60,0.15]);
-plot_metric(nexttile(layout),familyCategory,outOfPlaneAmplitude_km, ...
-    'Out-of-plane amplitude, A_z (km)',[0.20,0.65,0.70]);
+cL1 = [0,0,1];
+cL2 = [1,0,0];
+cMoon = [0.70,0.70,0.70];
+cPoint = [0.85,0.85,0.85];
 
-figureFile = fullfile(outputDir,'orbit_catalog_characteristics.eps');
-inspect_before_export(fig,inspectFigure,'orbit catalog characteristics');
-exportgraphics(fig,figureFile,'ContentType','image','Resolution',600);
-close(fig);
+numPairOrbits = 16;
+numDroOrbits = 16;
+maxPointsPerOrbit = 300;
+figureFiles = strings(numel(familyGroups),1);
+
+for groupIndex = 1:numel(familyGroups)
+    fig = figure('Color','w','Units','inches', ...
+        'Position',[1,1,10.5,9], ...
+        'PaperUnits','inches','PaperPosition',[0,0,10.5,9]);
+    ax = axes(fig);
+    hold(ax,'on');
+    box(ax,'on');
+    axis(ax,'equal');
+    set(ax,'TickLabelInterpreter','tex','Layer','top');
+
+    group = familyGroups{groupIndex};
+
+    if numel(group)==2
+        ax.Projection = 'perspective';
+        view(ax,-37.5,30);
+
+        familyHandles = gobjects(2,1);
+        familyLabels = strings(2,1);
+        colors = [cL1;cL2];
+        perFamily = ceil(numPairOrbits/2);
+
+        for member = 1:2
+            use = family==group(member);
+            familyRows = find(use);
+            assert(~isempty(familyRows), ...
+                'No selected orbits found for %s.',group(member));
+
+            selectedRows = unique(round(linspace( ...
+                1,numel(familyRows),min(perFamily,numel(familyRows)))));
+
+            for plotted = 1:numel(selectedRows)
+                state = T.state{familyRows(selectedRows(plotted))};
+                step = max(1,round(size(state,1)/maxPointsPerOrbit));
+                handle = plot3(ax,state(1:step:end,1), ...
+                    state(1:step:end,2),state(1:step:end,3),'-', ...
+                    'Color',colors(member,:),'LineWidth',3.0);
+                if plotted==1
+                    familyHandles(member) = handle;
+                end
+            end
+            familyLabels(member) = group(member);
+        end
+
+        moonHandle = draw_moon(ax,mu,LU);
+        l1Handle = plot3(ax,xL1,0,0,'^', ...
+            'MarkerSize',13,'MarkerFaceColor',cPoint, ...
+            'MarkerEdgeColor',[0.60,0.60,0.60],'LineWidth',1.8);
+        l2Handle = plot3(ax,xL2,0,0,'v', ...
+            'MarkerSize',13,'MarkerFaceColor',cPoint, ...
+            'MarkerEdgeColor',[0.60,0.60,0.60],'LineWidth',1.8);
+
+        legendHandles = [familyHandles;moonHandle;l1Handle;l2Handle];
+        legendLabels = [familyLabels;"Moon";"L1 point";"L2 point"];
+        zlabel(ax,'Z (LU)');
+        axis(ax,'tight');
+        axis(ax,'vis3d');
+    else
+        ax.Projection = 'orthographic';
+        view(ax,2);
+
+        familyRows = find(family=="DRO");
+        assert(~isempty(familyRows),'No selected DROs were found.');
+        selectedRows = unique(round(linspace( ...
+            1,numel(familyRows),min(numDroOrbits,numel(familyRows)))));
+
+        droHandle = gobjects(1);
+        allX = [];
+        allY = [];
+        for plotted = 1:numel(selectedRows)
+            state = T.state{familyRows(selectedRows(plotted))};
+            step = max(1,round(size(state,1)/maxPointsPerOrbit));
+            statePlot = state(1:step:end,:);
+            handle = plot(ax,statePlot(:,1),statePlot(:,2),'-', ...
+                'Color',cL1,'LineWidth',3.0);
+            allX = [allX;statePlot(:,1)]; %#ok<AGROW>
+            allY = [allY;statePlot(:,2)]; %#ok<AGROW>
+            if plotted==1
+                droHandle = handle;
+            end
+        end
+
+        moonRadius = 1737.1/LU;
+        angle = linspace(0,2*pi,200);
+        moonHandle = fill(ax,(1-mu)+moonRadius*cos(angle), ...
+            moonRadius*sin(angle),cMoon,'EdgeColor','none');
+
+        legendHandles = [droHandle;moonHandle];
+        legendLabels = ["DRO";"Moon"];
+        zlabel(ax,'');
+
+        xData = [allX;(1-mu)+moonRadius*cos(angle(:))];
+        yData = [allY;moonRadius*sin(angle(:))];
+        xPad = 0.05*max(max(xData)-min(xData),eps);
+        yPad = 0.05*max(max(yData)-min(yData),eps);
+        xlim(ax,[min(xData)-xPad,max(xData)+xPad]);
+        ylim(ax,[min(yData)-yPad,max(yData)+yPad]);
+    end
+
+    xlabel(ax,'X (LU)');
+    ylabel(ax,'Y (LU)');
+    set(ax,'FontName','Times New Roman','FontSize',30, ...
+        'FontWeight','bold','LineWidth',2.4);
+
+    legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
+        'Location','northoutside','Orientation','horizontal');
+    legendHandle.Box = 'on';
+    legendHandle.FontName = 'Times New Roman';
+    legendHandle.FontSize = 26;
+    legendHandle.FontWeight = 'bold';
+    legendHandle.ItemTokenSize = [28,16];
+
+    ax.Units = 'normalized';
+    ax.Position = [0.10,0.13,0.84,0.70];
+    ax.LooseInset = max(ax.TightInset,0.02);
+
+    figureFiles(groupIndex) = fullfile( ...
+        outputDir,figureNames(groupIndex)+".eps");
+    inspect_before_export(fig,inspectFigure, ...
+        figureNames(groupIndex)+" orbit-family");
+    exportgraphics(fig,figureFiles(groupIndex), ...
+        'ContentType','image','Resolution',600);
+    close(fig);
+end
 
 outputs = struct();
-outputs.figure = string(figureFile);
+outputs.figures = figureFiles;
 outputs.familySummary = string(summaryFile);
 outputs.orbitMetrics = string(metricFile);
 outputs.numOrbits = nOrbit;
 outputs.numFamilies = nFamily;
 
-fprintf('Saved orbit-catalog figure and tables to:\n  %s\n',outputDir);
+fprintf('Saved orbit-family figures and catalog tables to:\n  %s\n',outputDir);
 end
-
-
-
-function plot_metric(ax,group,value,yLabel,color)
-
-boxchart(ax,group,value, ...
-    'BoxFaceColor',color);
-
-grid(ax,'on');
-box(ax,'on');
-ylabel(ax,yLabel);
-xtickangle(ax,35);
-set(ax,'FontName','Times New Roman','FontSize',11, ...
-    'FontWeight','bold','LineWidth',1.2,'TickLabelInterpreter','tex');
-end
-
 
 function outputs = create_slot_definition(inspectFigure)
 % Illustrate the exact equal-time, endpoint-excluded 50-slot definition.
@@ -218,9 +329,9 @@ catalog = load(projectPaths.catalog,'T');
 T = catalog.T;
 
 family = string(T.orbitFamily);
-orbitIndex = find(family=="NNRHL1",1,'first');
+orbitIndex = find(family=="NHL1",1,'first');
 if isempty(orbitIndex)
-    orbitIndex = find(family=="NHL1",1,'first');
+    orbitIndex = find(family=="NNRHL1",1,'first');
 end
 assert(~isempty(orbitIndex), ...
     'No representative northern L1 orbit was found.');

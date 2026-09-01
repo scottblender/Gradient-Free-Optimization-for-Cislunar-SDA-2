@@ -13,9 +13,9 @@ legacyArrIndex = 400;
 depSlot = 10;
 arrSlot = 1;
 
-% Stable identities corresponding to legacy rows 52 and 400. The old
-% adjacent row 51 was the northern L1 counterpart; row 52 was southern.
-expectedDepID = "southern_halo_l1:1015";
+% Stable identities corresponding to legacy rows 52 and 400. Legacy
+% row 52 is the northern L1 halo used by the original low-thrust case.
+expectedDepID = "northern_halo_l1:1015";
 expectedArrID = "southern_halo_l2:97";
 
 S = load(catalogPath,"T");
