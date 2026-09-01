@@ -1,12 +1,13 @@
-function summary = test_small_fe_case(algorithms, seeds)
+function summary = test_small_fe_case(algorithms, seeds, missionType)
 % Small integration test of the current run_opt workflow.
 %
 % Examples:
 %   test_small_fe_case
 %   test_small_fe_case("PSO", 0)
 %   test_small_fe_case(["GA","PSO","BAYESIAN","ABC","ACO"], 0)
+%   test_small_fe_case("GA", 0, "LOW_THRUST_TRANSFER")
 %
-% This runs the real Gateway objective and final diagnostic replay.
+% This runs the selected real objective and final diagnostic replay.
 % One additional objective evaluation checks the saved winner.
 % That validation evaluation is outside the optimization budget.
 
@@ -18,7 +19,16 @@ if nargin < 2 || isempty(seeds)
     seeds = 0;
 end
 
+if nargin < 3 || isempty(missionType)
+    missionType = "LUNAR_GATEWAY";
+end
+
 algorithms = upper(string(algorithms));
+missionType = upper(string(missionType));
+
+assert(isscalar(missionType) && ...
+    ismember(missionType, ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER"]), ...
+    'Unknown pilot mission type.');
 
 assert(all(ismember(algorithms, ...
     ["GA","PSO","BAYESIAN","ABC","ACO"]), 'all'), ...
@@ -39,7 +49,7 @@ settings = {
     'MAX_EVALS',        '120'
     'MAX_ITERS',        '100000'
     'USE_PARALLEL_OPT', '0'
-    'MISSION_TYPE',     'LUNAR_GATEWAY'
+    'MISSION_TYPE',     char(missionType)
     'MEAS_MODEL',       'ANGLES_ONLY'
     'NUM_OBSERVERS',    '3'
     'NPERIODS',         '1'
@@ -49,7 +59,7 @@ settings = {
     'USE_J3',           '1'
     'MEAS_NOISE_SEED',  '1001'
     'EKF_DT',           '0.01'
-    'STUDY_ID',         'reviewer2_pilot_v2'
+    'STUDY_ID',         char("reviewer2_pilot_" + lower(missionType))
     'MAKE_PLOTS',       '0'
 };
 
@@ -115,8 +125,8 @@ for a = 1:numel(algorithms)
         setenv('SEED', num2str(seed));
         setenv('RUN_DIR', runDir);
 
-        fprintf('\nPilot: %s, seed %d, budget %d\n', ...
-            alg, seed, budget);
+        fprintf('\nPilot: %s, %s, seed %d, budget %d\n', ...
+            missionType, alg, seed, budget);
 
         recheckJ = NaN;
 
