@@ -104,6 +104,8 @@ assert(arrivalSlotStateError <= 1e-10, ...
 
 transferRef = struct();
 transferRef.slotDefinition = slotDefinition;
+transferRef.targetStateDefinition = ...
+    "legacy_equal_time_including_endpoint_v1";
 transferRef.slotsPerOrbit = slotsPerOrbit;
 
 transferRef.dep.legacyIndex = legacyDepIndex;
@@ -116,6 +118,8 @@ transferRef.dep.legacyInclusiveSlotEpoch = ...
     legacyInclusiveDepSlotEpoch;
 transferRef.dep.legacyInclusiveSlotState = ...
     legacyInclusiveDepSlotState;
+transferRef.dep.transferEpoch = legacyInclusiveDepSlotEpoch;
+transferRef.dep.transferState = legacyInclusiveDepSlotState;
 transferRef.dep.period = periods(depIndex);
 transferRef.dep.family = T.orbitFamily(depIndex);
 transferRef.dep.orbitID = depOrbitID;
@@ -128,6 +132,8 @@ transferRef.arr.slot = arrSlot;
 transferRef.arr.state0 = legacyArrState0;
 transferRef.arr.slotEpoch = arrSlotEpoch;
 transferRef.arr.slotState = arrSlotState;
+transferRef.arr.transferEpoch = arrSlotEpoch;
+transferRef.arr.transferState = arrSlotState;
 transferRef.arr.period = periods(arrIndex);
 transferRef.arr.family = T.orbitFamily(arrIndex);
 transferRef.arr.orbitID = arrOrbitID;
@@ -152,7 +158,10 @@ fprintf('Corrected departure slot epoch: %.15g TU (9T/50)\n', ...
     depSlotEpoch);
 fprintf('Legacy departure slot epoch:    %.15g TU (9T/49)\n', ...
     legacyInclusiveDepSlotEpoch);
-fprintf('Corrected departure slot state [x y z vx vy vz]:\n');
+fprintf('Transfer departure state used by the solver (old 9T/49):\n');
+fprintf('  %.15g  %.15g  %.15g  %.15g  %.15g  %.15g\n', ...
+    legacyInclusiveDepSlotState);
+fprintf('Corrected observer slot-10 state (new 9T/50):\n');
 fprintf('  %.15g  %.15g  %.15g  %.15g  %.15g  %.15g\n', ...
     depSlotState);
 
