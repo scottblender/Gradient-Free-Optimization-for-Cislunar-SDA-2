@@ -169,8 +169,8 @@ figureNames = [ ...
 
 [xL1,xL2] = cr3bp_L1L2(mu);
 
-cL1 = [0,0,1];
-cL2 = [1,0,0];
+cL1 = [0.05,0.32,0.82];
+cL2 = [0.90,0.16,0.12];
 cMoon = [0.70,0.70,0.70];
 cPoint = [0.85,0.85,0.85];
 
@@ -180,9 +180,7 @@ maxPointsPerOrbit = 300;
 figureFiles = strings(numel(familyGroups),1);
 
 for groupIndex = 1:numel(familyGroups)
-    fig = figure('Color','w','Units','inches', ...
-        'Position',[1,1,10.5,9], ...
-        'PaperUnits','inches','PaperPosition',[0,0,10.5,9]);
+    fig = publication_figure(8.0,6.8);
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
@@ -192,8 +190,8 @@ for groupIndex = 1:numel(familyGroups)
     group = familyGroups{groupIndex};
 
     if numel(group)==2
-        ax.Projection = 'perspective';
-        view(ax,-37.5,30);
+        ax.Projection = 'orthographic';
+        view(ax,-36,24);
 
         familyHandles = gobjects(2,1);
         familyLabels = strings(2,1);
@@ -214,7 +212,7 @@ for groupIndex = 1:numel(familyGroups)
                 step = max(1,round(size(state,1)/maxPointsPerOrbit));
                 handle = plot3(ax,state(1:step:end,1), ...
                     state(1:step:end,2),state(1:step:end,3),'-', ...
-                    'Color',colors(member,:),'LineWidth',3.0);
+                    'Color',colors(member,:),'LineWidth',1.45);
                 if plotted==1
                     familyHandles(member) = handle;
                 end
@@ -252,7 +250,7 @@ for groupIndex = 1:numel(familyGroups)
             step = max(1,round(size(state,1)/maxPointsPerOrbit));
             statePlot = state(1:step:end,:);
             handle = plot(ax,statePlot(:,1),statePlot(:,2),'-', ...
-                'Color',cL1,'LineWidth',3.0);
+                'Color',cL1,'LineWidth',1.45);
             allX = [allX;statePlot(:,1)]; %#ok<AGROW>
             allY = [allY;statePlot(:,2)]; %#ok<AGROW>
             if plotted==1
@@ -279,27 +277,28 @@ for groupIndex = 1:numel(familyGroups)
 
     xlabel(ax,'X (LU)');
     ylabel(ax,'Y (LU)');
-    set(ax,'FontName','Times New Roman','FontSize',30, ...
-        'FontWeight','bold','LineWidth',2.4);
+    format_publication_axes(ax,17);
 
     legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
         'Location','northoutside','Orientation','horizontal');
     legendHandle.Box = 'on';
     legendHandle.FontName = 'Times New Roman';
-    legendHandle.FontSize = 26;
+    legendHandle.FontSize = 14;
     legendHandle.FontWeight = 'bold';
-    legendHandle.ItemTokenSize = [28,16];
+    legendHandle.ItemTokenSize = [20,12];
+    legendHandle.NumColumns = min(3,numel(legendLabels));
+    place_legend_above(legendHandle, ...
+        min(3,numel(legendLabels)),14);
 
     ax.Units = 'normalized';
-    ax.Position = [0.10,0.13,0.84,0.70];
+    ax.Position = [0.13,0.14,0.74,0.66];
     ax.LooseInset = max(ax.TightInset,0.02);
 
     figureFiles(groupIndex) = fullfile( ...
         outputDir,figureNames(groupIndex)+".eps");
     inspect_before_export(fig,inspectFigure, ...
         figureNames(groupIndex)+" orbit-family");
-    exportgraphics(fig,figureFiles(groupIndex), ...
-        'ContentType','image','Resolution',600);
+    export_publication_eps(fig,figureFiles(groupIndex));
     close(fig);
 end
 
@@ -372,9 +371,7 @@ LU = 384400;
 [xL1,~] = cr3bp_L1L2(mu);
 
 % Figure 1: the orbit and its 50 equal-time candidate states.
-figGeometry = figure('Color','w','Units','inches', ...
-    'Position',[1,1,6.5,6.5], ...
-    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+figGeometry = publication_figure(7.2,6.2);
 ax = axes(figGeometry);
 prepare_axes(ax);
 
@@ -406,20 +403,19 @@ legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hMoon,hL1], ...
     'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
 legendHandle.NumColumns = 3;
 legendHandle.Box = 'on';
+place_legend_above(legendHandle,3,13);
 axis(ax,'tight');
 axis(ax,'vis3d');
+ax.Position = [0.13,0.14,0.74,0.66];
 
 geometryFile = fullfile(outputDir,'slot_geometry_equal_time.eps');
 inspect_before_export(figGeometry,inspectFigure, ...
     'equal-time slot geometry');
-exportgraphics(figGeometry,geometryFile, ...
-    'ContentType','image','Resolution',600);
+export_publication_eps(figGeometry,geometryFile);
 close(figGeometry);
 
 % Figure 2: the exact normalized phase grid and excluded endpoint.
-figPhase = figure('Color','w','Units','inches', ...
-    'Position',[1,1,6.5,3.6], ...
-    'PaperUnits','inches','PaperPosition',[0,0,6.5,3.6]);
+figPhase = publication_figure(7.2,3.8);
 ax = axes(figPhase);
 hold(ax,'on');
 box(ax,'on');
@@ -460,12 +456,13 @@ legendHandle = legend(ax, ...
     'Location','northoutside','Orientation','horizontal', ...
     'FontName','Times New Roman','FontSize',14,'FontWeight','bold');
 legendHandle.Box = 'on';
+place_legend_above(legendHandle,2,13);
+ax.Position = [0.12,0.19,0.80,0.56];
 
 phaseFile = fullfile(outputDir,'slot_phase_grid.eps');
 inspect_before_export(figPhase,inspectFigure, ...
     'endpoint-excluded phase grid');
-exportgraphics(figPhase,phaseFile, ...
-    'ContentType','image','Resolution',600);
+export_publication_eps(figPhase,phaseFile);
 close(figPhase);
 
 orbitID = "";
@@ -532,58 +529,85 @@ gatewayCfg.Nperiods = 1;
 [tGateway,sGateway,gatewayInfo] = build_truth_gateway( ...
     gatewayCfg,mu,odeOptions);
 
-% Case 2: low-thrust transfer using stable orbit IDs, never row numbers.
-referenceFile = fullfile(projectPaths.data,'transfer_reference.mat');
-assert(isfile(referenceFile), ...
-    'Transfer reference file was not found: %s',referenceFile);
-reference = load(referenceFile,'transferRef');
-transferRef = reference.transferRef;
+% Case 2: low-thrust transfer. Resolve the published endpoint identities
+% directly so a stale transfer_reference.mat cannot silently change the plot.
+departureID = "northern_halo_l1:1015";
+arrivalID = "southern_halo_l2:97";
+departureSlot = 10;
+arrivalSlot = 1;
 
 assert(ismember('orbitID',T.Properties.VariableNames), ...
     'The catalog does not contain stable orbitID values.');
-catalogIDs = string(T.orbitID);
+catalogIDs = lower(strtrim(string(T.orbitID)));
 
-departureID = string(transferRef.dep.orbitID);
-arrivalID = string(transferRef.arr.orbitID);
-departureIndex = find(catalogIDs==departureID,1);
-arrivalIndex = find(catalogIDs==arrivalID,1);
-assert(~isempty(departureIndex) && ~isempty(arrivalIndex), ...
-    'A transfer-reference orbit is absent from the selected catalog.');
+departureIndex = find(catalogIDs==departureID);
+arrivalIndex = find(catalogIDs==arrivalID);
+assert(numel(departureIndex)==1, ...
+    'Northern L1 departure ID %s resolved to %d rows.', ...
+    departureID,numel(departureIndex));
+assert(numel(arrivalIndex)==1, ...
+    'Arrival ID %s resolved to %d rows.', ...
+    arrivalID,numel(arrivalIndex));
 
-departureStateError = norm( ...
-    rawStates{departureIndex}(1,:)-transferRef.dep.state0);
-arrivalStateError = norm( ...
-    rawStates{arrivalIndex}(1,:)-transferRef.arr.state0);
-departurePeriodError_TU = abs( ...
-    periodAll(departureIndex)-transferRef.dep.period);
-arrivalPeriodError_TU = abs( ...
-    periodAll(arrivalIndex)-transferRef.arr.period);
+departureFamily = string(T.orbitFamily(departureIndex));
+arrivalFamily = string(T.orbitFamily(arrivalIndex));
+departureInitialZ = rawStates{departureIndex}(1,3);
+departureMeanZ = mean(rawStates{departureIndex}(:,3));
+departureSlotState = orbitDatabase{departureIndex}(departureSlot,:);
+arrivalSlotState = orbitDatabase{arrivalIndex}(arrivalSlot,:);
 
-assert(departureStateError<=1e-12 && arrivalStateError<=1e-12, ...
-    'A low-thrust endpoint orbit changed during catalog rebuilding.');
-assert(departurePeriodError_TU<=1e-12 && arrivalPeriodError_TU<=1e-12, ...
-    'A low-thrust endpoint period changed during catalog rebuilding.');
+assert(departureFamily=="NHL1", ...
+    'Departure orbit must be NHL1, but catalog reports %s.', ...
+    departureFamily);
+assert(departureInitialZ>0 && departureMeanZ>0, ...
+    ['Departure orbit is not the northern branch: ' ...
+     'initial z = %.12g, mean z = %.12g.'], ...
+    departureInitialZ,departureMeanZ);
+assert(departureSlotState(3)>0, ...
+    ['Corrected slot 10 must start above the rotating x-y plane. ' ...
+     'Resolved z = %.12g LU.'],departureSlotState(3));
+assert(arrivalFamily=="SHL2", ...
+    'Arrival orbit must be SHL2, but catalog reports %s.', ...
+    arrivalFamily);
+
+% Construct the reference structure used by metadata/reproduction exports.
+transferRef = struct();
+transferRef.dep.orbitID = departureID;
+transferRef.dep.slot = departureSlot;
+transferRef.dep.state0 = rawStates{departureIndex}(1,:);
+transferRef.dep.period = periodAll(departureIndex);
+transferRef.dep.newIndex = departureIndex;
+transferRef.arr.orbitID = arrivalID;
+transferRef.arr.slot = arrivalSlot;
+transferRef.arr.state0 = rawStates{arrivalIndex}(1,:);
+transferRef.arr.period = periodAll(arrivalIndex);
+transferRef.arr.newIndex = arrivalIndex;
 
 endpoint = ["Departure";"Arrival"];
 resolvedCatalogRow = [departureIndex;arrivalIndex];
 resolvedOrbitID = [departureID;arrivalID];
-slot = [double(transferRef.dep.slot);double(transferRef.arr.slot)];
-sourceInitialStateError = [departureStateError;arrivalStateError];
-periodError_TU = [departurePeriodError_TU;arrivalPeriodError_TU];
-endpointAudit = table(endpoint,resolvedCatalogRow,resolvedOrbitID,slot, ...
-    sourceInitialStateError,periodError_TU);
+orbitFamily = [departureFamily;arrivalFamily];
+slot = [departureSlot;arrivalSlot];
+initialZ_LU = [departureInitialZ;rawStates{arrivalIndex}(1,3)];
+meanZ_LU = [departureMeanZ;mean(rawStates{arrivalIndex}(:,3))];
+slotZ_LU = [departureSlotState(3);arrivalSlotState(3)];
+endpointAudit = table(endpoint,resolvedCatalogRow,resolvedOrbitID, ...
+    orbitFamily,slot,initialZ_LU,meanZ_LU,slotZ_LU);
 
-fprintf('\n--- Low-thrust endpoint reference audit ---\n');
+fprintf('\n--- Low-thrust endpoint identity audit ---\n');
 disp(endpointAudit);
+fprintf('Exact northern departure slot state [x y z vx vy vz]:\n');
+fprintf('  %.15g  %.15g  %.15g  %.15g  %.15g  %.15g\n', ...
+    departureSlotState);
 
 missionCfg = struct();
 missionCfg.type = "LOW_THRUST_TRANSFER";
 missionCfg.transfer.depOrbitID = departureID;
 missionCfg.transfer.depOrbitIndex = departureIndex;
-missionCfg.transfer.depSlot = transferRef.dep.slot;
+missionCfg.transfer.depSlot = departureSlot;
 missionCfg.transfer.arrOrbitID = arrivalID;
 missionCfg.transfer.arrOrbitIndex = arrivalIndex;
-missionCfg.transfer.arrSlot = transferRef.arr.slot;
+missionCfg.transfer.arrSlot = arrivalSlot;
 missionCfg.transfer.dt = 0.001;
 missionCfg.transfer.solverMode = "LOW_THRUST_CLASS";
 missionCfg.transfer.lowthrust.sigma = 1.0;
@@ -632,14 +656,13 @@ figureFiles = strings(3,1);
 cGateway = [0.85,0.27,0.22];
 cTransfer = [0.27,0.31,0.86];
 cImpulse = [0.55,0.30,0.72];
-cReference = [0.47,0.78,0.94];
+cDeparture = [0.20,0.58,0.88];
+cArrival = [0.93,0.52,0.13];
 cNominal = [0.35,0.35,0.35];
 cPoint = [0.80,0.80,0.80];
 
 % Case 1: nominal Lunar Gateway.
-figGateway = figure('Color','w','Units','inches', ...
-    'Position',[1,1,6.5,6.5], ...
-    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+figGateway = publication_figure(7.2,6.2);
 ax = axes(figGateway);
 prepare_axes(ax);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
@@ -654,24 +677,22 @@ legendHandle = legend(ax,[hGateway,hMoon], ...
     {'Nominal target','Moon'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,2);
+format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
 figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
 inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
-exportgraphics(figGateway,figureFiles(1), ...
-    'ContentType','image','Resolution',600);
+export_publication_eps(figGateway,figureFiles(1));
 close(figGateway);
 
 % Case 2: low-thrust transfer with both endpoint orbits and Gateway context.
-figTransfer = figure('Color','w','Units','inches', ...
-    'Position',[1,1,6.5,6.5], ...
-    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+figTransfer = publication_figure(7.2,6.2);
 ax = axes(figTransfer);
 prepare_axes(ax);
-plot3(ax,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3), ...
-    '-','Color',cReference,'LineWidth',1.8);
-plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3), ...
-    '-','Color',cReference,'LineWidth',1.8);
+hDeparture = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
+    departureOrbit(:,3),'-','Color',cDeparture,'LineWidth',1.8);
+hArrival = plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2), ...
+    arrivalOrbit(:,3),'-','Color',cArrival,'LineWidth',1.8);
 hGatewayContext = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
     '-','Color',cGateway,'LineWidth',2.2);
 hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3), ...
@@ -689,22 +710,21 @@ plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
     'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
 format_case_axes(ax);
 legendHandle = legend(ax, ...
-    [hGatewayContext,hTransfer,hStart,hEnd,hMoon], ...
-    {'Gateway','Transfer','Start','End','Moon'}, ...
+    [hDeparture,hArrival,hGatewayContext,hTransfer,hStart,hEnd,hMoon], ...
+    {'NHL1 departure','SHL2 arrival','Gateway','Transfer', ...
+     'Start','End','Moon'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,3);
+format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
 figureFiles(2) = fullfile(outputDir,'case_low_thrust_transfer.eps');
 inspect_before_export(figTransfer,inspectFigure,'low-thrust transfer case');
-exportgraphics(figTransfer,figureFiles(2), ...
-    'ContentType','image','Resolution',600);
+export_publication_eps(figTransfer,figureFiles(2));
 close(figTransfer);
 
 % Case 3: Gateway perilune impulse and nominal continuation.
-figImpulse = figure('Color','w','Units','inches', ...
-    'Position',[1,1,6.5,6.5], ...
-    'PaperUnits','inches','PaperPosition',[0,0,6.5,6.5]);
+figImpulse = publication_figure(7.2,6.2);
 ax = axes(figImpulse);
 prepare_axes(ax);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1), ...
@@ -725,12 +745,12 @@ legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon], ...
     {'Nominal','Post-impulse','10 m/s burn','Moon'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,2);
+format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
 figureFiles(3) = fullfile(outputDir,'case_gateway_perilune_impulse.eps');
 inspect_before_export(figImpulse,inspectFigure,'Gateway impulse case');
-exportgraphics(figImpulse,figureFiles(3), ...
-    'ContentType','image','Resolution',600);
+export_publication_eps(figImpulse,figureFiles(3));
 close(figImpulse);
 
 caseName = ["Lunar Gateway";"Low-thrust transfer";"Perilune impulse"];
@@ -909,7 +929,7 @@ function prepare_axes(ax)
 hold(ax,'on');
 box(ax,'on');
 axis(ax,'equal');
-view(ax,32,24);
+view(ax,-36,24);
 ax.Projection = 'orthographic';
 xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
@@ -988,8 +1008,10 @@ end
 
 function format_case_axes(ax)
 
-set(ax,'FontName','Times New Roman','FontSize',20, ...
-    'FontWeight','bold','LineWidth',1.8,'TickLabelInterpreter','tex');
+format_publication_axes(ax,16);
+ax.Units = 'normalized';
+ax.Position = [0.13,0.14,0.74,0.66];
+ax.LooseInset = max(ax.TightInset,0.02);
 end
 
 
@@ -997,10 +1019,75 @@ function format_case_legend(legendHandle,numColumns)
 
 legendHandle.Box = 'on';
 legendHandle.FontName = 'Times New Roman';
-legendHandle.FontSize = 16;
+legendHandle.FontSize = 13;
 legendHandle.FontWeight = 'bold';
-legendHandle.ItemTokenSize = [22,14];
+legendHandle.ItemTokenSize = [18,11];
 legendHandle.NumColumns = numColumns;
+place_legend_above(legendHandle,numColumns,13);
+end
+
+
+function fig = publication_figure(widthInches,heightInches)
+
+fig = figure( ...
+    'Color','w', ...
+    'Units','inches', ...
+    'Position',[1,1,widthInches,heightInches], ...
+    'PaperUnits','inches', ...
+    'PaperPosition',[0,0,widthInches,heightInches], ...
+    'PaperSize',[widthInches,heightInches], ...
+    'PaperPositionMode','manual', ...
+    'Renderer','painters', ...
+    'InvertHardcopy','off');
+end
+
+
+function format_publication_axes(ax,fontSize)
+
+set(ax, ...
+    'FontName','Times New Roman', ...
+    'FontSize',fontSize, ...
+    'FontWeight','bold', ...
+    'LineWidth',1.35, ...
+    'TickLabelInterpreter','tex');
+
+ax.XLabel.FontName = 'Times New Roman';
+ax.YLabel.FontName = 'Times New Roman';
+ax.ZLabel.FontName = 'Times New Roman';
+ax.XLabel.FontSize = fontSize+2;
+ax.YLabel.FontSize = fontSize+2;
+ax.ZLabel.FontSize = fontSize+2;
+ax.XLabel.FontWeight = 'bold';
+ax.YLabel.FontWeight = 'bold';
+ax.ZLabel.FontWeight = 'bold';
+end
+
+
+function place_legend_above(legendHandle,numColumns,fontSize)
+
+legendHandle.Location = 'northoutside';
+legendHandle.Orientation = 'horizontal';
+legendHandle.NumColumns = numColumns;
+legendHandle.FontSize = fontSize;
+drawnow;
+
+% MATLAB's automatic northoutside placement can extend beyond the paper
+% canvas. Preserve its natural size, center it, and keep it inside the
+% exported EPS bounding box.
+legendHandle.Units = 'normalized';
+position = legendHandle.Position;
+position(1) = max(0.02,0.5-position(3)/2);
+position(2) = min(position(2),0.97-position(4));
+legendHandle.Position = position;
+end
+
+
+function export_publication_eps(fig,fileName)
+
+drawnow;
+set(fig,'Renderer','painters','PaperPositionMode','manual');
+print(fig,char(fileName),'-depsc2','-painters','-r600');
+fprintf('Saved vector EPS: %s\n',fileName);
 end
 
 
@@ -1014,5 +1101,3 @@ if inspectFigure
         description),'s');
 end
 end
-
-
