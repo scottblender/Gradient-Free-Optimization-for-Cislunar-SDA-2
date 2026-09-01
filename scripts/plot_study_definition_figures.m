@@ -527,11 +527,7 @@ gatewayCfg.Nperiods = 1;
 % Case 2: low-thrust transfer. Resolve both endpoints by matching the
 % exact initial states captured from the old catalog. Row ordering and IDs
 % are used only as reported metadata, never as the matching mechanism.
-referenceFile = fullfile(projectPaths.data,'transfer_reference.mat');
-assert(isfile(referenceFile), ...
-    'Transfer reference was not found: %s',referenceFile);
-referenceData = load(referenceFile,'transferRef');
-transferRef = referenceData.transferRef;
+transferRef = low_thrust_case_config(T);
 
 [departureIndex,departureInitialStateError] = ...
     find_state_match(rawStates,transferRef.dep.state0);
@@ -711,9 +707,9 @@ legendHandle = legend(ax,[hGateway,hMoon], ...
     {'Nominal target','Moon'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,2);
-format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
+format_case_axes(ax);
 figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
 inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
 export_publication_eps(figGateway,figureFiles(1));
@@ -748,9 +744,9 @@ legendHandle = legend(ax, ...
     {'Coasting','Transfer','Start','End','Moon','L1','L2'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,4);
-format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
+format_case_axes(ax);
 figureFiles(2) = fullfile(outputDir,'case_low_thrust_transfer.eps');
 inspect_before_export(figTransfer,inspectFigure,'low-thrust transfer case');
 export_publication_eps(figTransfer,figureFiles(2));
@@ -778,9 +774,9 @@ legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon], ...
     {'Nominal','Post-impulse','10 m/s burn','Moon'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,2);
-format_case_axes(ax);
 axis(ax,'tight');
 axis(ax,'vis3d');
+format_case_axes(ax);
 figureFiles(3) = fullfile(outputDir,'case_gateway_perilune_impulse.eps');
 inspect_before_export(figImpulse,inspectFigure,'Gateway impulse case');
 export_publication_eps(figImpulse,figureFiles(3));
