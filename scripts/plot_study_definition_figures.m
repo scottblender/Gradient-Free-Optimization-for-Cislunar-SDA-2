@@ -306,8 +306,8 @@ for groupIndex = 1:numel(familyGroups)
         'Location','northeast','Orientation','vertical');
     legendHandle.Box = 'on';
     legendHandle.FontName = 'Times New Roman';
-    legendHandle.FontSize = 10;
-    legendHandle.FontWeight = 'normal';
+    legendHandle.FontSize = 12;
+    legendHandle.FontWeight = 'bold';
     legendHandle.ItemTokenSize = [14,8];
     legendHandle.NumColumns = 1;
 
@@ -607,27 +607,25 @@ text(ax,body(1),body(2)-1.06,'Body b', ...
     'FontWeight','bold','FontSize',17, ...
     'HorizontalAlignment','center');
 
-% Angle labels are positioned from the corresponding arc geometry
-% instead of fixed page coordinates.
-occLabel = observer + ...
-    1.12*[cos(0.5*thetaOcc),sin(0.5*thetaOcc)] + [-0.02,-0.22];
-keepoutLabel = observer + ...
-    1.67*[cos(0.5*thetaKeepout),sin(0.5*thetaKeepout)] + [0,0.13];
-targetAngleLabel = observer + ...
-    2.32*[cos(0.5*thetaB),sin(0.5*thetaB)] + [0.04,0.16];
+% Keep the angular labels outside the shaded geometry. Each leader points
+% to the middle of the arc represented by that label.
+occArcPoint = observer + ...
+    0.95*[cos(0.55*thetaOcc),sin(0.55*thetaOcc)];
+keepoutArcPoint = observer + ...
+    1.48*[cos(0.62*thetaKeepout),sin(0.62*thetaKeepout)];
+targetArcPoint = observer + ...
+    2.10*[cos(0.72*thetaB),sin(0.72*thetaB)];
 
-text(ax,occLabel(1),occLabel(2),'\theta_{occ,b}', ...
-    'Color',cOcc,'FontWeight','bold','FontSize',16, ...
-    'HorizontalAlignment','center','VerticalAlignment','middle', ...
-    'BackgroundColor','w','Margin',0.5);
-text(ax,keepoutLabel(1),keepoutLabel(2),'\theta_{keepout,b}', ...
-    'Color',cSensor,'FontWeight','bold','FontSize',16, ...
-    'HorizontalAlignment','center','VerticalAlignment','middle', ...
-    'BackgroundColor','w','Margin',0.5);
-text(ax,targetAngleLabel(1),targetAngleLabel(2),'\theta_b', ...
-    'Color',cTarget,'FontWeight','bold','FontSize',16, ...
-    'HorizontalAlignment','center','VerticalAlignment','middle', ...
-    'BackgroundColor','w','Margin',0.5);
+occLabel = observer + [1.05,-0.62];
+keepoutLabel = observer + [1.15,1.10];
+targetAngleLabel = observer + [2.72,1.42];
+
+draw_text_callout(ax,occLabel,occArcPoint, ...
+    '\theta_{occ,b}',cOcc,16);
+draw_text_callout(ax,keepoutLabel,keepoutArcPoint, ...
+    '\theta_{keepout,b}',cSensor,16);
+draw_text_callout(ax,targetAngleLabel,targetArcPoint, ...
+    '\theta_b',cTarget,16);
 
 ptOccRegion = observer + ...
     2.05*[cos(-0.25*thetaOcc),sin(-0.25*thetaOcc)];
@@ -646,7 +644,7 @@ quiver(ax,occArrowStart(1),occArrowStart(2), ...
 ptMargin = observer + ...
     2.55*[cos(0.5*(thetaOcc+thetaKeepout)), ...
     sin(0.5*(thetaOcc+thetaKeepout))];
-marginCallout = observer + [2.20,1.68];
+marginCallout = observer + [2.92,2.08];
 text(ax,marginCallout(1),marginCallout(2), ...
     {'sensor';'margin'}, ...
     'Color',cSensor,'FontSize',15,'FontAngle','italic', ...
@@ -658,8 +656,8 @@ quiver(ax,marginArrowStart(1),marginArrowStart(2), ...
     ptMargin(2)-marginArrowStart(2),0, ...
     'Color',cSensor,'LineWidth',1.3,'MaxHeadSize',0.18);
 
-xlim(ax,[-3.15,3.10]);
-ylim(ax,[-2.00,3.45]);
+xlim(ax,[-3.20,3.25]);
+ylim(ax,[-2.10,3.50]);
 set(findall(fig,'Type','text'),'FontName','Times New Roman');
 
 figureFile = fullfile(outputDir,'visibility_keepout_geometry.eps');
@@ -1124,11 +1122,11 @@ function format_case_legend(legendHandle,numColumns)
 
 legendHandle.Box = 'on';
 legendHandle.FontName = 'Times New Roman';
-legendHandle.FontSize = 11;
+legendHandle.FontSize = 12;
 legendHandle.FontWeight = 'bold';
 legendHandle.ItemTokenSize = [16,9];
 legendHandle.NumColumns = numColumns;
-place_legend_above(legendHandle,numColumns,11);
+place_legend_above(legendHandle,numColumns,12);
 end
 
 
@@ -1148,6 +1146,8 @@ end
 
 
 function format_publication_axes(ax,fontSize)
+
+fontSize = max(fontSize,12);
 
 set(ax, ...
     'FontName','Times New Roman', ...
@@ -1170,6 +1170,8 @@ end
 
 function place_legend_above(legendHandle,numColumns,fontSize)
 
+fontSize = max(fontSize,12);
+
 legendHandle.Location = 'northoutside';
 legendHandle.Orientation = 'horizontal';
 legendHandle.NumColumns = numColumns;
@@ -1187,8 +1189,50 @@ legendHandle.Position = position;
 end
 
 
+function draw_text_callout(ax,labelPosition,targetPosition, ...
+    labelText,labelColor,fontSize)
+
+fontSize = max(fontSize,12);
+direction = targetPosition-labelPosition;
+distance = norm(direction);
+
+if distance > 0
+    arrowStart = labelPosition + 0.46*direction/distance;
+else
+    arrowStart = labelPosition;
+end
+
+quiver(ax,arrowStart(1),arrowStart(2), ...
+    targetPosition(1)-arrowStart(1), ...
+    targetPosition(2)-arrowStart(2),0, ...
+    'Color',labelColor,'LineWidth',1.3,'MaxHeadSize',0.18, ...
+    'HandleVisibility','off');
+
+text(ax,labelPosition(1),labelPosition(2),labelText, ...
+    'Color',labelColor,'FontWeight','bold','FontSize',fontSize, ...
+    'HorizontalAlignment','center','VerticalAlignment','middle', ...
+    'BackgroundColor','w','Margin',0.8);
+end
+
+
+function enforce_minimum_font_size(fig,minFontSize)
+
+fontObjects = findall(fig,'-property','FontSize');
+for k = 1:numel(fontObjects)
+    try
+        if fontObjects(k).FontSize < minFontSize
+            fontObjects(k).FontSize = minFontSize;
+        end
+    catch
+        % Some graphics proxy objects expose FontSize as read-only.
+    end
+end
+end
+
+
 function export_publication_eps(fig,fileName)
 
+enforce_minimum_font_size(fig,12);
 drawnow;
 set(fig,'Renderer','painters','PaperPositionMode','manual');
 print(fig,char(fileName),'-depsc2','-painters','-r600');
@@ -1197,6 +1241,8 @@ end
 
 
 function inspect_before_export(fig,inspectFigure,description)
+
+enforce_minimum_font_size(fig,12);
 
 if inspectFigure
     figure(fig);
