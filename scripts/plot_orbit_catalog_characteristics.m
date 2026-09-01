@@ -1,6 +1,8 @@
-function outputs = plot_orbit_catalog_characteristics()
+function outputs = plot_orbit_catalog_characteristics(inspectFigure)
 % Plot quantitative characteristics of all 450 selected catalog orbits.
 % The accompanying CSV provides the values needed for the family table.
+
+if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
@@ -145,6 +147,7 @@ plot_metric(nexttile(layout),familyCategory,outOfPlaneAmplitude_km, ...
     'Out-of-plane amplitude, A_z (km)',[0.20,0.65,0.70]);
 
 figureFile = fullfile(outputDir,'orbit_catalog_characteristics.eps');
+inspect_before_export(fig,inspectFigure,'orbit catalog characteristics');
 exportgraphics(fig,figureFile,'ContentType','image','Resolution',600);
 close(fig);
 
@@ -156,6 +159,18 @@ outputs.numOrbits = nOrbit;
 outputs.numFamilies = nFamily;
 
 fprintf('Saved orbit-catalog figure and tables to:\n  %s\n',outputDir);
+end
+
+
+function inspect_before_export(fig,inspectFigure,description)
+
+if inspectFigure
+    figure(fig);
+    drawnow;
+    input(sprintf( ...
+        'Inspect the %s figure, then press Enter to export: ', ...
+        description),'s');
+end
 end
 
 

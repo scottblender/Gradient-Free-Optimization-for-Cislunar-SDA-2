@@ -1,5 +1,7 @@
-function outputs = plot_tracking_cases()
+function outputs = plot_tracking_cases(inspectFigure)
 % Plot the three target scenarios used for the revised optimization study.
+
+if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
@@ -51,6 +53,32 @@ departureIndex = find(catalogIDs==departureID,1);
 arrivalIndex = find(catalogIDs==arrivalID,1);
 assert(~isempty(departureIndex) && ~isempty(arrivalIndex), ...
     'A transfer-reference orbit is absent from the selected catalog.');
+
+departureStateError = norm( ...
+    rawStates{departureIndex}(1,:)-transferRef.dep.state0);
+arrivalStateError = norm( ...
+    rawStates{arrivalIndex}(1,:)-transferRef.arr.state0);
+departurePeriodError_TU = abs( ...
+    periodAll(departureIndex)-transferRef.dep.period);
+arrivalPeriodError_TU = abs( ...
+    periodAll(arrivalIndex)-transferRef.arr.period);
+
+assert(departureStateError<=1e-12 && arrivalStateError<=1e-12, ...
+    'A low-thrust endpoint orbit changed during catalog rebuilding.');
+assert(departurePeriodError_TU<=1e-12 && arrivalPeriodError_TU<=1e-12, ...
+    'A low-thrust endpoint period changed during catalog rebuilding.');
+
+endpoint = ["Departure";"Arrival"];
+resolvedCatalogRow = [departureIndex;arrivalIndex];
+resolvedOrbitID = [departureID;arrivalID];
+slot = [double(transferRef.dep.slot);double(transferRef.arr.slot)];
+sourceInitialStateError = [departureStateError;arrivalStateError];
+periodError_TU = [departurePeriodError_TU;arrivalPeriodError_TU];
+endpointAudit = table(endpoint,resolvedCatalogRow,resolvedOrbitID,slot, ...
+    sourceInitialStateError,periodError_TU);
+
+fprintf('\n--- Low-thrust endpoint reference audit ---\n');
+disp(endpointAudit);
 
 missionCfg = struct();
 missionCfg.type = "LOW_THRUST_TRANSFER";
@@ -169,6 +197,7 @@ set(allAxes,'FontName','Times New Roman','FontSize',10.5, ...
     'FontWeight','bold','LineWidth',1.1,'TickLabelInterpreter','tex');
 
 figureFile = fullfile(outputDir,'tracking_cases.eps');
+inspect_before_export(fig,inspectFigure,'tracking cases');
 exportgraphics(fig,figureFile,'ContentType','image','Resolution',600);
 close(fig);
 
@@ -198,6 +227,10 @@ caseMetadata = table( ...
 
 metadataFile = fullfile(outputDir,'tracking_case_metadata.csv');
 writetable(caseMetadata,metadataFile);
+
+endpointAuditFile = fullfile( ...
+    outputDir,'low_thrust_endpoint_reference_audit.csv');
+writetable(endpointAudit,endpointAuditFile);
 
 % State conditions are the reproducible scenario definition. Orbit IDs and
 % slots above are retained only as catalog provenance for the transfer.
@@ -300,6 +333,8 @@ save(reproductionFile,'reproduction','-v7');
 outputs = struct();
 outputs.figure = string(figureFile);
 outputs.metadata = string(metadataFile);
+outputs.endpointAuditFile = string(endpointAuditFile);
+outputs.endpointAudit = endpointAudit;
 outputs.normalizedStateConditionsFile = string(normalizedStateFile);
 outputs.dimensionalStateConditionsFile = string(dimensionalStateFile);
 outputs.latexStateRows = string(latexRowsFile);
@@ -317,6 +352,18 @@ fprintf('Transfer reference resolved to catalog rows %d and %d.\n', ...
     departureIndex,arrivalIndex);
 fprintf('\nNormalized initial, maneuver, and final conditions:\n');
 disp(stateConditionsND);
+end
+
+
+function inspect_before_export(fig,inspectFigure,description)
+
+if inspectFigure
+    figure(fig);
+    drawnow;
+    input(sprintf( ...
+        'Inspect the %s figure, then press Enter to export: ', ...
+        description),'s');
+end
 end
 
 

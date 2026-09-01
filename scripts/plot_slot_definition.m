@@ -1,5 +1,7 @@
-function outputs = plot_slot_definition()
+function outputs = plot_slot_definition(inspectFigure)
 % Illustrate the exact equal-time, endpoint-excluded 50-slot definition.
+
+if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
@@ -122,6 +124,7 @@ set(allAxes,'FontName','Times New Roman','FontSize',11, ...
     'FontWeight','bold','LineWidth',1.2,'TickLabelInterpreter','tex');
 
 figureFile = fullfile(outputDir,'equal_time_slot_definition.eps');
+inspect_before_export(fig,inspectFigure,'equal-time slot-definition');
 exportgraphics(fig,figureFile,'ContentType','image','Resolution',600);
 close(fig);
 
@@ -146,4 +149,16 @@ outputs.summary = string(summaryFile);
 outputs.slotSummary = slotSummary;
 
 fprintf('Saved equal-time slot-definition figure to:\n  %s\n',figureFile);
+end
+
+
+function inspect_before_export(fig,inspectFigure,description)
+
+if inspectFigure
+    figure(fig);
+    drawnow;
+    input(sprintf( ...
+        'Inspect the %s figure, then press Enter to export: ', ...
+        description),'s');
+end
 end
