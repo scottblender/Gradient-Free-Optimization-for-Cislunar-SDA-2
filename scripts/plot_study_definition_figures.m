@@ -251,7 +251,7 @@ for groupIndex = 1:numel(familyGroups)
             familyHandles;moonHandle;l1PointHandle;l2PointHandle];
         legendLabels = [ ...
             familyLabels;"Moon";"L1 point";"L2 point"];
-        zlabel(ax,'Z (LU)');
+        zlabel(ax,'z (LU)');
         axis(ax,'tight');
         axis(ax,'vis3d');
     else
@@ -298,8 +298,8 @@ for groupIndex = 1:numel(familyGroups)
         ylim(ax,[min(yData)-yPad,max(yData)+yPad]);
     end
 
-    xlabel(ax,'X (LU)');
-    ylabel(ax,'Y (LU)');
+    xlabel(ax,'x (LU)');
+    ylabel(ax,'y (LU)');
     format_publication_axes(ax,13);
 
     legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
@@ -920,7 +920,7 @@ figureFiles = strings(3,1);
 cGateway = [0.85,0.27,0.22];
 cTransfer = [0.27,0.31,0.86];
 cImpulse = [0.55,0.30,0.72];
-cNominal = [0.35,0.35,0.35];
+cNominal = cGateway;
 cReference = [0.48,0.48,0.48];
 cPoint = [0.80,0.80,0.80];
 
@@ -928,11 +928,15 @@ figGateway = publication_figure(7.2,6.5);
 ax = axes(figGateway); prepare_axes(ax);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3),'-','Color',cGateway,'LineWidth',2.8);
 hMoon = draw_moon(ax,mu,LU);
-plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
-plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
 format_case_axes(ax);
-legendHandle = legend(ax,[hGateway,hMoon],{'Nominal target','Moon'},'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,2); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
+legendHandle = legend(ax,[hGateway,hMoon,hL1,hL2], ...
+    {'Nominal Gateway','Moon','L1','L2'}, ...
+    'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,4); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
 figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
 inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
 export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
@@ -960,11 +964,15 @@ hNominal = plot3(ax,sNominalAfterPerilune(:,1),sNominalAfterPerilune(:,2),sNomin
 hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3),'-','Color',cImpulse,'LineWidth',3.0);
 hBurn = plot3(ax,sImpulse(1,1),sImpulse(1,2),sImpulse(1,3),'p','MarkerSize',12,'MarkerFaceColor',[0.95,0.65,0.15],'MarkerEdgeColor','k','LineWidth',1.2);
 hMoon = draw_moon(ax,mu,LU);
-plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
-plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
+    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
 format_case_axes(ax);
-legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon],{'Nominal','Post-impulse','10 m/s burn','Moon'},'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,2); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
+legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon,hL1,hL2], ...
+    {'Nominal Gateway','Post-impulse','10 m/s burn','Moon','L1','L2'}, ...
+    'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,3); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
 figureFiles(3) = fullfile(outputDir,'case_gateway_perilune_impulse.eps');
 inspect_before_export(figImpulse,inspectFigure,'Gateway impulse case');
 export_publication_eps(figImpulse,figureFiles(3)); close(figImpulse);
