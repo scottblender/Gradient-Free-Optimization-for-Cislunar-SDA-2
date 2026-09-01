@@ -12,6 +12,7 @@ function paths = setup_project()
     paths.runs = fullfile(paths.results, 'runs');
     paths.orbitCache = fullfile(paths.data, 'cache', 'orbits');
     paths.transferCache = fullfile(paths.data, 'cache', 'transfers');
+    paths.targetCaseDatabase = fullfile(paths.data, 'TargetCaseDatabase.mat');
 
     addpath(paths.root);
     addpath(genpath(paths.src));

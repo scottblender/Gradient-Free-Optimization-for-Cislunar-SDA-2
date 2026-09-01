@@ -15,12 +15,16 @@ function test_project_structure()
     assert(strcmp(pwd, externalFolder), 'setup_project changed the current folder.');
     assert(isfolder(paths.data) && isfolder(paths.results), ...
         'Missing data/ or results/ directory.');
+    assert(strcmp(paths.targetCaseDatabase, ...
+        fullfile(paths.data,'TargetCaseDatabase.mat')), ...
+        'Incorrect target-case database path.');
 
     expected = {
         'run_opt', 'run_opt.m'
         'launch_optimization_gui', 'launch_optimization_gui.m'
         'cr3bp_dynamics', 'src/orbitDynamics/cr3bp_dynamics.m'
         'cr3bp_jacobian', 'src/orbitDynamics/cr3bp_jacobian.m'
+        'jacobi_constant', 'src/orbitDynamics/jacobi_constant.m'
         'sun_pos_bc4bp', 'src/orbitDynamics/sun_pos_bc4bp.m'
         'cr3bp_ekf', 'src/estimation/cr3bp_ekf.m'
         'measurement_model', 'src/measurements/measurement_model.m'
@@ -37,7 +41,9 @@ function test_project_structure()
         'build_truth_gateway', 'src/targetGeneration/build_truth_gateway.m'
         'build_truth_periodic_orbit', 'src/targetGeneration/build_truth_periodic_orbit.m'
         'LowThrustTransferSolver', 'src/targetGeneration/LowThrustTransferSolver.m'
-        'load_and_filter_data', 'scripts/load_and_filter_data.m'
+        'load_target_case_database', 'src/targetGeneration/load_target_case_database.m'
+        'build_observer_orbit_catalog', 'scripts/build_observer_orbit_catalog.m'
+        'build_target_case_database', 'scripts/build_target_case_database.m'
         'plot_jpl_orbit_catalog', 'scripts/plot_jpl_orbit_catalog.m'
         'process_baseline_results', 'scripts/process_baseline_results.m'
         'process_comparison_results', 'scripts/process_comparison_results.m'
