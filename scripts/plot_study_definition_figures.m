@@ -184,10 +184,9 @@ for groupIndex = 1:numel(familyGroups)
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
-    grid(ax,'on');
+    grid(ax,'off');
     axis(ax,'equal');
-    set(ax,'TickLabelInterpreter','tex','Layer','top', ...
-        'GridAlpha',0.16,'MinorGridAlpha',0.08);
+    set(ax,'TickLabelInterpreter','tex','Layer','top');
 
     group = familyGroups{groupIndex};
 
@@ -730,7 +729,7 @@ inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
 export_publication_eps(figGateway,figureFiles(1));
 close(figGateway);
 
-% Case 2: low-thrust transfer with both endpoint orbits and Gateway context.
+% Case 2: low-thrust transfer with both endpoint orbits.
 figTransfer = publication_figure(7.2,6.5);
 ax = axes(figTransfer);
 prepare_axes(ax);
@@ -738,8 +737,6 @@ hDeparture = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
     departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
 hArrival = plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2), ...
     arrivalOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
-hGatewayContext = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
-    '-','Color',cGateway,'LineWidth',2.2);
 hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3), ...
     '-','Color',cTransfer,'LineWidth',3.0);
 hStart = plot3(ax,sTransfer(1,1),sTransfer(1,2),sTransfer(1,3), ...
@@ -755,8 +752,8 @@ hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
     'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
 format_case_axes(ax);
 legendHandle = legend(ax, ...
-    [hGatewayContext,hTransfer,hStart,hEnd,hMoon,hL1,hL2], ...
-    {'Coasting','Transfer','Start','End','Moon','L1','L2'}, ...
+    [hDeparture,hTransfer,hStart,hEnd,hMoon,hL1,hL2], ...
+    {'Endpoint orbits','Transfer','Start','End','Moon','L1','L2'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,4);
 axis(ax,'tight');
