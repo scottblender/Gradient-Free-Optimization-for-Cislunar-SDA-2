@@ -42,12 +42,14 @@ function test_project_structure()
         'build_truth_periodic_orbit', 'src/targetGeneration/build_truth_periodic_orbit.m'
         'LowThrustTransferSolver', 'src/targetGeneration/LowThrustTransferSolver.m'
         'load_target_case_database', 'src/targetGeneration/load_target_case_database.m'
+        'target_case_config', 'src/targetGeneration/target_case_config.m'
         'build_observer_orbit_catalog', 'scripts/build_observer_orbit_catalog.m'
         'build_target_case_database', 'scripts/build_target_case_database.m'
         'plot_jpl_orbit_catalog', 'scripts/plot_jpl_orbit_catalog.m'
         'process_baseline_results', 'scripts/process_baseline_results.m'
         'process_comparison_results', 'scripts/process_comparison_results.m'
         'print_observer_ics_from_experiment_summary', 'scripts/print_observer_ics_from_experiment_summary.m'
+        'test_observer_catalog', 'tests/test_observer_catalog.m'
         'test_visibility_trajectories', 'tests/test_visibility_trajectories.m'
     };
 

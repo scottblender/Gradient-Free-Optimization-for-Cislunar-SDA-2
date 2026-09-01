@@ -9,9 +9,11 @@ if nargin < 1 || strlength(string(databasePath)) == 0
 end
 
 databasePath = char(databasePath);
+if ~isfile(databasePath)
+    build_target_case_database(databasePath);
+end
 assert(isfile(databasePath), ...
-    ['Target-case database was not found: %s\n' ...
-     'Run scripts/build_target_case_database.m first.'],databasePath);
+    'Target-case database was not created: %s',databasePath);
 
 S = load(databasePath,'caseDatabase');
 assert(isfield(S,'caseDatabase') && isstruct(S.caseDatabase), ...

@@ -73,7 +73,7 @@ Run `setup_project` first when calling functions or scripts directly. The main
 runner, GUI, and moved scripts also initialize their own project paths, so the
 scripts can be opened and run from their new locations.
 
-`load_and_filter_data` is only needed to rebuild the catalog from raw JPL CSV
+`build_observer_orbit_catalog` is only needed to rebuild the observer catalog from raw JPL CSV
 files. It reads `data/JPL_Data/`, with support for an existing root-level
 `JPL_Data/`, and writes the catalog into `data/`. Its filtering and orbit
 ordering are unchanged by this reorganization.
@@ -92,7 +92,8 @@ optimizer, seed, and stopping settings have not changed.
 
 | Content | Default location |
 | --- | --- |
-| Orbit catalog | `data/JPL_CR3BP_OrbitCatalog.mat` |
+| Observer orbit catalog | `data/JPL_CR3BP_OrbitCatalog.mat` |
+| Fixed target cases | `data/TargetCaseDatabase.mat` |
 | Raw JPL CSV files | `data/JPL_Data/` |
 | Interpolated orbit cache | `data/cache/orbits/` |
 | Transfer truth cache | `data/cache/transfers/` |
@@ -121,3 +122,5 @@ This commit reorganizes paths only. Measurement-noise handling, evaluation
 budgets, independent optimizer runs, and convergence logging are separate
 follow-up changes. Historical results should still be interpreted using the
 mission and model settings with which they were generated.
+
+Fixed Gateway, low-thrust, and Gateway-impulse target definitions are stored in `data/TargetCaseDatabase.mat`. The loader creates this compact database from `scripts/build_target_case_database.m` when it is missing. Fixed target cases never resolve observer catalog rows or observer slots.

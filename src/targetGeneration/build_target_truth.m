@@ -19,8 +19,7 @@ switch missionType
     case "LOW_THRUST_TRANSFER"
 
         solver = LowThrustTransferSolver( ...
-            missionCfg.transfer, ...
-            T1, orbit_database, times, states, mu, ode_opts);
+            missionCfg.transfer, mu, ode_opts);
 
         [t_target, s_target, info] = solver.solve();
     

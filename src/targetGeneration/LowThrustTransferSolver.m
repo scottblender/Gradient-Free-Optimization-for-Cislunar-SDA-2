@@ -1,21 +1,13 @@
 classdef LowThrustTransferSolver
     properties
         cfg
-        T1
-        orbit_database
-        times
-        states
         mu
         ode_opts
     end
 
     methods
-        function obj = LowThrustTransferSolver(cfg, T1, orbit_database, times, states, mu, ode_opts)
+        function obj = LowThrustTransferSolver(cfg, mu, ode_opts)
             obj.cfg = cfg;
-            obj.T1 = T1;
-            obj.orbit_database = orbit_database;
-            obj.times = times;
-            obj.states = states;
             obj.mu = mu;
             obj.ode_opts = ode_opts;
         end
@@ -55,10 +47,6 @@ classdef LowThrustTransferSolver
             info.type              = "LOW_THRUST_TRANSFER";
             info.builder           = "LowThrustTransferSolver";
             info.method            = "INDIRECT_SINGLE_SHOOTING_FIXED_ENDPOINT_FSOLVE";
-            info.depOrbitIndex     = tr.depOrbitIndex;
-            info.depSlot           = tr.depSlot;
-            info.arrOrbitIndex     = tr.arrOrbitIndex;
-            info.arrSlot           = obj.getArrivalSlot();
             info.dt                = tr.dt;
             info.Tmax              = lt.Tmax;
             info.ve                = lt.ve;
@@ -75,12 +63,9 @@ classdef LowThrustTransferSolver
             info.x_dep             = x_dep;
             info.xf                = finalData.xf;
             info.x_arr             = finalData.x_arr;
-            if isfield(tr,'fixedDepartureState') && ...
-                    ~isempty(tr.fixedDepartureState)
-                info.departureStateSource = "FIXED_STATE";
-            else
-                info.departureStateSource = "ORBIT_DATABASE_SLOT";
-            end
+            info.endpointDefinition = "FIXED_STATES";
+            info.departureStateSource = "FIXED_STATE";
+            info.arrivalStateSource = "FIXED_STATE";
             info.lambda_f          = finalData.lambda_f;
             info.mass_final        = finalData.mass_final;
             info.controls          = finalData.controls;
@@ -105,55 +90,28 @@ classdef LowThrustTransferSolver
 
         function x_dep = getDepartureState(obj)
             tr = obj.getTransferCfg();
+            assert(isfield(tr,'fixedDepartureState') && ...
+                ~isempty(tr.fixedDepartureState), ...
+                ['Low-thrust transfer requires fixedDepartureState. ' ...
+                 'Observer-catalog rows and slots are not target inputs.']);
 
-            if isfield(tr,'fixedDepartureState') && ...
-                    ~isempty(tr.fixedDepartureState)
-                x_dep = tr.fixedDepartureState(:);
-                if numel(x_dep) ~= 6
-                    error( ...
-                        'transfer.fixedDepartureState must have 6 elements.');
-                end
-                return;
-            end
-
-            iDep = tr.depOrbitIndex;
-            jDep = tr.depSlot;
-            x_dep = obj.orbit_database{iDep}(jDep,:).';
-        end
-
-        function jArr = getArrivalSlot(obj)
-            tr = obj.getTransferCfg();
-
-            if isfield(tr, 'arrSlot') && ~isempty(tr.arrSlot)
-                jArr = tr.arrSlot;
-            else
-                jArr = 1;
+            x_dep = tr.fixedDepartureState(:);
+            if numel(x_dep) ~= 6
+                error('transfer.fixedDepartureState must have 6 elements.');
             end
         end
 
         function x_arr = getArrivalTargetState(obj)
             tr = obj.getTransferCfg();
+            assert(isfield(tr,'fixedTargetState') && ...
+                ~isempty(tr.fixedTargetState), ...
+                ['Low-thrust transfer requires fixedTargetState. ' ...
+                 'Observer-catalog rows and slots are not target inputs.']);
 
-            if isfield(tr, 'fixedTargetState') && ~isempty(tr.fixedTargetState)
-                x_arr = tr.fixedTargetState(:);
-                if numel(x_arr) ~= 6
-                    error('transfer.fixedTargetState must have 6 elements.');
-                end
-                return;
+            x_arr = tr.fixedTargetState(:);
+            if numel(x_arr) ~= 6
+                error('transfer.fixedTargetState must have 6 elements.');
             end
-
-            if isfield(tr, 'lowthrust') && isfield(tr.lowthrust, 'fixed_target_state') ...
-                    && ~isempty(tr.lowthrust.fixed_target_state)
-                x_arr = tr.lowthrust.fixed_target_state(:);
-                if numel(x_arr) ~= 6
-                    error('lowthrust.fixed_target_state must have 6 elements.');
-                end
-                return;
-            end
-
-            iArr = tr.arrOrbitIndex;
-            jArr = obj.getArrivalSlot();
-            x_arr = obj.orbit_database{iArr}(jArr,:).';
         end
 
         function sigma = getSigma(obj)

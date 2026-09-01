@@ -10,16 +10,8 @@ LU = 384400;
 TU = 375695;
 VU = LU / TU;
 
-cfg = struct();
-cfg.s0 = [1.02202108343387, 0, -0.182096487798513, ...
-          0, -0.103255420206012, 0]';
-cfg.period = 1.51110546287394;
-cfg.dt = 0.001;
-cfg.duration_TU = 1.5;
-cfg.deltaV_m_s = 10;
-cfg.deltaV_LU_TU = (cfg.deltaV_m_s / 1000) / VU;
-cfg.direction = "PROGRADE";
-cfg.periluneSearchSamples = 4001;
+missionCfg = target_case_config("GATEWAY_IMPULSE");
+cfg = missionCfg.impulse;
 
 odeOptions = odeset( ...
     'RelTol',1e-13, ...

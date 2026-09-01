@@ -251,11 +251,8 @@ missionCfg.optimization.numObservers = round(missionCfg.optimization.numObserver
 switch missionCfg.type
 
     case "LUNAR_GATEWAY"
-        missionCfg.gateway.s0 = [1.02202108343387, 0, -0.182096487798513, ...
-                                 0, -0.103255420206012, 0]';
-        missionCfg.gateway.period   = 1.51110546287394;
-        missionCfg.gateway.dt       = 0.001;
-        missionCfg.gateway.Nperiods = 1;
+        fixedCase = target_case_config("LUNAR_GATEWAY");
+        missionCfg.gateway = fixedCase.gateway;
 
     case "PERIODIC_ORBIT"
         missionCfg.periodic.orbitIndex = 1;
@@ -263,14 +260,8 @@ switch missionCfg.type
         missionCfg.periodic.Nperiods   = 1;
 
     case "GATEWAY_IMPULSE"
-        missionCfg.impulse.s0 = [1.02202108343387, 0, -0.182096487798513, ...
-                                 0, -0.103255420206012, 0]';
-        missionCfg.impulse.period = 1.51110546287394;
-        missionCfg.impulse.dt = 0.001;
-        missionCfg.impulse.duration_TU = 1.5;
-        missionCfg.impulse.deltaV_m_s = 10;
-        missionCfg.impulse.direction = "PROGRADE";
-        missionCfg.impulse.periluneSearchSamples = 4001;
+        fixedCase = target_case_config("GATEWAY_IMPULSE");
+        missionCfg.impulse = fixedCase.impulse;
 
         v = getenv("IMPULSE_DURATION_TU");
         if ~isempty(v)
@@ -296,127 +287,8 @@ switch missionCfg.type
             (missionCfg.impulse.deltaV_m_s / 1000) / VU;
 
     case "LOW_THRUST_TRANSFER"
-        transferRef = low_thrust_case_config(T1);
-
-        assert(ismember("orbitID", string(T1.Properties.VariableNames)), ...
-            "The orbit catalog does not contain orbitID.");
-        assert(isfield(transferRef.dep, "state0") && ...
-            isfield(transferRef.arr, "state0"), ...
-            "The transfer reference must contain endpoint initial states.");
-
-        [missionCfg.transfer.depOrbitIndex, depStateError] = ...
-            find_transfer_state_match(T1, transferRef.dep.state0);
-        [missionCfg.transfer.arrOrbitIndex, arrStateError] = ...
-            find_transfer_state_match(T1, transferRef.arr.state0);
-
-        stateMatchTolerance = 1e-12;
-        assert(depStateError <= stateMatchTolerance, ...
-            "Departure IC was not found in the current catalog. " + ...
-            "Minimum state error = %.6e.", depStateError);
-        assert(arrStateError <= stateMatchTolerance, ...
-            "Arrival IC was not found in the current catalog. " + ...
-            "Minimum state error = %.6e.", arrStateError);
-
-        catalogIds = string(T1.orbitID);
-        missionCfg.transfer.depOrbitID = ...
-            catalogIds(missionCfg.transfer.depOrbitIndex);
-        missionCfg.transfer.arrOrbitID = ...
-            catalogIds(missionCfg.transfer.arrOrbitIndex);
-        missionCfg.transfer.depSlot = transferRef.dep.slot;
-        missionCfg.transfer.arrSlot = transferRef.arr.slot;
-
-        assert(strcmpi(missionCfg.transfer.depOrbitID, ...
-            string(transferRef.dep.orbitID)), ...
-            "Low-thrust departure does not match the saved reference.");
-        assert(strcmpi(missionCfg.transfer.arrOrbitID, ...
-            string(transferRef.arr.orbitID)), ...
-            "Low-thrust arrival does not match the saved reference.");
-        assert(isfield(transferRef.dep,"legacyIndex") && ...
-            transferRef.dep.legacyIndex == 52 && ...
-            missionCfg.transfer.depSlot == 10, ...
-            "Low-thrust departure must reproduce old row 52, slot 10.");
-        assert(isfield(transferRef,"slotDefinition") && ...
-            string(transferRef.slotDefinition) == ...
-            "equal_time_no_endpoint_v1", ...
-            "Transfer reference uses an unexpected slot definition.");
-        assert(isfield(transferRef.dep,"slotState") && ...
-            isfield(transferRef.arr,"slotState"), ...
-            "Transfer reference does not contain endpoint slot states.");
-
-        depSlotState = orbit_database{ ...
-            missionCfg.transfer.depOrbitIndex}( ...
-            missionCfg.transfer.depSlot,:);
-        arrSlotState = orbit_database{ ...
-            missionCfg.transfer.arrOrbitIndex}( ...
-            missionCfg.transfer.arrSlot,:);
-        depSlotStateError = norm( ...
-            depSlotState-reshape(transferRef.dep.slotState,1,[]));
-        arrSlotStateError = norm( ...
-            arrSlotState-reshape(transferRef.arr.slotState,1,[]));
-
-        assert(depSlotStateError <= 1e-10, ...
-            "Corrected departure observer-slot reference is inconsistent. " + ...
-            "State error = %.6e.",depSlotStateError);
-        assert(arrSlotStateError <= 1e-10, ...
-            "Corrected arrival observer-slot reference is inconsistent. " + ...
-            "State error = %.6e.",arrSlotStateError);
-        assert(isfield(transferRef,"targetStateDefinition") && ...
-            string(transferRef.targetStateDefinition) == ...
-            "explicit_fixed_states_v1", ...
-            "Low-thrust target must use explicit fixed endpoint states.");
-        assert(isfield(transferRef.dep,"transferState") && ...
-            isfield(transferRef.arr,"transferState"), ...
-            "Transfer reference does not contain fixed endpoint states.");
-
-        missionCfg.transfer.fixedDepartureState = ...
-            reshape(transferRef.dep.transferState,1,[]);
-        missionCfg.transfer.fixedTargetState = ...
-            reshape(transferRef.arr.transferState,1,[]);
-        missionCfg.transfer.depSlotStateError = depSlotStateError;
-        missionCfg.transfer.arrSlotStateError = arrSlotStateError;
-
-        safe_printf([ ...
-            'Low-thrust catalog provenance and fixed endpoints loaded:\n' ...
-            '  Departure: row %d, slot %d, %s ' ...
-            '(orbit %.3e, slot %.3e)\n' ...
-            '  Arrival:   row %d, slot %d, %s ' ...
-            '(orbit %.3e, slot %.3e)\n'], ...
-            missionCfg.transfer.depOrbitIndex, ...
-            missionCfg.transfer.depSlot, ...
-            char(missionCfg.transfer.depOrbitID), ...
-            depStateError,depSlotStateError, ...
-            missionCfg.transfer.arrOrbitIndex, ...
-            missionCfg.transfer.arrSlot, ...
-            char(missionCfg.transfer.arrOrbitID), ...
-            arrStateError,arrSlotStateError);
-        missionCfg.transfer.dt            = 0.001;
-        missionCfg.transfer.solverMode    = "LOW_THRUST_CLASS";
-
-        missionCfg.transfer.lowthrust.sigma            = 1.0;
-        missionCfg.transfer.lowthrust.m0               = 1.0;
-        missionCfg.transfer.lowthrust.Tmax             = 0.3672;
-        missionCfg.transfer.lowthrust.ve               = 39.8;
-        missionCfg.transfer.lowthrust.tf_guess         = 2.0;
-        missionCfg.transfer.lowthrust.tf_lb            = 0.1;
-        missionCfg.transfer.lowthrust.tf_ub            = 12.0;
-
-        missionCfg.transfer.lowthrust.lambda_guess     = [
-           -0.25
-            0.75
-            0.35
-           -0.20
-            0.40
-            0.10
-            0.05
-        ];
-
-        missionCfg.transfer.lowthrust.lambda_lb        = -20 * ones(7,1);
-        missionCfg.transfer.lowthrust.lambda_ub        =  20 * ones(7,1);
-
-        missionCfg.transfer.lowthrust.w_pos_indirect   = 1;
-        missionCfg.transfer.lowthrust.w_vel_indirect   = 1;
-        missionCfg.transfer.lowthrust.w_norm_indirect  = 1;
-        missionCfg.transfer.lowthrust.w_mass_indirect  = 1;
+        fixedCase = target_case_config("LOW_THRUST_TRANSFER");
+        missionCfg.transfer = fixedCase.transfer;
 
     otherwise
         error("Unknown MISSION_TYPE: %s", missionCfg.type);
@@ -632,76 +504,63 @@ UB_common = repmat([num_orbits, slots_per_orbit], 1, num_obs_cfg);
 % ---------------- Build/load target truth ----------------
 useTransferCache = true;
 
-if contains(string(missionCfg.type), "TRANSFER") && useTransferCache
-    cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit);
-    cacheKey = cacheKey + "_" + study_hash({catalogHash,missionCfg.transfer,mu,slots_per_orbit});
+if missionCfg.type == "LOW_THRUST_TRANSFER" && useTransferCache
+    cacheKey = make_transfer_cache_key(missionCfg);
+    cacheKey = cacheKey + "_" + study_hash({missionCfg.transfer,mu});
     cacheFile = fullfile(TransferCacheDir, cacheKey + ".mat");
 
     loadedFromCache = false;
 
     if isfile(cacheFile)
         try
-            safe_printf('Loading cached transfer truth from:\n  %s\n', cacheFile);
-
+            safe_printf('Loading cached transfer truth from:
+  %s
+', cacheFile);
             C = load(cacheFile, 't_target', 's_target', 'truthInfo', 'cacheMeta');
             t_target  = C.t_target;
             s_target  = C.s_target;
             truthInfo = C.truthInfo;
-
             if isfield(C, 'cacheMeta')
-                safe_printf('Cached transfer key: %s\n', string(C.cacheMeta.cacheKey));
+                safe_printf('Cached transfer key: %s
+', string(C.cacheMeta.cacheKey));
             end
-
             loadedFromCache = true;
-
         catch ME
-            safe_printf(2, 'WARNING: failed to load transfer cache, rebuilding: %s\n', ME.message);
-
+            safe_printf(2, 'WARNING: failed to load transfer cache, rebuilding: %s
+', ME.message);
             try
                 delete(cacheFile);
-                safe_printf('Deleted corrupt transfer cache:\n  %s\n', cacheFile);
-            catch MEdel
-                safe_printf(2, 'WARNING: failed to delete corrupt transfer cache: %s\n', MEdel.message);
+            catch
             end
         end
     end
 
     if ~loadedFromCache
-        safe_printf('No valid cached transfer found. Computing transfer truth.\n');
-
+        safe_printf('No valid cached transfer found. Computing transfer truth.
+');
         [t_target, s_target, truthInfo] = build_target_truth( ...
             missionCfg, T1, orbit_database, times, states, mu, ode_opts);
 
         cacheMeta = struct();
-        cacheMeta.cacheKey        = cacheKey;
-        cacheMeta.missionType     = string(missionCfg.type);
-        cacheMeta.created         = string(datetime('now'));
-        cacheMeta.slots_per_orbit = slots_per_orbit;
-        cacheMeta.mu              = mu;
-
+        cacheMeta.cacheKey    = cacheKey;
+        cacheMeta.missionType = string(missionCfg.type);
+        cacheMeta.created     = string(datetime('now'));
+        cacheMeta.mu          = mu;
         tmpFile = fullfile(TransferCacheDir, cacheKey + "_t.mat");
 
         try
-            if isfile(tmpFile)
-                delete(tmpFile);
-            end
-
-            if isfile(cacheFile)
-                delete(cacheFile);
-            end
-
+            if isfile(tmpFile), delete(tmpFile); end
+            if isfile(cacheFile), delete(cacheFile); end
             save(tmpFile, 't_target', 's_target', 'truthInfo', 'cacheMeta', '-v7.3');
             movefile(tmpFile, cacheFile, 'f');
-
-            safe_printf('Saved transfer truth cache to:\n  %s\n', cacheFile);
-
+            safe_printf('Saved transfer truth cache to:
+  %s
+', cacheFile);
         catch ME
-            safe_printf(2, 'WARNING: failed to save transfer cache: %s\n', ME.message);
-
+            safe_printf(2, 'WARNING: failed to save transfer cache: %s
+', ME.message);
             try
-                if isfile(tmpFile)
-                    delete(tmpFile);
-                end
+                if isfile(tmpFile), delete(tmpFile); end
             catch
             end
         end
@@ -1296,58 +1155,18 @@ for k = 1:num_obs
         'Color', cmap(k,:), 'LineWidth', 1.8);
 end
 
-hDepOrb = gobjects(0);
-hArrOrb = gobjects(0);
 hStart  = gobjects(0);
 hEnd    = gobjects(0);
 
-isTransferMission = contains(string(missionCfg.type), "TRANSFER");
+isTransferMission = missionCfg.type == "LOW_THRUST_TRANSFER";
 
 if isTransferMission
-    depIdx = missionCfg.transfer.depOrbitIndex;
-    arrIdx = missionCfg.transfer.arrOrbitIndex;
-
-    s_dep_orb = states{depIdx};
-    s_arr_orb = states{arrIdx};
-
-    depBase = [0.00 0.45 0.74];
-    arrBase = [0.85 0.33 0.10];
-    depLight = 0.45*depBase + 0.55*[1 1 1];
-    arrLight = 0.45*arrBase + 0.55*[1 1 1];
-
-    hDepOrb = plot3(ax, s_dep_orb(:,1), s_dep_orb(:,2), s_dep_orb(:,3), '-', ...
-        'Color', depLight, 'LineWidth', 1.5);
-
-    hArrOrb = plot3(ax, s_arr_orb(:,1), s_arr_orb(:,2), s_arr_orb(:,3), '-', ...
-        'Color', arrLight, 'LineWidth', 1.5);
-
     hStart = plot3(ax, s_truth(1,1), s_truth(1,2), s_truth(1,3), 'o', ...
-        'MarkerSize', 9, 'MarkerFaceColor', depBase, ...
+        'MarkerSize', 9, 'MarkerFaceColor', [0.85 0.27 0.22], ...
         'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
-
     hEnd = plot3(ax, s_truth(end,1), s_truth(end,2), s_truth(end,3), 's', ...
-        'MarkerSize', 9, 'MarkerFaceColor', arrBase, ...
+        'MarkerSize', 9, 'MarkerFaceColor', [0.27 0.31 0.86], ...
         'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
-
-    if isfield(missionCfg.transfer, 'depSlot') && ~isempty(missionCfg.transfer.depSlot)
-        depSlot = missionCfg.transfer.depSlot;
-        depSlot = max(1, min(depSlot, size(orbit_database{depIdx},1)));
-        depState0 = orbit_database{depIdx}(depSlot,:);
-
-        plot3(ax, depState0(1), depState0(2), depState0(3), '^', ...
-            'MarkerSize', 9, 'MarkerFaceColor', depBase, ...
-            'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
-    end
-
-    if isfield(missionCfg.transfer, 'arrSlot') && ~isempty(missionCfg.transfer.arrSlot)
-        arrSlot = missionCfg.transfer.arrSlot;
-        arrSlot = max(1, min(arrSlot, size(orbit_database{arrIdx},1)));
-        arrState0 = orbit_database{arrIdx}(arrSlot,:);
-
-        plot3(ax, arrState0(1), arrState0(2), arrState0(3), 's', ...
-            'MarkerSize', 9, 'MarkerFaceColor', arrBase, ...
-            'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
-    end
 end
 
 R_moon = 1737.1 / LU; 
@@ -1428,8 +1247,8 @@ for k = 1:num_obs
 end
 
 if isTransferMission
-    legHandles = [legHandles; hDepOrb; hArrOrb; hStart; hEnd];
-    legLabels  = [legLabels; {'Departure orbit'; 'Arrival orbit'; 'Transfer start'; 'Transfer end'}];
+    legHandles = [legHandles; hStart; hEnd];
+    legLabels  = [legLabels; {'Transfer start'; 'Transfer end'}];
 end
 
 legHandles = [legHandles; hM; hL1; hL2];
@@ -1608,33 +1427,16 @@ end
 
 % ---------------- Helper functions ----------------
 
-function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
+function cacheKey = make_transfer_cache_key(missionCfg)
     tr = missionCfg.transfer;
-    solverMode = upper(string(tr.solverMode));
+    lt = tr.lowthrust;
+    endpointHash = string(study_hash({tr.fixedDepartureState,tr.fixedTargetState}));
+    shortHash = extractBefore(endpointHash, min(9,strlength(endpointHash)+1));
 
-    depOrb  = get_field_or_default(tr, 'depOrbitIndex', 0);
-    arrOrb  = get_field_or_default(tr, 'arrOrbitIndex', 0);
-    depSlot = get_field_or_default(tr, 'depSlot', 0);
-    arrSlot = get_field_or_default(tr, 'arrSlot', 0);
-    dtVal   = get_field_or_default(tr, 'dt', 0);
-
-    switch solverMode
-        case "LOW_THRUST_CLASS"
-            lt = tr.lowthrust;
-
-            cacheKey = sprintf('lt_d%d_a%d_ds%d_as%d_dt%s_sl%d_tf%s', ...
-                depOrb, ...
-                arrOrb, ...
-                depSlot, ...
-                arrSlot, ...
-                local_num_str(dtVal), ...
-                slots_per_orbit, ...
-                local_num_str(get_field_or_default(lt, 'tf_guess', 0)));
-
-        otherwise
-            cacheKey = sprintf('tr_d%d_a%d_ds%d_as%d_dt%s_sl%d', ...
-                depOrb, arrOrb, depSlot, arrSlot, local_num_str(dtVal), slots_per_orbit);
-    end
+    cacheKey = sprintf('lt_fixed_%s_dt%s_tf%s', ...
+        char(shortHash), ...
+        local_num_str(get_field_or_default(tr, 'dt', 0)), ...
+        local_num_str(get_field_or_default(lt, 'tf_guess', 0)));
 
     cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_');
 end
@@ -1875,30 +1677,6 @@ function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, 
     exportgraphics(f, savePath, 'ContentType','image');
     savefig(f, replace(savePath, '.pdf', '.fig'));
     close(f);
-end
-
-function [index, stateError] = find_transfer_state_match(T, referenceState)
-    assert(ismember("state", string(T.Properties.VariableNames)), ...
-        "The orbit catalog does not contain state.");
-
-    referenceState = reshape(double(referenceState), 1, []);
-    stateVariable = T.state;
-    if iscell(stateVariable)
-        catalogStates = zeros(height(T),numel(referenceState));
-        for orbitIndex = 1:height(T)
-            catalogStates(orbitIndex,:) = ...
-                reshape(double(stateVariable{orbitIndex}(1,:)),1,[]);
-        end
-    else
-        catalogStates = double(stateVariable);
-    end
-
-    assert(size(catalogStates,1) == height(T) && ...
-        size(catalogStates,2) == numel(referenceState), ...
-        "Catalog and reference states have different dimensions.");
-
-    stateErrors = vecnorm(catalogStates - referenceState, 2, 2);
-    [stateError, index] = min(stateErrors);
 end
 
 function [xL1, xL2] = cr3bp_L1L2(mu)

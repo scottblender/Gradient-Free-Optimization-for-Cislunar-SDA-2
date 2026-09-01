@@ -959,67 +959,19 @@ end
 
 function missionCfg = buildMissionCfg(runInfo)
 
-    missionCfg = struct();
+switch lower(string(runInfo.mission))
+    case "lg"
+        missionCfg = target_case_config("LUNAR_GATEWAY");
+        if isfinite(runInfo.periods) && runInfo.periods > 0
+            missionCfg.gateway.Nperiods = round(runInfo.periods);
+        end
+    case "lt"
+        missionCfg = target_case_config("LOW_THRUST_TRANSFER");
+    otherwise
+        error("Cannot determine mission type for run %s.", runInfo.runName);
+end
 
-    switch lower(string(runInfo.mission))
-        case "lg"
-            missionCfg.type = "LUNAR_GATEWAY";
-        case "lt"
-            missionCfg.type = "LOW_THRUST_TRANSFER";
-        otherwise
-            error("Cannot determine mission type for run %s.", runInfo.runName);
-    end
-
-    missionCfg.optimization.numObservers = round(runInfo.numObservers);
-
-    switch missionCfg.type
-
-        case "LUNAR_GATEWAY"
-            missionCfg.gateway.s0 = [1.02202108343387, 0, -0.182096487798513, ...
-                                     0, -0.103255420206012, 0]';
-            missionCfg.gateway.period   = 1.51110546287394;
-            missionCfg.gateway.dt       = 0.001;
-
-            if isfinite(runInfo.periods) && runInfo.periods > 0
-                missionCfg.gateway.Nperiods = round(runInfo.periods);
-            else
-                missionCfg.gateway.Nperiods = 1;
-            end
-
-        case "LOW_THRUST_TRANSFER"
-            missionCfg.transfer.depOrbitIndex = 51;
-            missionCfg.transfer.depSlot       = 10;
-            missionCfg.transfer.arrOrbitIndex = 400;
-            missionCfg.transfer.arrSlot       = 1;
-            missionCfg.transfer.dt            = 0.001;
-            missionCfg.transfer.solverMode    = "LOW_THRUST_CLASS";
-
-            missionCfg.transfer.lowthrust.sigma            = 1.0;
-            missionCfg.transfer.lowthrust.m0               = 1.0;
-            missionCfg.transfer.lowthrust.Tmax             = 0.3672;
-            missionCfg.transfer.lowthrust.ve               = 39.8;
-            missionCfg.transfer.lowthrust.tf_guess         = 2.0;
-            missionCfg.transfer.lowthrust.tf_lb            = 0.1;
-            missionCfg.transfer.lowthrust.tf_ub            = 12.0;
-
-            missionCfg.transfer.lowthrust.lambda_guess     = [
-               -0.25
-                0.75
-                0.35
-               -0.20
-                0.40
-                0.10
-                0.05
-            ];
-
-            missionCfg.transfer.lowthrust.lambda_lb        = -20 * ones(7,1);
-            missionCfg.transfer.lowthrust.lambda_ub        =  20 * ones(7,1);
-
-            missionCfg.transfer.lowthrust.w_pos_indirect   = 1;
-            missionCfg.transfer.lowthrust.w_vel_indirect   = 1;
-            missionCfg.transfer.lowthrust.w_norm_indirect  = 1;
-            missionCfg.transfer.lowthrust.w_mass_indirect  = 1;
-    end
+missionCfg.optimization.numObservers = round(runInfo.numObservers);
 end
 
 function [t_target, s_target, truthInfo] = buildOrLoadTargetTruth(missionCfg, baseCtx, cfg)
@@ -1027,7 +979,7 @@ function [t_target, s_target, truthInfo] = buildOrLoadTargetTruth(missionCfg, ba
     useTransferCache = cfg.useTransferCache && contains(string(missionCfg.type), "TRANSFER");
 
     if useTransferCache
-        cacheKey  = make_transfer_cache_key(missionCfg, baseCtx.slots_per_orbit);
+        cacheKey  = make_transfer_cache_key(missionCfg);
         cacheFile = fullfile(baseCtx.TransferCacheDir, cacheKey + ".mat");
 
         if isfile(cacheFile)
@@ -2350,33 +2302,19 @@ function val = getNumericVarValue(T, candidateNames)
     end
 end
 
-function cacheKey = make_transfer_cache_key(missionCfg, slots_per_orbit)
+function cacheKey = make_transfer_cache_key(missionCfg)
 
-    tr = missionCfg.transfer;
-    solverMode = upper(string(tr.solverMode));
+tr = missionCfg.transfer;
+lt = tr.lowthrust;
+endpointHash = string(study_hash({tr.fixedDepartureState,tr.fixedTargetState}));
+shortHash = extractBefore(endpointHash, min(9,strlength(endpointHash)+1));
 
-    depOrb  = get_field_or_default(tr, 'depOrbitIndex', 0);
-    arrOrb  = get_field_or_default(tr, 'arrOrbitIndex', 0);
-    depSlot = get_field_or_default(tr, 'depSlot', 0);
-    arrSlot = get_field_or_default(tr, 'arrSlot', 0);
-    dtVal   = get_field_or_default(tr, 'dt', 0);
+cacheKey = sprintf('lt_fixed_%s_dt%s_tf%s', ...
+    char(shortHash), ...
+    local_num_str(get_field_or_default(tr, 'dt', 0)), ...
+    local_num_str(get_field_or_default(lt, 'tf_guess', 0)));
 
-    switch solverMode
-        case "LOW_THRUST_CLASS"
-            lt = tr.lowthrust;
-
-            cacheKey = sprintf('lt_d%d_a%d_ds%d_as%d_dt%s_sl%d_tf%s', ...
-                depOrb, arrOrb, depSlot, arrSlot, ...
-                local_num_str(dtVal), slots_per_orbit, ...
-                local_num_str(get_field_or_default(lt, 'tf_guess', 0)));
-
-        otherwise
-            cacheKey = sprintf('tr_d%d_a%d_ds%d_as%d_dt%s_sl%d', ...
-                depOrb, arrOrb, depSlot, arrSlot, ...
-                local_num_str(dtVal), slots_per_orbit);
-    end
-
-    cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_');
+cacheKey = regexprep(cacheKey, '[^A-Za-z0-9_]', '_');
 end
 
 function v = get_field_or_default(s, fieldName, defaultVal)

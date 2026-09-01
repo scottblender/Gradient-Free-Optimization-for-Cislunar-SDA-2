@@ -12,7 +12,7 @@ earth_min = deg2rad(10);    % Test setting only
 
 % Observer selection: each row is [orbit_index, slot_index].
 % Leave empty to test the first orbit from each family at five slots.
-% These are observers, separate from the transfer endpoints below.
+% These are observer candidates; target cases are loaded independently.
 observer_pairs = [];
 
 % ---------------- Project path ----------------
@@ -49,8 +49,6 @@ states  = T1.("state");
 
 num_orbits = height(T1);
 
-assert(num_orbits >= 400, ...
-    'The catalog must contain departure orbit 52 and arrival orbit 400.');
 
 % ---------------- Build orbit database ----------------
 % Same interpolation and corrected slot definition as run_opt.
@@ -114,20 +112,7 @@ fprintf('Selected %d observer orbit/slot pairs.\n', num_obs);
 % ---------------- Generate Gateway truth ----------------
 % Same initial state, period, and truth cadence as run_opt.
 
-missionCfg = struct();
-missionCfg.type = "LUNAR_GATEWAY";
-
-missionCfg.gateway.s0 = [
-     1.02202108343387
-     0
-    -0.182096487798513
-     0
-    -0.103255420206012
-     0
-];
-
-missionCfg.gateway.period   = 1.51110546287394;
-missionCfg.gateway.dt       = 0.001;
+missionCfg = target_case_config("LUNAR_GATEWAY");
 missionCfg.gateway.Nperiods = gateway_periods;
 
 fprintf('\nGenerating Lunar Gateway truth...\n');
@@ -136,47 +121,13 @@ fprintf('\nGenerating Lunar Gateway truth...\n');
     missionCfg, T1, orbit_database, times, states, mu, ode_opts);
 
 % ---------------- Generate low-thrust truth ----------------
-% Same endpoints and solver settings as run_opt.
+% Fixed boundary states come from TargetCaseDatabase.mat.
 
-missionCfg = struct();
-missionCfg.type = "LOW_THRUST_TRANSFER";
+missionCfg = target_case_config("LOW_THRUST_TRANSFER");
 
-missionCfg.transfer.depOrbitIndex = 51;
-missionCfg.transfer.depSlot       = 10;
-missionCfg.transfer.arrOrbitIndex = 400;
-missionCfg.transfer.arrSlot       = 1;
-missionCfg.transfer.dt            = 0.001;
-missionCfg.transfer.solverMode    = "LOW_THRUST_CLASS";
-
-missionCfg.transfer.lowthrust.sigma    = 1.0;
-missionCfg.transfer.lowthrust.m0       = 1.0;
-missionCfg.transfer.lowthrust.Tmax     = 0.3672;
-missionCfg.transfer.lowthrust.ve       = 39.8;
-missionCfg.transfer.lowthrust.tf_guess = 2.0;
-missionCfg.transfer.lowthrust.tf_lb    = 0.1;
-missionCfg.transfer.lowthrust.tf_ub    = 12.0;
-
-missionCfg.transfer.lowth.lowthrust.lambda_guess = [
-   -0.25
-    0.75
-    0.35
-   -0.20
-    0.40
-    0.10
-    0.05
-];
-
-missionCfg.transfer.lowthrust.lambda_lb = -20 * ones(7,1);
-missionCfg.transfer.lowthrust.lambda_ub =  20 * ones(7,1);
-
-missionCfg.transfer.lowthrust.w_pos_indirect  = 1;
-missionCfg.transfer.lowthrust.w_vel_indirect  = 1;
-missionCfg.transfer.lowthrust.w_norm_indirect = 1;
-missionCfg.transfer.lowthrust.w_mass_indirect = 1;
-
-fprintf('\nGenerating low-thrust transfer:\n');
-fprintf('  Departure: orbit 52, slot 10\n');
-fprintf('  Arrival:   orbit 400, slot 1\n');
+fprintf('
+Generating fixed-boundary low-thrust transfer.
+');
 
 [t_transfer, s_transfer, transferInfo] = build_target_truth( ...
     missionCfg, T1, orbit_database, times, states, mu, ode_opts);

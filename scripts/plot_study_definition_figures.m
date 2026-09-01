@@ -501,7 +501,7 @@ end
 
 
 function outputs = create_tracking_cases(inspectFigure)
-% Plot the three target scenarios used for the revised optimization study.
+% Plot the three fixed target scenarios from TargetCaseDatabase.mat.
 
 if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 
@@ -512,185 +512,24 @@ projectPaths = setup_project();
 outputDir = fullfile(projectPaths.results,'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
 
-catalog = load(projectPaths.catalog,'T');
-T = catalog.T;
-
 mu = 1.215058560962404E-2;
 LU = 384400;
 TU = 375695;
 VU = LU/TU;
 odeOptions = odeset('RelTol',1e-13,'AbsTol',1e-13);
 
-periodAll = T.('Period (TU) ');
-rawTimes = T.time;
-rawStates = T.state;
-numSlots = 50;
-orbitDatabase = build_slot_database( ...
-    rawTimes,rawStates,periodAll,numSlots);
+gatewayCfg = target_case_config("LUNAR_GATEWAY");
+[tGateway,sGateway,gatewayInfo] = build_target_truth( ...
+    gatewayCfg,table(),{}, {}, {},mu,odeOptions);
 
-% Case 1: nominal Lunar Gateway tracking.
-gatewayCfg = struct();
-gatewayCfg.s0 = [1.02202108343387,0,-0.182096487798513, ...
-                 0,-0.103255420206012,0]';
-gatewayCfg.period = 1.51110546287394;
-gatewayCfg.dt = 0.001;
-gatewayCfg.Nperiods = 1;
-[tGateway,sGateway,gatewayInfo] = build_truth_gateway( ...
-    gatewayCfg,mu,odeOptions);
-
-% Case 2: low-thrust transfer. Resolve both endpoints by matching the
-% exact initial states captured from the old catalog. Row ordering and IDs
-% are used only as reported metadata, never as the matching mechanism.
-transferRef = low_thrust_case_config(T);
-
-[departureIndex,departureInitialStateError] = ...
-    find_state_match(rawStates,transferRef.dep.state0);
-[arrivalIndex,arrivalInitialStateError] = ...
-    find_state_match(rawStates,transferRef.arr.state0);
-
-departureSlot = double(transferRef.dep.slot);
-arrivalSlot = double(transferRef.arr.slot);
-departureID = string(T.orbitID(departureIndex));
-arrivalID = string(T.orbitID(arrivalIndex));
-
-departureFamily = string(T.orbitFamily(departureIndex));
-arrivalFamily = string(T.orbitFamily(arrivalIndex));
-departureInitialState = rawStates{departureIndex}(1,:);
-departureInitialZ = departureInitialState(3);
-departureMeanZ = mean(rawStates{departureIndex}(:,3));
-departureSlotState = orbitDatabase{departureIndex}(departureSlot,:);
-arrivalSlotState = orbitDatabase{arrivalIndex}(arrivalSlot,:);
-assert(isfield(transferRef,'targetStateDefinition') && ...
-    string(transferRef.targetStateDefinition) == ...
-    "explicit_fixed_states_v1", ...
-    'Low-thrust target must use explicit fixed endpoint states.');
-assert(isfield(transferRef.dep,'transferState') && ...
-    isfield(transferRef.arr,'transferState'), ...
-    'Transfer reference does not contain fixed endpoint states.');
-departureTransferState = reshape(transferRef.dep.transferState,1,[]);
-arrivalTransferState = reshape(transferRef.arr.transferState,1,[]);
-
-assert(departureInitialStateError <= 1e-12, ...
-    ['Old-catalog departure did not match the rebuilt catalog. ' ...
-     'Initial-state error = %.6e.'],departureInitialStateError);
-assert(arrivalInitialStateError <= 1e-12, ...
-    ['Old-catalog arrival did not match the rebuilt catalog. ' ...
-     'Initial-state error = %.6e.'],arrivalInitialStateError);
-assert(isfield(transferRef.dep,'legacyIndex') && ...
-    transferRef.dep.legacyIndex==52 && departureSlot==10, ...
-    'Low-thrust departure must reproduce old row 52, slot 10.');
-assert(isfield(transferRef.dep,'slotState') && ...
-    isfield(transferRef.arr,'slotState'), ...
-    'Transfer reference does not contain endpoint slot states.');
-
-departureSlotReferenceError = norm( ...
-    departureSlotState-reshape(transferRef.dep.slotState,1,[]));
-arrivalSlotReferenceError = norm( ...
-    arrivalSlotState-reshape(transferRef.arr.slotState,1,[]));
-assert(departureSlotReferenceError <= 1e-10, ...
-    ['Corrected departure observer-slot reference is inconsistent. ' ...
-     'State error = %.6e.'],departureSlotReferenceError);
-assert(arrivalSlotReferenceError <= 1e-10, ...
-    ['Corrected arrival observer-slot reference is inconsistent. ' ...
-     'State error = %.6e.'],arrivalSlotReferenceError);
-
-assert(departureFamily=="SHL1", ...
-    'Matched departure must be SHL1, but catalog reports %s.', ...
-    departureFamily);
-assert(departureInitialZ<0 && departureMeanZ<0, ...
-    ['Matched departure is not the southern branch: ' ...
-     'initial z = %.12g, mean z = %.12g.'], ...
-    departureInitialZ,departureMeanZ);
-assert(departureTransferState(3)<0, ...
-    ['The fixed old-row-52 transfer state must lie below the rotating ' ...
-     'x-y plane. Resolved z = %.12g LU.'],departureTransferState(3));
-
-validArrivalFamilies = ["SHL2","SNRHL2"];
-assert(ismember(arrivalFamily,validArrivalFamilies), ...
-    ['Matched arrival must be a southern L2 halo or near-rectilinear ' ...
-     'halo, but catalog reports %s.'],arrivalFamily);
-
-endpoint = ["Departure";"Arrival"];
-legacyCatalogRow = [52;400];
-resolvedCatalogRow = [departureIndex;arrivalIndex];
-resolvedOrbitID = [departureID;arrivalID];
-orbitFamily = [departureFamily;arrivalFamily];
-slot = [departureSlot;arrivalSlot];
-initialZ_LU = [departureInitialZ;rawStates{arrivalIndex}(1,3)];
-meanZ_LU = [departureMeanZ;mean(rawStates{arrivalIndex}(:,3))];
-observerSlotZ_LU = [departureSlotState(3);arrivalSlotState(3)];
-transferStateZ_LU = [departureTransferState(3);arrivalTransferState(3)];
-fixedVsObserverSlotError = [ ...
-    norm(departureTransferState-departureSlotState); ...
-    norm(arrivalTransferState-arrivalSlotState)];
-slotStateReferenceError = [ ...
-    departureSlotReferenceError;arrivalSlotReferenceError];
-endpointAudit = table(endpoint,legacyCatalogRow,resolvedCatalogRow, ...
-    resolvedOrbitID,orbitFamily,slot,initialZ_LU,meanZ_LU, ...
-    observerSlotZ_LU,transferStateZ_LU,fixedVsObserverSlotError, ...
-    slotStateReferenceError);
-
-fprintf('\n--- Low-thrust endpoint identity audit ---\n');
-disp(endpointAudit);
-fprintf('Fixed old-row-52 transfer state [x y z vx vy vz]:\n');
-fprintf('  %.15g  %.15g  %.15g  %.15g  %.15g  %.15g\n', ...
-    departureTransferState);
-
-missionCfg = struct();
-missionCfg.type = "LOW_THRUST_TRANSFER";
-missionCfg.transfer.depOrbitID = departureID;
-missionCfg.transfer.depOrbitIndex = departureIndex;
-missionCfg.transfer.depSlot = departureSlot;
-missionCfg.transfer.arrOrbitID = arrivalID;
-missionCfg.transfer.arrOrbitIndex = arrivalIndex;
-missionCfg.transfer.arrSlot = arrivalSlot;
-missionCfg.transfer.fixedDepartureState = departureTransferState;
-missionCfg.transfer.fixedTargetState = arrivalTransferState;
-missionCfg.transfer.dt = 0.001;
-missionCfg.transfer.solverMode = "LOW_THRUST_CLASS";
-missionCfg.transfer.lowthrust.sigma = 1.0;
-missionCfg.transfer.lowthrust.m0 = 1.0;
-missionCfg.transfer.lowthrust.Tmax = 0.3672;
-missionCfg.transfer.lowthrust.ve = 39.8;
-missionCfg.transfer.lowthrust.tf_guess = 2.0;
-missionCfg.transfer.lowthrust.tf_lb = 0.1;
-missionCfg.transfer.lowthrust.tf_ub = 12.0;
-missionCfg.transfer.lowthrust.lambda_guess = ...
-    [-0.25;0.75;0.35;-0.20;0.40;0.10;0.05];
-missionCfg.transfer.lowthrust.lambda_lb = -20*ones(7,1);
-missionCfg.transfer.lowthrust.lambda_ub = 20*ones(7,1);
-missionCfg.transfer.lowthrust.w_pos_indirect = 1;
-missionCfg.transfer.lowthrust.w_vel_indirect = 1;
-missionCfg.transfer.lowthrust.w_norm_indirect = 1;
-missionCfg.transfer.lowthrust.w_mass_indirect = 1;
-
+transferCfg = target_case_config("LOW_THRUST_TRANSFER");
 [tTransfer,sTransfer,transferInfo] = build_target_truth( ...
-    missionCfg,T,orbitDatabase,rawTimes,rawStates,mu,odeOptions);
+    transferCfg,table(),{}, {}, {},mu,odeOptions);
 
-transferStartError = norm(sTransfer(1,:)-departureTransferState);
-assert(transferStartError <= 1e-12, ...
-    ['Low-thrust propagation did not start from old row 52, slot 10. ' ...
-     'State error = %.6e.'],transferStartError);
-assert(sTransfer(1,3)<0, ...
-    'Old row 52, slot 10 must start on the southern side of the x-y plane.');
+impulseCfg = target_case_config("GATEWAY_IMPULSE");
+[tImpulse,sImpulse,impulseInfo] = build_target_truth( ...
+    impulseCfg,table(),{}, {}, {},mu,odeOptions);
 
-departureOrbit = rawStates{departureIndex};
-arrivalOrbit = rawStates{arrivalIndex};
-
-% Case 3: instantaneous prograde impulse at nominal Gateway perilune.
-impulseCfg = struct();
-impulseCfg.s0 = gatewayCfg.s0;
-impulseCfg.period = gatewayCfg.period;
-impulseCfg.dt = 0.001;
-impulseCfg.duration_TU = 1.5;
-impulseCfg.deltaV_m_s = 10;
-impulseCfg.deltaV_LU_TU = ...
-    (impulseCfg.deltaV_m_s/1000)/VU;
-impulseCfg.direction = "PROGRADE";
-impulseCfg.periluneSearchSamples = 4001;
-
-[tImpulse,sImpulse,impulseInfo] = build_truth_gateway_impulse( ...
-    impulseCfg,mu,odeOptions);
 [~,sNominalAfterPerilune] = ode45( ...
     @(t,s) cr3bp_dynamics(t,s,mu),tImpulse, ...
     impulseInfo.statePreImpulse,odeOptions);
@@ -701,285 +540,92 @@ figureFiles = strings(3,1);
 cGateway = [0.85,0.27,0.22];
 cTransfer = [0.27,0.31,0.86];
 cImpulse = [0.55,0.30,0.72];
-cReference = [0.47,0.78,0.94];
 cNominal = [0.35,0.35,0.35];
 cPoint = [0.80,0.80,0.80];
 
-% Case 1: nominal Lunar Gateway.
 figGateway = publication_figure(7.2,6.5);
-ax = axes(figGateway);
-prepare_axes(ax);
-hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
-    '-','Color',cGateway,'LineWidth',2.8);
+ax = axes(figGateway); prepare_axes(ax);
+hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3),'-','Color',cGateway,'LineWidth',2.8);
 hMoon = draw_moon(ax,mu,LU);
-plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
-plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
 format_case_axes(ax);
-legendHandle = legend(ax,[hGateway,hMoon], ...
-    {'Nominal target','Moon'}, ...
-    'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,2);
-axis(ax,'tight');
-axis(ax,'vis3d');
-format_case_axes(ax);
+legendHandle = legend(ax,[hGateway,hMoon],{'Nominal target','Moon'},'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,2); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
 figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
 inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
-export_publication_eps(figGateway,figureFiles(1));
-close(figGateway);
+export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
 
-% Case 2: low-thrust transfer with both endpoint orbits.
 figTransfer = publication_figure(7.2,6.5);
-ax = axes(figTransfer);
-prepare_axes(ax);
-hDeparture = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
-    departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
-hArrival = plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2), ...
-    arrivalOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
-hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3), ...
-    '-','Color',cTransfer,'LineWidth',3.0);
-hStart = plot3(ax,sTransfer(1,1),sTransfer(1,2),sTransfer(1,3), ...
-    'o','MarkerSize',9,'MarkerFaceColor',cGateway, ...
-    'MarkerEdgeColor','k','LineWidth',1.2);
-hEnd = plot3(ax,sTransfer(end,1),sTransfer(end,2),sTransfer(end,3), ...
-    's','MarkerSize',9,'MarkerFaceColor',cTransfer, ...
-    'MarkerEdgeColor','k','LineWidth',1.2);
+ax = axes(figTransfer); prepare_axes(ax);
+hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3),'-','Color',cTransfer,'LineWidth',3.0);
+hStart = plot3(ax,sTransfer(1,1),sTransfer(1,2),sTransfer(1,3),'o','MarkerSize',9,'MarkerFaceColor',cGateway,'MarkerEdgeColor','k','LineWidth',1.2);
+hEnd = plot3(ax,sTransfer(end,1),sTransfer(end,2),sTransfer(end,3),'s','MarkerSize',9,'MarkerFaceColor',cTransfer,'MarkerEdgeColor','k','LineWidth',1.2);
 hMoon = draw_moon(ax,mu,LU);
-hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
-hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
+hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
+hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
 format_case_axes(ax);
-legendHandle = legend(ax, ...
-    [hDeparture,hTransfer,hStart,hEnd,hMoon,hL1,hL2], ...
-    {'Endpoint orbits','Transfer','Start','End','Moon','L1','L2'}, ...
-    'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,4);
-axis(ax,'tight');
-axis(ax,'vis3d');
-format_case_axes(ax);
+legendHandle = legend(ax,[hTransfer,hStart,hEnd,hMoon,hL1,hL2],{'Transfer','Start','End','Moon','L1','L2'},'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,3); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
 figureFiles(2) = fullfile(outputDir,'case_low_thrust_transfer.eps');
 inspect_before_export(figTransfer,inspectFigure,'low-thrust transfer case');
-export_publication_eps(figTransfer,figureFiles(2));
-close(figTransfer);
+export_publication_eps(figTransfer,figureFiles(2)); close(figTransfer);
 
-% Case 3: Gateway perilune impulse and nominal continuation.
 figImpulse = publication_figure(7.2,6.5);
-ax = axes(figImpulse);
-prepare_axes(ax);
-hNominal = plot3(ax,sNominalAfterPerilune(:,1), ...
-    sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3), ...
-    '--','Color',cNominal,'LineWidth',2.2);
-hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3), ...
-    '-','Color',cImpulse,'LineWidth',3.0);
-hBurn = plot3(ax,sImpulse(1,1),sImpulse(1,2),sImpulse(1,3), ...
-    'p','MarkerSize',12,'MarkerFaceColor',[0.95,0.65,0.15], ...
-    'MarkerEdgeColor','k','LineWidth',1.2);
+ax = axes(figImpulse); prepare_axes(ax);
+hNominal = plot3(ax,sNominalAfterPerilune(:,1),sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3),'--','Color',cNominal,'LineWidth',2.2);
+hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3),'-','Color',cImpulse,'LineWidth',3.0);
+hBurn = plot3(ax,sImpulse(1,1),sImpulse(1,2),sImpulse(1,3),'p','MarkerSize',12,'MarkerFaceColor',[0.95,0.65,0.15],'MarkerEdgeColor','k','LineWidth',1.2);
 hMoon = draw_moon(ax,mu,LU);
-plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
-plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint, ...
-    'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
+plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',9,'LineWidth',1.2);
 format_case_axes(ax);
-legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon], ...
-    {'Nominal','Post-impulse','10 m/s burn','Moon'}, ...
-    'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,2);
-axis(ax,'tight');
-axis(ax,'vis3d');
-format_case_axes(ax);
+legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon],{'Nominal','Post-impulse','10 m/s burn','Moon'},'Location','northoutside','Orientation','horizontal');
+format_case_legend(legendHandle,2); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
 figureFiles(3) = fullfile(outputDir,'case_gateway_perilune_impulse.eps');
 inspect_before_export(figImpulse,inspectFigure,'Gateway impulse case');
-export_publication_eps(figImpulse,figureFiles(3));
-close(figImpulse);
+export_publication_eps(figImpulse,figureFiles(3)); close(figImpulse);
 
 caseName = ["Lunar Gateway";"Low-thrust transfer";"Perilune impulse"];
 duration_TU = [tGateway(end);tTransfer(end);tImpulse(end)];
-targetDefinition = [ ...
-    "Nominal Gateway orbit"; ...
-    "Continuous low-thrust cislunar transfer"; ...
-    "10 m/s prograde burn at nominal Gateway perilune"];
-initialCondition = ["Initial";"Initial";"Post-impulse"];
-finalCondition = ["Final";"Final";"Final"];
-departureOrbitID = ["";string(transferRef.dep.orbitID);""];
-departureSlot = [NaN;double(transferRef.dep.slot);NaN];
-arrivalOrbitID = ["";string(transferRef.arr.orbitID);""];
-arrivalSlot = [NaN;double(transferRef.arr.slot);NaN];
+targetDefinition = ["Nominal Gateway orbit";"Fixed-boundary continuous low-thrust transfer";"10 m/s prograde burn at nominal Gateway perilune"];
 deltaV_m_s = [NaN;NaN;impulseInfo.deltaV_m_s];
 impulseDirection = ["";"";string(impulseInfo.direction)];
-nominalPeriluneEpoch_TU = [NaN;NaN; ...
-    impulseInfo.periluneEpochNominal_TU];
+nominalPeriluneEpoch_TU = [NaN;NaN;impulseInfo.periluneEpochNominal_TU];
 transferFinalResidualNorm = [NaN;transferInfo.finalResidualNorm;NaN];
+caseMetadata = table(caseName,targetDefinition,duration_TU,deltaV_m_s,impulseDirection,nominalPeriluneEpoch_TU,transferFinalResidualNorm);
+metadataFile = fullfile(outputDir,'tracking_case_metadata.csv'); writetable(caseMetadata,metadataFile);
 
-caseMetadata = table( ...
-    caseName,targetDefinition,duration_TU,initialCondition,finalCondition, ...
-    departureOrbitID,departureSlot,arrivalOrbitID,arrivalSlot, ...
-    deltaV_m_s,impulseDirection,nominalPeriluneEpoch_TU, ...
-    transferFinalResidualNorm);
-
-metadataFile = fullfile(outputDir,'tracking_case_metadata.csv');
-writetable(caseMetadata,metadataFile);
-
-endpointAuditFile = fullfile( ...
-    outputDir,'low_thrust_endpoint_reference_audit.csv');
-writetable(endpointAudit,endpointAuditFile);
-
-% State conditions are the reproducible scenario definition. Orbit IDs and
-% slots above are retained only as catalog provenance for the transfer.
-conditionCase = [ ...
-    "Lunar Gateway";"Lunar Gateway"; ...
-    "Low-thrust transfer";"Low-thrust transfer"; ...
-    "Perilune impulse";"Perilune impulse";"Perilune impulse"];
-
-condition = [ ...
-    "Initial";"Final"; ...
-    "Initial";"Final"; ...
-    "Pre-impulse";"Post-impulse";"Final"];
-
-caseEpoch_TU = [ ...
-    tGateway(1);tGateway(end); ...
-    tTransfer(1);tTransfer(end); ...
-    0;0;tImpulse(end)];
-
-referenceEpoch_TU = [ ...
-    0;gatewayCfg.period; ...
-    NaN;NaN; ...
-    impulseInfo.periluneEpochNominal_TU; ...
-    impulseInfo.periluneEpochNominal_TU;NaN];
-
-stateND = [ ...
-    sGateway(1,:); ...
-    sGateway(end,:); ...
-    sTransfer(1,:); ...
-    sTransfer(end,:); ...
-    impulseInfo.statePreImpulse(:).'; ...
-    impulseInfo.statePostImpulse(:).'; ...
-    sImpulse(end,:)];
-
-stateConditionsND = table( ...
-    conditionCase,condition,caseEpoch_TU,referenceEpoch_TU, ...
-    stateND(:,1),stateND(:,2),stateND(:,3), ...
-    stateND(:,4),stateND(:,5),stateND(:,6), ...
-    'VariableNames',{'caseName','condition','caseEpoch_TU', ...
-    'referenceEpoch_TU','x_LU','y_LU','z_LU', ...
-    'vx_LU_TU','vy_LU_TU','vz_LU_TU'});
-
-stateDimensional = stateND;
-stateDimensional(:,1:3) = stateDimensional(:,1:3)*LU;
-stateDimensional(:,4:6) = stateDimensional(:,4:6)*VU;
-
-stateConditionsDimensional = table( ...
-    conditionCase,condition,caseEpoch_TU,referenceEpoch_TU, ...
-    stateDimensional(:,1),stateDimensional(:,2), ...
-    stateDimensional(:,3),stateDimensional(:,4), ...
-    stateDimensional(:,5),stateDimensional(:,6), ...
-    'VariableNames',{'caseName','condition','caseEpoch_TU', ...
-    'referenceEpoch_TU','x_km','y_km','z_km', ...
-    'vx_km_s','vy_km_s','vz_km_s'});
-
-normalizedStateFile = fullfile( ...
-    outputDir,'tracking_case_state_conditions_nd.csv');
-dimensionalStateFile = fullfile( ...
-    outputDir,'tracking_case_state_conditions_dimensional.csv');
-writetable(stateConditionsND,normalizedStateFile);
-writetable(stateConditionsDimensional,dimensionalStateFile);
-
-latexRowsFile = fullfile(outputDir,'tracking_case_state_rows.tex');
-write_latex_state_rows(latexRowsFile,stateConditionsND);
+conditionCase = ["Lunar Gateway";"Lunar Gateway";"Low-thrust transfer";"Low-thrust transfer";"Perilune impulse";"Perilune impulse";"Perilune impulse"];
+condition = ["Initial";"Final";"Departure";"Arrival";"Pre-impulse";"Post-impulse";"Final"];
+caseEpoch_TU = [tGateway(1);tGateway(end);tTransfer(1);tTransfer(end);0;0;tImpulse(end)];
+referenceEpoch_TU = [0;gatewayCfg.gateway.period;NaN;NaN;impulseInfo.periluneEpochNominal_TU;impulseInfo.periluneEpochNominal_TU;NaN];
+stateND = [sGateway(1,:);sGateway(end,:);transferCfg.transfer.fixedDepartureState(:).';transferCfg.transfer.fixedTargetState(:).';impulseInfo.statePreImpulse(:).';impulseInfo.statePostImpulse(:).';sImpulse(end,:)];
+stateConditionsND = table(conditionCase,condition,caseEpoch_TU,referenceEpoch_TU,stateND(:,1),stateND(:,2),stateND(:,3),stateND(:,4),stateND(:,5),stateND(:,6),'VariableNames',{'caseName','condition','caseEpoch_TU','referenceEpoch_TU','x_LU','y_LU','z_LU','vx_LU_TU','vy_LU_TU','vz_LU_TU'});
+stateDimensional = stateND; stateDimensional(:,1:3) = stateDimensional(:,1:3)*LU; stateDimensional(:,4:6) = stateDimensional(:,4:6)*VU;
+stateConditionsDimensional = table(conditionCase,condition,caseEpoch_TU,referenceEpoch_TU,stateDimensional(:,1),stateDimensional(:,2),stateDimensional(:,3),stateDimensional(:,4),stateDimensional(:,5),stateDimensional(:,6),'VariableNames',{'caseName','condition','caseEpoch_TU','referenceEpoch_TU','x_km','y_km','z_km','vx_km_s','vy_km_s','vz_km_s'});
+normalizedStateFile = fullfile(outputDir,'tracking_case_state_conditions_nd.csv'); dimensionalStateFile = fullfile(outputDir,'tracking_case_state_conditions_dimensional.csv');
+writetable(stateConditionsND,normalizedStateFile); writetable(stateConditionsDimensional,dimensionalStateFile);
+latexRowsFile = fullfile(outputDir,'tracking_case_state_rows.tex'); write_latex_state_rows(latexRowsFile,stateConditionsND);
 
 reproduction = struct();
 reproduction.frame = "Earth-Moon barycentric rotating CR3BP";
-reproduction.units = struct('position',"LU",'velocity',"LU/TU", ...
-    'time',"TU",'LU_km',LU,'TU_s',TU,'VU_km_s',VU,'mu',mu);
+reproduction.units = struct('position',"LU",'velocity',"LU/TU",'time',"TU",'LU_km',LU,'TU_s',TU,'VU_km_s',VU,'mu',mu);
+reproduction.gateway = struct('config',gatewayCfg.gateway,'initialState',sGateway(1,:).','finalState',sGateway(end,:).');
+reproduction.transfer = struct('config',transferCfg.transfer,'initialState',sTransfer(1,:).','finalState',sTransfer(end,:).','lambda0',transferInfo.lambda0,'timeOfFlight_TU',transferInfo.tf,'finalResidualNorm',transferInfo.finalResidualNorm);
+reproduction.impulse = struct('config',impulseCfg.impulse,'nominalPeriluneEpoch_TU',impulseInfo.periluneEpochNominal_TU,'preImpulseState',impulseInfo.statePreImpulse,'postImpulseState',impulseInfo.statePostImpulse,'deltaVVector_LU_TU',impulseInfo.deltaVVector_LU_TU,'finalState',sImpulse(end,:).');
+reproductionFile = fullfile(outputDir,'tracking_case_reproduction.mat'); save(reproductionFile,'reproduction','-v7');
 
-reproduction.gateway = struct( ...
-    'config',gatewayCfg, ...
-    'initialState',sGateway(1,:).', ...
-    'finalState',sGateway(end,:).');
+outputs = struct(); outputs.figures = figureFiles; outputs.gatewayFigure = figureFiles(1); outputs.lowThrustFigure = figureFiles(2); outputs.impulseFigure = figureFiles(3);
+outputs.metadata = string(metadataFile); outputs.normalizedStateConditionsFile = string(normalizedStateFile); outputs.dimensionalStateConditionsFile = string(dimensionalStateFile); outputs.latexStateRows = string(latexRowsFile); outputs.reproductionFile = string(reproductionFile);
+outputs.stateConditionsND = stateConditionsND; outputs.stateConditionsDimensional = stateConditionsDimensional; outputs.gatewayInfo = gatewayInfo; outputs.transferInfo = transferInfo; outputs.impulseInfo = impulseInfo;
 
-reproduction.transfer = struct( ...
-    'config',missionCfg.transfer, ...
-    'departureOrbitID',departureID, ...
-    'departureSlot',transferRef.dep.slot, ...
-    'arrivalOrbitID',arrivalID, ...
-    'arrivalSlot',transferRef.arr.slot, ...
-    'initialState',sTransfer(1,:).', ...
-    'finalState',sTransfer(end,:).', ...
-    'lambda0',transferInfo.lambda0, ...
-    'timeOfFlight_TU',transferInfo.tf, ...
-    'finalResidualNorm',transferInfo.finalResidualNorm);
-
-reproduction.impulse = struct( ...
-    'config',impulseCfg, ...
-    'nominalPeriluneEpoch_TU', ...
-        impulseInfo.periluneEpochNominal_TU, ...
-    'preImpulseState',impulseInfo.statePreImpulse, ...
-    'postImpulseState',impulseInfo.statePostImpulse, ...
-    'deltaVVector_LU_TU',impulseInfo.deltaVVector_LU_TU, ...
-    'finalState',sImpulse(end,:).');
-
-reproductionFile = fullfile( ...
-    outputDir,'tracking_case_reproduction.mat');
-save(reproductionFile,'reproduction','-v7');
-
-outputs = struct();
-outputs.figures = figureFiles;
-outputs.gatewayFigure = figureFiles(1);
-outputs.lowThrustFigure = figureFiles(2);
-outputs.impulseFigure = figureFiles(3);
-outputs.metadata = string(metadataFile);
-outputs.endpointAuditFile = string(endpointAuditFile);
-outputs.endpointAudit = endpointAudit;
-outputs.normalizedStateConditionsFile = string(normalizedStateFile);
-outputs.dimensionalStateConditionsFile = string(dimensionalStateFile);
-outputs.latexStateRows = string(latexRowsFile);
-outputs.reproductionFile = string(reproductionFile);
-outputs.stateConditionsND = stateConditionsND;
-outputs.stateConditionsDimensional = stateConditionsDimensional;
-outputs.gatewayInfo = gatewayInfo;
-outputs.transferInfo = transferInfo;
-outputs.impulseInfo = impulseInfo;
-outputs.departureIndex = departureIndex;
-outputs.arrivalIndex = arrivalIndex;
-
-fprintf('Saved the three separate tracking-case figures to:\n  %s\n',outputDir);
-fprintf('Transfer reference resolved to catalog rows %d and %d.\n', ...
-    departureIndex,arrivalIndex);
-fprintf('\nNormalized initial, maneuver, and final conditions:\n');
-disp(stateConditionsND);
-end
-
-
-
-function orbitDatabase = build_slot_database(times,states,periods,numSlots)
-
-orbitDatabase = cell(numel(periods),1);
-for k = 1:numel(periods)
-    [uniqueTime,uniqueIndex] = unique(times{k});
-    uniqueState = states{k}(uniqueIndex,:);
-    interpolant = griddedInterpolant(uniqueTime,uniqueState,'spline');
-    slotTime = (0:numSlots-1)'*periods(k)/numSlots;
-    orbitDatabase{k} = interpolant(slotTime);
-end
-end
-
-
-function [index,minimumDistance] = ...
-    find_state_match(stateHistories,referenceState)
-
-initialStates = zeros(numel(stateHistories),6);
-
-for k = 1:numel(stateHistories)
-    initialStates(k,:) = stateHistories{k}(1,:);
-end
-
-distance = vecnorm(initialStates-referenceState,2,2);
-[minimumDistance,index] = min(distance);
-
-assert(minimumDistance < 1e-10, ...
-    ['An old-catalog transfer endpoint was not retained in the rebuilt ' ...
-     'catalog. Minimum initial-state difference = %.6e.'],minimumDistance);
+fprintf('Saved the three separate tracking-case figures to:
+  %s
+',outputDir);
+fprintf('
+Normalized initial, maneuver, and final conditions:
+'); disp(stateConditionsND);
 end
 
 
