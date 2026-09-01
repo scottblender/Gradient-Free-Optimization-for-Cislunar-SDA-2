@@ -8,15 +8,20 @@ referencePath = fullfile(projectRoot,"data", ...
     "transfer_reference.mat");
 
 % Original paper definition before catalog reordering.
-legacyDepIndex = 52;
+legacyDepIndex = 51;
 legacyArrIndex = 400;
 depSlot = 10;
 arrSlot = 1;
 
-% Stable identities corresponding to legacy rows 52 and 400. The
-% original amplitude-sorted catalog maps row 52 to northern L1 source Id 1015.
+% Stable identities corresponding to legacy rows 51 and 400. Legacy row
+% 52 is the southern mirror of row 51 and must not be used here.
 expectedDepID = "northern_halo_l1:1015";
 expectedArrID = "southern_halo_l2:97";
+
+expectedDepState0 = [ ...
+     0.8402957900765589,  6.021304054218165e-28, ...
+     0.1583034195863712, -7.135606147838344e-16, ...
+     0.2616335345519606, -9.179544887747458e-16];
 
 S = load(catalogPath,"T");
 T = S.T;
@@ -30,7 +35,7 @@ if ismember("orbitID",tableNames)
     arrIndex = find(catalogIds==expectedArrID);
 
     assert(numel(depIndex)==1, ...
-        "Legacy orbit 52 (%s) did not resolve uniquely.",expectedDepID);
+        "Legacy orbit 51 (%s) did not resolve uniquely.",expectedDepID);
     assert(numel(arrIndex)==1, ...
         "Legacy orbit 400 (%s) did not resolve uniquely.",expectedArrID);
 else
@@ -51,12 +56,20 @@ else
     arrIndex = legacyArrIndex;
 
     assert(catalogIds(depIndex)==expectedDepID, ...
-        "Legacy row 52 resolved to %s instead of %s.", ...
+        "Legacy row 51 resolved to %s instead of %s.", ...
         catalogIds(depIndex),expectedDepID);
     assert(catalogIds(arrIndex)==expectedArrID, ...
         "Legacy row 400 resolved to %s instead of %s.", ...
         catalogIds(arrIndex),expectedArrID);
 end
+
+departureStateError = norm( ...
+    T.state{depIndex}(1,:) - expectedDepState0);
+assert(departureStateError <= 1e-12, ...
+    ['Resolved departure does not match old catalog row 51. ' ...
+     'Initial-state error = %.6e.'],departureStateError);
+assert(mean(T.state{depIndex}(:,3)) > 0, ...
+    'Resolved departure is not on the northern L1 branch.');
 
 transferRef = struct();
 
