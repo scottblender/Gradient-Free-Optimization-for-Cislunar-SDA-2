@@ -177,6 +177,22 @@ disp(familySummary);
 isDRO = families == "DRO";
 droCount = nnz(isDRO);
 
+% Catalog ordering: the original Halo/NRHO population is globally sorted
+% by ascending z-amplitude, followed by DROs sorted by apolune altitude.
+haloRows = find(~isDRO);
+droRows = find(isDRO);
+
+assert(~isempty(haloRows) && ~isempty(droRows), ...
+    "The catalog must contain both Halo/NRHO and DRO populations.");
+assert(max(haloRows) < min(droRows), ...
+    "DRO rows must be appended after all Halo/NRHO rows.");
+assert(all(diff(T.zAmplitude(haloRows)) >= 0), ...
+    "Halo/NRHO rows are not sorted by ascending z-amplitude.");
+assert(all(diff(T.apoluneAltitude_km(droRows)) >= 0), ...
+    "DRO rows are not sorted by ascending apolune altitude.");
+
+fprintf("Catalog ordering checks passed.\n\n");
+
 assert(droCount == EXPECTED_DRO_COUNT, ...
     "Expected %d DROs, but found %d.", ...
     EXPECTED_DRO_COUNT, droCount);
