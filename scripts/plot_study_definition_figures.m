@@ -174,8 +174,8 @@ cL2 = [0.90,0.16,0.12];
 cMoon = [0.70,0.70,0.70];
 cPoint = [0.85,0.85,0.85];
 
-numPairOrbitsPerFamily = 16;
-numDroOrbits = 16;
+numPairOrbitsPerFamily = 10;
+numDroOrbits = 10;
 maxPointsPerOrbit = 300;
 figureFiles = strings(numel(familyGroups),1);
 
@@ -205,8 +205,13 @@ for groupIndex = 1:numel(familyGroups)
             assert(~isempty(familyRows), ...
                 'No selected orbits found for %s.',group(member));
 
-            selectedRows = select_evenly_spaced_rows( ...
-                familyRows,T.zAmplitude(familyRows),perFamily);
+            assert(numel(familyRows)==50, ...
+                'Expected 50 selected orbits for %s, found %d.', ...
+                group(member),numel(familyRows));
+            plotStride = numel(familyRows)/perFamily;
+            assert(plotStride==round(plotStride), ...
+                'Orbit plotting stride must be an integer.');
+            selectedRows = familyRows(plotStride:plotStride:end);
 
             for plotted = 1:numel(selectedRows)
                 state = T.state{selectedRows(plotted)};
@@ -250,8 +255,12 @@ for groupIndex = 1:numel(familyGroups)
 
         familyRows = find(family=="DRO");
         assert(~isempty(familyRows),'No selected DROs were found.');
-        selectedRows = unique(round(linspace( ...
-            1,numel(familyRows),min(numDroOrbits,numel(familyRows)))));
+        assert(numel(familyRows)==50, ...
+            'Expected 50 selected DROs, found %d.',numel(familyRows));
+        plotStride = numel(familyRows)/numDroOrbits;
+        assert(plotStride==round(plotStride), ...
+            'DRO plotting stride must be an integer.');
+        selectedRows = plotStride:plotStride:numel(familyRows);
 
         droHandle = gobjects(1);
         allX = [];
@@ -736,30 +745,6 @@ for k = 1:height(stateTable)
     fprintf(fid,'%s & %s & %.12g & $[%s]^{\\mathsf{T}}$ \\\\\n', ...
         char(stateTable.caseName(k)),char(stateTable.condition(k)), ...
         stateTable.caseEpoch_TU(k),char(stateText));
-end
-end
-
-
-function selectedRows = select_evenly_spaced_rows( ...
-    candidateRows,spacingValue,numberToSelect)
-
-candidateRows = candidateRows(:);
-spacingValue = spacingValue(:);
-numberToSelect = min(numberToSelect,numel(candidateRows));
-
-[spacingValue,order] = sort(spacingValue);
-candidateRows = candidateRows(order);
-targets = linspace(spacingValue(1),spacingValue(end),numberToSelect);
-
-available = true(numel(candidateRows),1);
-selectedRows = zeros(numberToSelect,1);
-
-for index = 1:numberToSelect
-    distance = abs(spacingValue-targets(index));
-    distance(~available) = inf;
-    [~,selected] = min(distance);
-    selectedRows(index) = candidateRows(selected);
-    available(selected) = false;
 end
 end
 
