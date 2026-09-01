@@ -45,7 +45,7 @@ function test_project_structure()
         'target_case_config', 'src/targetGeneration/target_case_config.m'
         'build_observer_orbit_catalog', 'scripts/build_observer_orbit_catalog.m'
         'build_target_case_database', 'scripts/build_target_case_database.m'
-        'plot_jpl_orbit_catalog', 'scripts/plot_jpl_orbit_catalog.m'
+        'plot_study_definition_figures', 'scripts/plot_study_definition_figures.m'
         'process_baseline_results', 'scripts/process_baseline_results.m'
         'process_comparison_results', 'scripts/process_comparison_results.m'
         'print_observer_ics_from_experiment_summary', 'scripts/print_observer_ics_from_experiment_summary.m'
