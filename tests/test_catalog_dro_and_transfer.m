@@ -166,7 +166,7 @@ end
 
 familySummary = table( ...
     uniqueFamilies, familyCounts, ...
-    "VariableNames", ["Family", "Count"]);
+    'VariableNames', {'Family', 'Count'});
 
 fprintf("--- Selected orbit families ---\n");
 disp(familySummary);
