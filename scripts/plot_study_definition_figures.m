@@ -337,12 +337,9 @@ catalog = load(projectPaths.catalog,'T');
 T = catalog.T;
 
 family = string(T.orbitFamily);
-orbitIndex = find(family=="NHL1",1,'first');
-if isempty(orbitIndex)
-    orbitIndex = find(family=="NNRHL1",1,'first');
-end
+orbitIndex = find(family=="NNRHL1",1,'first');
 assert(~isempty(orbitIndex), ...
-    'No representative northern L1 orbit was found.');
+    'No representative northern NRHO L1 orbit was found.');
 
 periodAll = T.('Period (TU) ');
 period = periodAll(orbitIndex);
@@ -376,21 +373,7 @@ nextColor = [0.20,0.50,0.80];
 orbitColor = [0.27,0.31,0.86];
 neutralColor = [0.25,0.25,0.25];
 mu = 1.215058560962404E-2;
-[xL1,xL2] = cr3bp_L1L2(mu);
-
-representativeFamily = family(orbitIndex);
-if endsWith(representativeFamily,"L1")
-    lagrangeX = xL1;
-    lagrangeMarker = '^';
-    lagrangeLabel = "L1";
-elseif endsWith(representativeFamily,"L2")
-    lagrangeX = xL2;
-    lagrangeMarker = 'v';
-    lagrangeLabel = "L2";
-else
-    error('Representative slot orbit must belong to an L1 or L2 family: %s', ...
-        representativeFamily);
-end
+LU = 384400;
 
 % Figure 1: the orbit and its 50 equal-time candidate states.
 figGeometry = publication_figure(6.5,6.5);
@@ -412,14 +395,12 @@ hNext = plot3(ax,slotState(nextSlot,1), ...
     slotState(nextSlot,2),slotState(nextSlot,3), ...
     's','MarkerSize',9,'MarkerFaceColor',nextColor, ...
     'MarkerEdgeColor','k','LineWidth',1.2);
-hLagrange = plot3(ax,lagrangeX,0,0,lagrangeMarker,'MarkerSize',9, ...
-    'MarkerFaceColor',[0.80,0.80,0.80], ...
-    'MarkerEdgeColor','k','LineWidth',1.2);
+hMoon = draw_moon(ax,mu,LU);
 
 set(ax,'FontName','Times New Roman','FontSize',18, ...
     'FontWeight','bold','LineWidth',1.8);
-legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hLagrange], ...
-    {'Orbit','Candidate slots','Slot j','Slot j+1',char(lagrangeLabel)}, ...
+legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hMoon], ...
+    {'Orbit','Candidate slots','Slot j','Slot j+1','Moon'}, ...
     'Location','northoutside','Orientation','horizontal', ...
     'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
 legendHandle.NumColumns = 3;
