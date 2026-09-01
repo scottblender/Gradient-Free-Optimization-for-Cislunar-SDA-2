@@ -434,13 +434,13 @@ plot(ax,phase([nextSlot,nextSlot]),[0,0.16],':k');
 text(ax,mean(phase([selectedSlot,nextSlot])),0.20, ...
     '\Delta t/T=1/50','HorizontalAlignment','center', ...
     'FontName','Times New Roman','FontSize',16,'FontWeight','bold');
-text(ax,0.99,-0.07,{'t=T','not stored'}, ...
+text(ax,0.99,-0.025,{'t=T','not stored'}, ...
     'HorizontalAlignment','right','VerticalAlignment','top', ...
     'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
 
 xlabel(ax,'Normalized epoch, t/T');
 yticks(ax,[]);
-ylim(ax,[-0.30,0.30]);
+ylim(ax,[-0.18,0.30]);
 xlim(ax,[-0.02,1.02]);
 set(ax,'FontName','Times New Roman','FontSize',18, ...
     'FontWeight','bold','LineWidth',1.8,'TickLabelInterpreter','tex');
@@ -658,7 +658,7 @@ cNominal = [0.35,0.35,0.35];
 cPoint = [0.80,0.80,0.80];
 
 % Case 1: nominal Lunar Gateway.
-figGateway = publication_figure(6.5,6.5);
+figGateway = publication_figure(7.2,6.5);
 ax = axes(figGateway);
 prepare_axes(ax);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3), ...
@@ -682,7 +682,7 @@ export_publication_eps(figGateway,figureFiles(1));
 close(figGateway);
 
 % Case 2: low-thrust transfer with both endpoint orbits and Gateway context.
-figTransfer = publication_figure(6.5,6.5);
+figTransfer = publication_figure(7.2,6.5);
 ax = axes(figTransfer);
 prepare_axes(ax);
 hDeparture = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
@@ -719,7 +719,7 @@ export_publication_eps(figTransfer,figureFiles(2));
 close(figTransfer);
 
 % Case 3: Gateway perilune impulse and nominal continuation.
-figImpulse = publication_figure(6.5,6.5);
+figImpulse = publication_figure(7.2,6.5);
 ax = axes(figImpulse);
 prepare_axes(ax);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1), ...
@@ -942,7 +942,7 @@ function prepare_axes(ax)
 hold(ax,'on');
 box(ax,'on');
 axis(ax,'equal');
-view(ax,32,24);
+view(ax,-37.5,30);
 ax.Projection = 'perspective';
 xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
@@ -1021,10 +1021,10 @@ end
 
 function format_case_axes(ax)
 
-format_publication_axes(ax,13);
+format_publication_axes(ax,12);
 ax.Units = 'normalized';
-ax.Position = [0.16,0.16,0.68,0.67];
-ax.LooseInset = max(ax.TightInset,0.025);
+ax.Position = [0.15,0.18,0.70,0.62];
+ax.LooseInset = max(ax.TightInset,0.04);
 end
 
 
