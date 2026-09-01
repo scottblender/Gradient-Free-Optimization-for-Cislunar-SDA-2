@@ -7,103 +7,80 @@ catalogPath = fullfile(projectRoot,"data", ...
 referencePath = fullfile(projectRoot,"data", ...
     "transfer_reference.mat");
 
+% Original paper definition before catalog reordering.
+legacyDepIndex = 52;
+legacyArrIndex = 400;
+depSlot = 10;
+arrSlot = 1;
+
+% Stable identities corresponding to legacy rows 52 and 400. The old
+% adjacent row 51 was the northern L1 counterpart; row 52 was southern.
+expectedDepID = "southern_halo_l1:1015";
+expectedArrID = "southern_halo_l2:97";
+
 S = load(catalogPath,"T");
 T = S.T;
 periods = T.("Period (TU) ");
 tableNames = string(T.Properties.VariableNames);
 
-% A catalog containing orbitID has already been rebuilt. In that case this
-% script validates the saved legacy reference and must not overwrite it
-% using obsolete row numbers.
 if ismember("orbitID",tableNames)
-    assert(isfile(referencePath), ...
-        "The catalog is already rebuilt, but transfer_reference.mat is missing.");
-
-    R = load(referencePath,"transferRef");
-    transferRef = R.transferRef;
-    catalogIds = string(T.orbitID);
-
-    depIndex = find(catalogIds==string(transferRef.dep.orbitID));
-    arrIndex = find(catalogIds==string(transferRef.arr.orbitID));
+    % Rebuilt catalog: resolve the original physical orbits by stable ID.
+    catalogIds = strtrim(lower(string(T.orbitID)));
+    depIndex = find(catalogIds==expectedDepID);
+    arrIndex = find(catalogIds==expectedArrID);
 
     assert(numel(depIndex)==1, ...
-        "The saved departure orbitID did not resolve uniquely.");
+        "Legacy orbit 52 (%s) did not resolve uniquely.",expectedDepID);
     assert(numel(arrIndex)==1, ...
-        "The saved arrival orbitID did not resolve uniquely.");
+        "Legacy orbit 400 (%s) did not resolve uniquely.",expectedArrID);
+else
+    % Legacy catalog: construct stable IDs from sourceFile and the exact
+    % preserved source column named Id. Do not use a case-insensitive search
+    % because the table can contain more than one ID-like column.
+    idMatch = find(strtrim(tableNames)=="Id");
+    assert(numel(idMatch)==1, ...
+        'Expected one exact source column named Id; found %d.',numel(idMatch));
+    assert(ismember("sourceFile",tableNames), ...
+        "The legacy catalog does not contain sourceFile.");
 
-    depStateError = norm( ...
-        T.state{depIndex}(1,:)-transferRef.dep.state0);
-    arrStateError = norm( ...
-        T.state{arrIndex}(1,:)-transferRef.arr.state0);
-    depPeriodError = abs(periods(depIndex)-transferRef.dep.period);
-    arrPeriodError = abs(periods(arrIndex)-transferRef.arr.period);
+    sourceIds = strtrim(string(T.(char(tableNames(idMatch)))));
+    sourceStem = erase(lower(strtrim(string(T.sourceFile))),".csv");
+    catalogIds = sourceStem+":"+sourceIds;
 
-    fprintf("Existing transfer reference resolved in the rebuilt catalog.\n\n");
-    fprintf("Departure: row %d, slot %d, %s\n", ...
-        depIndex,transferRef.dep.slot,transferRef.dep.orbitID);
-    fprintf("  Initial-state error: %.6e\n",depStateError);
-    fprintf("  Period error:        %.6e TU\n",depPeriodError);
-    fprintf("Arrival:   row %d, slot %d, %s\n", ...
-        arrIndex,transferRef.arr.slot,transferRef.arr.orbitID);
-    fprintf("  Initial-state error: %.6e\n",arrStateError);
-    fprintf("  Period error:        %.6e TU\n",arrPeriodError);
+    depIndex = legacyDepIndex;
+    arrIndex = legacyArrIndex;
 
-    assert(depStateError<=1e-12 && arrStateError<=1e-12, ...
-        "A transfer-reference orbit state changed during catalog rebuilding.");
-    assert(depPeriodError<=1e-12 && arrPeriodError<=1e-12, ...
-        "A transfer-reference orbit period changed during catalog rebuilding.");
-
-    fprintf("\nReference validation passed. No file was overwritten.\n");
-    return;
+    assert(catalogIds(depIndex)==expectedDepID, ...
+        "Legacy row 52 resolved to %s instead of %s.", ...
+        catalogIds(depIndex),expectedDepID);
+    assert(catalogIds(arrIndex)==expectedArrID, ...
+        "Legacy row 400 resolved to %s instead of %s.", ...
+        catalogIds(arrIndex),expectedArrID);
 end
-
-% Legacy capture mode. These indices refer only to the catalog that was
-% used by the original study, before filtering/reordering.
-depIndex = 51;
-arrIndex = 400;
-
-trimmedNames = strtrim(tableNames);
-idMatch = find(trimmedNames=="Id");
-
-if isempty(idMatch)
-    idMatch = find(strcmpi(trimmedNames,"id"));
-end
-
-assert(numel(idMatch)==1, ...
-    'Expected exactly one source Id column. Found: %s', ...
-    strjoin(tableNames(idMatch),', '));
-
-sourceIds = strtrim(string(T.(char(tableNames(idMatch)))));
-
-assert(ismember("sourceFile",tableNames), ...
-    "The legacy catalog does not contain sourceFile.");
-
-sourceStem = erase(lower(strtrim(string(T.sourceFile))),".csv");
-catalogIds = sourceStem+":"+sourceIds;
-
-assert(numel(unique(catalogIds))==height(T), ...
-    "The composite sourceFile + Id identifiers are not unique.");
 
 transferRef = struct();
 
-transferRef.dep.legacyIndex = depIndex;
-transferRef.dep.slot = 10;
+transferRef.dep.legacyIndex = legacyDepIndex;
+transferRef.dep.newIndex = depIndex;
+transferRef.dep.slot = depSlot;
 transferRef.dep.state0 = T.state{depIndex}(1,:);
 transferRef.dep.period = periods(depIndex);
 transferRef.dep.family = T.orbitFamily(depIndex);
-transferRef.dep.orbitID = catalogIds(depIndex);
+transferRef.dep.orbitID = expectedDepID;
 
-transferRef.arr.legacyIndex = arrIndex;
-transferRef.arr.slot = 1;
+transferRef.arr.legacyIndex = legacyArrIndex;
+transferRef.arr.newIndex = arrIndex;
+transferRef.arr.slot = arrSlot;
 transferRef.arr.state0 = T.state{arrIndex}(1,:);
 transferRef.arr.period = periods(arrIndex);
 transferRef.arr.family = T.orbitFamily(arrIndex);
-transferRef.arr.orbitID = catalogIds(arrIndex);
+transferRef.arr.orbitID = expectedArrID;
 
 save(referencePath,"transferRef");
 
-fprintf("Saved legacy transfer reference to:\n  %s\n",referencePath);
-fprintf("Departure: legacy orbit %d, slot %d, %s\n", ...
-    depIndex,transferRef.dep.slot,transferRef.dep.orbitID);
-fprintf("Arrival:   legacy orbit %d, slot %d, %s\n", ...
-    arrIndex,transferRef.arr.slot,transferRef.arr.orbitID);
+fprintf("Saved original low-thrust transfer reference to:\n  %s\n", ...
+    referencePath);
+fprintf("Departure: legacy row %d -> current row %d, slot %d, %s\n", ...
+    legacyDepIndex,depIndex,depSlot,expectedDepID);
+fprintf("Arrival:   legacy row %d -> current row %d, slot %d, %s\n", ...
+    legacyArrIndex,arrIndex,arrSlot,expectedArrID);
