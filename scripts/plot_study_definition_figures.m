@@ -737,7 +737,8 @@ for k = 1:height(stateTable)
         stateTable.vx_LU_TU(k),stateTable.vy_LU_TU(k), ...
         stateTable.vz_LU_TU(k)];
 
-    stateText = strjoin(compose('%.12g',state),',\,');
+    latexSeparator = [',' char(92) ','];
+    stateText = strjoin(compose('%.12g',state),latexSeparator);
 
     fprintf(fid,'%s & %s & %.12g & $[%s]^{\\mathsf{T}}$ \\\\\n', ...
         char(stateTable.caseName(k)),char(stateTable.condition(k)), ...
