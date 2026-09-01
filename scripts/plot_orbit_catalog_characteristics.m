@@ -6,7 +6,7 @@ projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
 projectPaths = setup_project();
 
-outputDir = fullfile(projectPaths.results, 'reviewer2_figures');
+outputDir = fullfile(projectPaths.results, 'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
 
 catalog = load(projectPaths.catalog, 'T');

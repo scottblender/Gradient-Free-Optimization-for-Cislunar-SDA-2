@@ -1,11 +1,11 @@
-function outputs = plot_reviewer2_figures()
-% Generate the pre-study figures added in response to Reviewer 2.
+function outputs = plot_study_definition_figures()
+% Generate catalog, slot-definition, and target-case figures.
 
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
 setup_project();
 
-fprintf('\n--- Reviewer 2 pre-study figures ---\n');
+fprintf('\n--- Study-definition figures ---\n');
 
 fprintf('\n1/3 Orbit catalog characteristics\n');
 outputs.catalog = plot_orbit_catalog_characteristics();
@@ -17,5 +17,5 @@ fprintf('\n3/3 Tracking cases\n');
 fprintf('The low-thrust panel solves the transfer and can take several minutes.\n');
 outputs.cases = plot_tracking_cases();
 
-fprintf('\nAll Reviewer 2 pre-study figures were generated.\n');
+fprintf('\nAll study-definition figures were generated.\n');
 end
