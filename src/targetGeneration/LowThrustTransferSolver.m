@@ -72,8 +72,15 @@ classdef LowThrustTransferSolver
             info.output            = output;
             info.resnorm           = norm(residual)^2;
             info.residualVector    = residual;
+            info.x_dep             = x_dep;
             info.xf                = finalData.xf;
             info.x_arr             = finalData.x_arr;
+            if isfield(tr,'fixedDepartureState') && ...
+                    ~isempty(tr.fixedDepartureState)
+                info.departureStateSource = "FIXED_STATE";
+            else
+                info.departureStateSource = "ORBIT_DATABASE_SLOT";
+            end
             info.lambda_f          = finalData.lambda_f;
             info.mass_final        = finalData.mass_final;
             info.controls          = finalData.controls;
@@ -98,6 +105,17 @@ classdef LowThrustTransferSolver
 
         function x_dep = getDepartureState(obj)
             tr = obj.getTransferCfg();
+
+            if isfield(tr,'fixedDepartureState') && ...
+                    ~isempty(tr.fixedDepartureState)
+                x_dep = tr.fixedDepartureState(:);
+                if numel(x_dep) ~= 6
+                    error( ...
+                        'transfer.fixedDepartureState must have 6 elements.');
+                end
+                return;
+            end
+
             iDep = tr.depOrbitIndex;
             jDep = tr.depSlot;
             x_dep = obj.orbit_database{iDep}(jDep,:).';
