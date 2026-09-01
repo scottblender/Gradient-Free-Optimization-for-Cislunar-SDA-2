@@ -230,15 +230,18 @@ fprintf([ ...
 T = T(~T.nearLG,:);
 
 % ---------------- Orbit-family selection ----------------
+% Select 50 representative trajectories from the full eligible population
+% of every family using one-dimensional Latin-hypercube targets along a
+% geometry coordinate that spans the family continuation. Stability is
+% deliberately NOT used as either a filter or a sampling coordinate so it
+% remains an outcome variable for the optimization study.
 K = 50;
-
-DRO_STABILITY_MAX = 1 + 1e-8;
-DRO_LHS_SEED = 20260831;
+LHS_SEED_BASE = 20260901;
 
 T.stability = T.("Stability index  ");
 T.period_TU = T.("Period (TU) ");
 
-families = unique(T.orbitFamily);
+families = sort(unique(T.orbitFamily));
 keepMask = false(height(T),1);
 
 for f = 1:numel(families)
@@ -246,41 +249,37 @@ for f = 1:numel(families)
     familyName = families(f);
     familyIdx = find(T.orbitFamily == familyName);
 
+    assert(numel(familyIdx) >= K, ...
+        ['Fewer than %d eligible %s candidates remain after collision ' ...
+         'and near-Gateway screening.'], K, familyName);
+
     if familyName == "DRO"
-
-        stableMask = ...
-            isfinite(T.stability(familyIdx)) & ...
-            T.stability(familyIdx) <= DRO_STABILITY_MAX;
-
-        candidateIdx = familyIdx(stableMask);
-
-        fprintf('DRO candidates: %d total, %d satisfying stability <= %.8f\n', ...
-            numel(familyIdx), numel(candidateIdx), ...
-            DRO_STABILITY_MAX);
-
-        assert(numel(candidateIdx) >= K, ...
-            ['Fewer than %d stable DRO candidates remain after ' ...
-             'collision and near-Gateway screening.'], K);
-
-        localTake = select_dro_lhs( ...
-            T(candidateIdx,:), K, DRO_LHS_SEED);
-
-        take = candidateIdx(localTake);
-
+        % DROs are planar, so out-of-plane amplitude cannot parameterize
+        % the family. Moon-relative apolune altitude provides a monotonic
+        % geometric progression across the available DRO trajectories.
+        sampleValue = T.apoluneAltitude_km(familyIdx);
+        sampleCoordinate = "apolune altitude";
     else
-
-        stability = T.stability(familyIdx);
-        stability(~isfinite(stability)) = inf;
-
-        [~, order] = sort(stability, "ascend");
-        take = familyIdx(order(1:min(K,numel(order))));
-
+        % Halo and NRHO families are naturally spanned by their
+        % out-of-plane extent. Use the propagated maximum |z| amplitude,
+        % not stability, to distribute the 50 representatives.
+        sampleValue = T.zAmplitude(familyIdx);
+        sampleCoordinate = "z amplitude";
     end
+
+    localTake = select_family_lhs( ...
+        sampleValue, K, LHS_SEED_BASE + f);
+    take = familyIdx(localTake);
+
+    fprintf('%s candidates: %d eligible; selected %d by LHS over %s.
+', ...
+        familyName, numel(familyIdx), numel(take), sampleCoordinate);
 
     keepMask(take) = true;
 end
 
-fprintf("Keeping %d total orbits after family selection.\n", ...
+fprintf("Keeping %d total orbits after all-family LHS selection.
+", ...
     nnz(keepMask));
 
 T = T(keepMask,:);
@@ -295,8 +294,8 @@ assert(numel(unique(catalogIds)) == height(T), ...
     "The selected catalog contains duplicate orbitID values.");
 
 % Preserve the original global z-amplitude ordering for Halo and
-% near-rectilinear Halo families. Organize the separately sampled DRO
-% population by ascending apolune altitude, then append it to the catalog.
+% near-rectilinear Halo families. Organize the LHS-sampled DRO population
+% by ascending apolune altitude, then append it to the catalog.
 isDROFinal = T.orbitFamily == "DRO";
 
 haloCatalog = sortrows(T(~isDROFinal,:), ...
@@ -352,45 +351,40 @@ function [value, isTerminal, direction] = moonImpactEvent(t,s,mu,R_moon)
     direction = -1;
 end
 
-function take = select_dro_lhs(Tdro, K, seed)
-% Select actual DRO catalog rows using Latin-hypercube targets distributed
-% over the Moon-relative apolune-altitude range.
+function take = select_family_lhs(value, K, seed)
+% Select actual catalog rows using Latin-hypercube targets distributed over
+% a scalar geometric coordinate spanning one eligible orbit family.
 
-assert(height(Tdro) >= K, ...
-    "The DRO candidate table must contain at least K rows.");
-
-value = Tdro.apoluneAltitude_km;
-
+value = value(:);
+assert(numel(value) >= K, ...
+    "The family candidate set must contain at least K rows.");
 assert(all(isfinite(value)), ...
-    "DRO apolune altitudes contain nonfinite values.");
+    "The family LHS coordinate contains nonfinite values.");
 
 valueMin = min(value);
 valueMax = max(value);
-
 assert(valueMax > valueMin, ...
-    "The DRO apolune-altitude range is zero.");
+    "The family LHS coordinate range is zero.");
 
-valueNormalized = ...
-    (value - valueMin) ./ (valueMax - valueMin);
+valueNormalized = (value - valueMin) ./ (valueMax - valueMin);
 
 previousRng = rng;
-cleanup = onCleanup(@() rng(previousRng));
+cleanup = onCleanup(@() rng(previousRng)); %#ok<NASGU>
 rng(seed, "twister");
 
-% One target in every equal-width portion of [0,1].
+% Draw one target in every equal-width stratum of [0,1]. The nearest
+% currently available catalog trajectory is assigned to each target so the
+% result remains a subset of the original JPL orbit population.
 targets = lhsdesign(K, 1, "Criterion", "none");
 targets = sort(targets);
 
-available = true(height(Tdro),1);
+available = true(numel(value),1);
 take = zeros(K,1);
 
 for k = 1:K
-
     distance = abs(valueNormalized - targets(k));
     distance(~available) = inf;
-
     [~, selected] = min(distance);
-
     take(k) = selected;
     available(selected) = false;
 end

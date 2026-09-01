@@ -1,5 +1,5 @@
 function audit = test_observer_catalog()
-%TEST_OBSERVER_CATALOG Validate the filtered 450-orbit observer database.
+%TEST_OBSERVER_CATALOG Validate the LHS-selected 450-orbit observer database.
 
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir); paths = setup_project();
@@ -22,9 +22,8 @@ for k = 1:numel(familyOrder)
     counts(k) = nnz(use);
     assert(counts(k)==50, 'Expected 50 %s %s observer orbits, found %d.',familyOrder(k),regionOrder(k),counts(k));
 end
-isDRO = string(T.manuscriptFamily)=="DRO";
-assert(all(T.stability(isDRO) <= 1+1e-8), 'A selected DRO exceeds the stability threshold.');
-audit = struct('numOrbits',height(T),'familyCounts',counts,'maxJacobiVariation',max(T.jacobiVariation),'jacobiRange',[min(T.jacobiConstant),max(T.jacobiConstant)]);
+assert(all(isfinite(T.stability)), 'A selected observer orbit has a nonfinite stability index.');
+audit = struct('numOrbits',height(T),'familyCounts',counts,'maxJacobiVariation',max(T.jacobiVariation),'jacobiRange',[min(T.jacobiConstant),max(T.jacobiConstant)],'stabilityRange',[min(T.stability),max(T.stability)]);
 fprintf('\nObserver catalog audit passed.\n');
 fprintf('Selected observer orbits: %d\n',audit.numOrbits);
 fprintf('Maximum Jacobi variation: %.6e\n',audit.maxJacobiVariation);
