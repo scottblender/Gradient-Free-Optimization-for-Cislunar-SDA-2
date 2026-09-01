@@ -513,21 +513,17 @@ if missionCfg.type == "LOW_THRUST_TRANSFER" && useTransferCache
 
     if isfile(cacheFile)
         try
-            safe_printf('Loading cached transfer truth from:
-  %s
-', cacheFile);
+            safe_printf('Loading cached transfer truth from:\n  %s\n', cacheFile);
             C = load(cacheFile, 't_target', 's_target', 'truthInfo', 'cacheMeta');
             t_target  = C.t_target;
             s_target  = C.s_target;
             truthInfo = C.truthInfo;
             if isfield(C, 'cacheMeta')
-                safe_printf('Cached transfer key: %s
-', string(C.cacheMeta.cacheKey));
+                safe_printf('Cached transfer key: %s\n', string(C.cacheMeta.cacheKey));
             end
             loadedFromCache = true;
         catch ME
-            safe_printf(2, 'WARNING: failed to load transfer cache, rebuilding: %s
-', ME.message);
+            safe_printf(2, 'WARNING: failed to load transfer cache, rebuilding: %s\n', ME.message);
             try
                 delete(cacheFile);
             catch
@@ -536,8 +532,7 @@ if missionCfg.type == "LOW_THRUST_TRANSFER" && useTransferCache
     end
 
     if ~loadedFromCache
-        safe_printf('No valid cached transfer found. Computing transfer truth.
-');
+        safe_printf('No valid cached transfer found. Computing transfer truth.\n');
         [t_target, s_target, truthInfo] = build_target_truth( ...
             missionCfg, T1, orbit_database, times, states, mu, ode_opts);
 
@@ -553,12 +548,9 @@ if missionCfg.type == "LOW_THRUST_TRANSFER" && useTransferCache
             if isfile(cacheFile), delete(cacheFile); end
             save(tmpFile, 't_target', 's_target', 'truthInfo', 'cacheMeta', '-v7.3');
             movefile(tmpFile, cacheFile, 'f');
-            safe_printf('Saved transfer truth cache to:
-  %s
-', cacheFile);
+            safe_printf('Saved transfer truth cache to:\n  %s\n', cacheFile);
         catch ME
-            safe_printf(2, 'WARNING: failed to save transfer cache: %s
-', ME.message);
+            safe_printf(2, 'WARNING: failed to save transfer cache: %s\n', ME.message);
             try
                 if isfile(tmpFile), delete(tmpFile); end
             catch

@@ -125,9 +125,7 @@ fprintf('\nGenerating Lunar Gateway truth...\n');
 
 missionCfg = target_case_config("LOW_THRUST_TRANSFER");
 
-fprintf('
-Generating fixed-boundary low-thrust transfer.
-');
+fprintf('\nGenerating fixed-boundary low-thrust transfer.\n');
 
 [t_transfer, s_transfer, transferInfo] = build_target_truth( ...
     missionCfg, T1, orbit_database, times, states, mu, ode_opts);

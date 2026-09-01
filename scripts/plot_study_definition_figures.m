@@ -620,12 +620,8 @@ outputs = struct(); outputs.figures = figureFiles; outputs.gatewayFigure = figur
 outputs.metadata = string(metadataFile); outputs.normalizedStateConditionsFile = string(normalizedStateFile); outputs.dimensionalStateConditionsFile = string(dimensionalStateFile); outputs.latexStateRows = string(latexRowsFile); outputs.reproductionFile = string(reproductionFile);
 outputs.stateConditionsND = stateConditionsND; outputs.stateConditionsDimensional = stateConditionsDimensional; outputs.gatewayInfo = gatewayInfo; outputs.transferInfo = transferInfo; outputs.impulseInfo = impulseInfo;
 
-fprintf('Saved the three separate tracking-case figures to:
-  %s
-',outputDir);
-fprintf('
-Normalized initial, maneuver, and final conditions:
-'); disp(stateConditionsND);
+fprintf('Saved the three separate tracking-case figures to:\n  %s\n',outputDir);
+fprintf('\nNormalized initial, maneuver, and final conditions:\n'); disp(stateConditionsND);
 end
 
 
