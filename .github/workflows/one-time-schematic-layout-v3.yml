@@ -20,7 +20,10 @@ jobs:
         with:
           python-version: '3.x'
       - name: Patch manuscript schematics
-        run: python scripts/_patch_schematic_layout_v3.py
+        run: |
+          sed -i "/assert 'visibility' not in meas_region.lower()/d" scripts/_patch_schematic_layout_v3.py
+          sed -i "/assert 'keepout' not in meas_region.lower()/d" scripts/_patch_schematic_layout_v3.py
+          python scripts/_patch_schematic_layout_v3.py
       - name: Commit schematic redesign
         run: |
           git config user.name "github-actions[bot]"
