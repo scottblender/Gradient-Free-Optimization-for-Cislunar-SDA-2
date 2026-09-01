@@ -45,6 +45,12 @@ timeCell      = cell(N,1);
 stateCell     = cell(N,1);
 collidesVec   = false(N,1);
 zAmplitudeVec = nan(N,1);
+periluneAltitudeVec  = nan(N,1);
+apoluneAltitudeVec   = nan(N,1);
+xAmplitudeVec        = nan(N,1);
+yAmplitudeVec        = nan(N,1);
+inPlaneAmplitudeVec  = nan(N,1);
+outPlaneAmplitudeVec = nan(N,1);
 x0s     = T{:, "x0 (LU) "};        % extract data from each row of the table
 y0s    = T{:, "y0 (LU) "};
 z0s     = T{:, "z0 (LU) "};
@@ -73,7 +79,32 @@ parfor j = 1:N
         collidesVec(j) = true;
         continue
     end
-    % z-amplitude
+
+    % Moon-relative position
+    rRel = state(:,1:3) - [1-mu, 0, 0];
+    rMoon = vecnorm(rRel, 2, 2);
+    
+    % Moon-relative altitudes
+    periluneAltitudeVec(j) = ...
+        (min(rMoon) - R_moon) * LU;
+    
+    apoluneAltitudeVec(j) = ...
+        (max(rMoon) - R_moon) * LU;
+    
+    % Half peak-to-peak amplitudes
+    xAmplitudeVec(j) = ...
+        0.5 * (max(state(:,1)) - min(state(:,1))) * LU;
+    
+    yAmplitudeVec(j) = ...
+        0.5 * (max(state(:,2)) - min(state(:,2))) * LU;
+    
+    inPlaneAmplitudeVec(j) = hypot( ...
+        xAmplitudeVec(j), yAmplitudeVec(j));
+    
+    outPlaneAmplitudeVec(j) = ...
+        0.5 * (max(state(:,3)) - min(state(:,3))) * LU;
+    
+    % Retain the original nondimensional column if existing code needs it
     zAmplitudeVec(j) = max(abs(state(:,3)));
 end
 % add columns to table (time history, state history, collision,
@@ -82,6 +113,12 @@ T.time        = timeCell;
 T.state       = stateCell;
 T.collides    = collidesVec;
 T.zAmplitude  = zAmplitudeVec;
+T.periluneAltitude_km  = periluneAltitudeVec;
+T.apoluneAltitude_km   = apoluneAltitudeVec;
+T.xAmplitude_km        = xAmplitudeVec;
+T.yAmplitude_km        = yAmplitudeVec;
+T.inPlaneAmplitude_km  = inPlaneAmplitudeVec;
+T.outPlaneAmplitude_km = outPlaneAmplitudeVec;
 
 % filter out orbits that collide with moon
 T = T(~T.collides, :);
@@ -134,17 +171,6 @@ nearLG_thresh = 5e-3;   % LU (tune). 0.005 LU ~ 1900 km
 rLG = s_lg(:,1:3);
 states_local = T.state;      % cell array
 N_local      = numel(states_local);
-
-% filter out DRO orbits (if any) before computing near-LG proximity
-isDRO = contains(T.orbitFamily, "DRO", "IgnoreCase", true);
-if any(isDRO)
-    fprintf('Excluding %d DRO orbits from consideration (user requested no DROs)\n', nnz(isDRO));
-    T = T(~isDRO, :);
-    % update local variables that depend on T
-    states_local = T.state;
-    N_local = numel(states_local);
-end
-
 nearLG_score = nan(N_local,1);
 nearLG = false(N_local,1);
 
@@ -172,38 +198,107 @@ T.nearLG = nearLG;
 fprintf('Excluding %d/%d as near-LG (thresh=%.3g LU)\n', nnz(T.nearLG), height(T), nearLG_thresh);
 T = T(~T.nearLG, :);
 
-% keep top K most stable per family
+% ---------------- Orbit-family selection ----------------
 K = 50;
 
-% Grab stability column (your column name has extra spaces)
-stab = T.("Stability index  ");
-T.stability = stab;  % optional: normalize the name
+DRO_STABILITY_MAX = 1 + 1e-8;
+DRO_LHS_SEED = 20260831;
+
+T.stability = T.("Stability index  ");
+T.period_TU = T.("Period (TU) ");
 
 families = unique(T.orbitFamily);
 keepMask = false(height(T),1);
 
 for f = 1:numel(families)
-    fam = families(f);
-    idx = find(T.orbitFamily == fam);
 
-    stab_f = T.stability(idx);
-    stab_f(~isfinite(stab_f)) = inf;
+    familyName = families(f);
+    familyIdx = find(T.orbitFamily == familyName);
 
-    % If "more stable" means SMALLER stability index, sort ascending.
-    % If it means larger, flip the sort.
-    [~, ord] = sort(stab_f, 'ascend');
+    if familyName == "DRO"
 
-    take = idx(ord(1:min(K, numel(ord))));
+        stableMask = ...
+            isfinite(T.stability(familyIdx)) & ...
+            T.stability(familyIdx) <= DRO_STABILITY_MAX;
+
+        candidateIdx = familyIdx(stableMask);
+
+        fprintf(["DRO candidates: %d total, " ...
+                 "%d satisfying stability <= %.8f\n"], ...
+            numel(familyIdx), numel(candidateIdx), ...
+            DRO_STABILITY_MAX);
+
+        assert(numel(candidateIdx) >= K, ...
+            ["Fewer than %d stable DRO candidates remain after " ...
+             "collision and near-Gateway screening."], K);
+
+        localTake = select_dro_lhs( ...
+            T(candidateIdx,:), K, DRO_LHS_SEED);
+
+        take = candidateIdx(localTake);
+
+    else
+
+        stability = T.stability(familyIdx);
+        stability(~isfinite(stability)) = inf;
+
+        [~, order] = sort(stability, "ascend");
+        take = familyIdx(order(1:min(K,numel(order))));
+
+    end
+
     keepMask(take) = true;
 end
 
-fprintf('Keeping %d total orbits after top-%d per family filter.\n', nnz(keepMask), K);
+fprintf("Keeping %d total orbits after family selection.\n", ...
+    nnz(keepMask));
+
 T = T(keepMask,:);
 
+T.orbitID = strings(height(T),1);
+
+for i = 1:height(T)
+
+    orbitKey = [ ...
+        T.state{i}(1,:), ...
+        T.period_TU(i)];
+
+    T.orbitID(i) = "orb_" + study_hash(orbitKey);
+end
+
 % finally, sort orbits by z-amplitude
-T = sortrows(T, 'zAmplitude');
-save(fullfile(projectPaths.data, 'JPL_CR3BP_OrbitCatalog.mat'), ...
-    'T','t_lg','s_lg','dt_lg','-v7.3');
+T = sortrows(T, ...
+    ["orbitFamily", "apoluneAltitude_km", ...
+     "period_TU", "orbitID"]);
+
+referencePath = fullfile(projectRoot, ...
+    "data", "transfer_reference.mat");
+
+if isfile(referencePath)
+
+    Sref = load(referencePath, "transferRef");
+    transferRef = Sref.transferRef;
+
+    transferRef.dep.newIndex = ...
+        find_reference_orbit(T, transferRef.dep.state0);
+
+    transferRef.arr.newIndex = ...
+        find_reference_orbit(T, transferRef.arr.state0);
+
+    transferRef.dep.orbitID = ...
+        T.orbitID(transferRef.dep.newIndex);
+
+    transferRef.arr.orbitID = ...
+        T.orbitID(transferRef.arr.newIndex);
+
+    save(referencePath, "transferRef");
+
+    fprintf("Remapped transfer endpoints:\n");
+    fprintf("  Departure: row %d, slot %d\n", ...
+        transferRef.dep.newIndex, transferRef.dep.slot);
+    fprintf("  Arrival:   row %d, slot %d\n", ...
+        transferRef.arr.newIndex, transferRef.arr.slot);
+end
 toc
 
 
@@ -225,4 +320,67 @@ function [value, isTerminal, direction] = moonImpactEvent(t,s,mu,R_moon)
     value = dist - R_moon;
     isTerminal = 1;
     direction = -1;
+end
+
+function take = select_dro_lhs(Tdro, K, seed)
+% Select actual DRO catalog rows using Latin-hypercube targets distributed
+% over the Moon-relative apolune-altitude range.
+
+assert(height(Tdro) >= K, ...
+    "The DRO candidate table must contain at least K rows.");
+
+value = Tdro.apoluneAltitude_km;
+
+assert(all(isfinite(value)), ...
+    "DRO apolune altitudes contain nonfinite values.");
+
+valueMin = min(value);
+valueMax = max(value);
+
+assert(valueMax > valueMin, ...
+    "The DRO apolune-altitude range is zero.");
+
+valueNormalized = ...
+    (value - valueMin) ./ (valueMax - valueMin);
+
+previousRng = rng;
+cleanup = onCleanup(@() rng(previousRng));
+rng(seed, "twister");
+
+% One target in every equal-width portion of [0,1].
+targets = lhsdesign(K, 1, "Criterion", "none");
+targets = sort(targets);
+
+available = true(height(Tdro),1);
+take = zeros(K,1);
+
+for k = 1:K
+
+    distance = abs(valueNormalized - targets(k));
+    distance(~available) = inf;
+
+    [~, selected] = min(distance);
+
+    take(k) = selected;
+    available(selected) = false;
+end
+end
+
+function index = find_reference_orbit(T, referenceState)
+
+initialStates = zeros(height(T),6);
+
+for i = 1:height(T)
+    initialStates(i,:) = T.state{i}(1,:);
+end
+
+distance = vecnorm( ...
+    initialStates - referenceState, 2, 2);
+
+[minimumDistance, index] = min(distance);
+
+assert(minimumDistance < 1e-10, ...
+    ["The original transfer orbit was not retained in the " ...
+    "new catalog. Minimum state difference: %.3e"], ...
+    minimumDistance);
 end

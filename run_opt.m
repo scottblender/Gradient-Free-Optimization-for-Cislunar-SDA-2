@@ -263,10 +263,26 @@ switch missionCfg.type
         missionCfg.periodic.Nperiods   = 1;
 
     case "LOW_THRUST_TRANSFER"
-        missionCfg.transfer.depOrbitIndex = 51;
-        missionCfg.transfer.depSlot       = 10;
-        missionCfg.transfer.arrOrbitIndex = 400;
-        missionCfg.transfer.arrSlot       = 1;
+        referencePath = fullfile(projectRoot, ...
+    "data", "transfer_reference.mat");
+        Sref = load(referencePath, "transferRef");
+        transferRef = Sref.transferRef;
+        missionCfg.transfer.depOrbitID = ...
+            transferRef.dep.orbitID;
+        missionCfg.transfer.depOrbitIndex = find( ...
+            T1.orbitID == missionCfg.transfer.depOrbitID, 1);
+        missionCfg.transfer.depSlot = ...
+            transferRef.dep.slot;
+        missionCfg.transfer.arrOrbitID = ...
+            transferRef.arr.orbitID;
+        missionCfg.transfer.arrOrbitIndex = find( ...
+            T1.orbitID == missionCfg.transfer.arrOrbitID, 1);
+        missionCfg.transfer.arrSlot = ...
+            transferRef.arr.slot;
+        assert(~isempty(missionCfg.transfer.depOrbitIndex), ...
+            "Departure orbit ID was not found.");
+        assert(~isempty(missionCfg.transfer.arrOrbitIndex), ...
+            "Arrival orbit ID was not found.");
         missionCfg.transfer.dt            = 0.001;
         missionCfg.transfer.solverMode    = "LOW_THRUST_CLASS";
 
