@@ -6,6 +6,7 @@ function summary = test_small_fe_case(algorithms, seeds, missionType)
 %   test_small_fe_case("PSO", 0)
 %   test_small_fe_case(["GA","PSO","BAYESIAN","ABC","ACO"], 0)
 %   test_small_fe_case("GA", 0, "LOW_THRUST_TRANSFER")
+%   test_small_fe_case("GA", 0, "GATEWAY_IMPULSE")
 %
 % This runs the selected real objective and final diagnostic replay.
 % One additional objective evaluation checks the saved winner.
@@ -27,7 +28,8 @@ algorithms = upper(string(algorithms));
 missionType = upper(string(missionType));
 
 assert(isscalar(missionType) && ...
-    ismember(missionType, ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER"]), ...
+    ismember(missionType, ...
+    ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"]), ...
     'Unknown pilot mission type.');
 
 assert(all(ismember(algorithms, ...
@@ -61,6 +63,9 @@ settings = {
     'EKF_DT',           '0.01'
     'STUDY_ID',         char("reviewer2_pilot_" + lower(missionType))
     'MAKE_PLOTS',       '0'
+    'IMPULSE_DV_MPS',    '10'
+    'IMPULSE_DIRECTION', 'PROGRADE'
+    'IMPULSE_DURATION_TU','1.5'
 };
 
 envNames = [

@@ -11,6 +11,10 @@ switch missionType
     case "PERIODIC_ORBIT"
         [t_target, s_target, info] = build_truth_periodic_orbit( ...
             missionCfg.periodic, T1, times, states, mu, ode_opts);
+
+    case "GATEWAY_IMPULSE"
+        [t_target, s_target, info] = build_truth_gateway_impulse( ...
+            missionCfg.impulse, mu, ode_opts);
     
     case "LOW_THRUST_TRANSFER"
 

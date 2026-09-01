@@ -262,6 +262,39 @@ switch missionCfg.type
         missionCfg.periodic.dt         = 0.001;
         missionCfg.periodic.Nperiods   = 1;
 
+    case "GATEWAY_IMPULSE"
+        missionCfg.impulse.s0 = [1.02202108343387, 0, -0.182096487798513, ...
+                                 0, -0.103255420206012, 0]';
+        missionCfg.impulse.period = 1.51110546287394;
+        missionCfg.impulse.dt = 0.001;
+        missionCfg.impulse.duration_TU = 1.5;
+        missionCfg.impulse.deltaV_m_s = 10;
+        missionCfg.impulse.direction = "PROGRADE";
+        missionCfg.impulse.periluneSearchSamples = 4001;
+
+        v = getenv("IMPULSE_DURATION_TU");
+        if ~isempty(v)
+            missionCfg.impulse.duration_TU = str2double(v);
+        end
+
+        v = getenv("IMPULSE_DV_MPS");
+        if ~isempty(v)
+            missionCfg.impulse.deltaV_m_s = str2double(v);
+        end
+
+        v = getenv("IMPULSE_DIRECTION");
+        if ~isempty(v)
+            missionCfg.impulse.direction = upper(string(v));
+        end
+
+        validateattributes(missionCfg.impulse.duration_TU, {'numeric'}, ...
+            {'scalar','real','finite','positive'});
+        validateattributes(missionCfg.impulse.deltaV_m_s, {'numeric'}, ...
+            {'scalar','real','finite','positive'});
+
+        missionCfg.impulse.deltaV_LU_TU = ...
+            (missionCfg.impulse.deltaV_m_s / 1000) / VU;
+
     case "LOW_THRUST_TRANSFER"
         referencePath = fullfile(projectPaths.data, ...
             "transfer_reference.mat");
@@ -371,6 +404,8 @@ if strlength(string(RunDir)) == 0
             missionCode = "lt";
         case "LUNAR_GATEWAY"
             missionCode = "lg";
+        case "GATEWAY_IMPULSE"
+            missionCode = "gi";
         case "PERIODIC_ORBIT"
             missionCode = "po";
         otherwise
@@ -423,6 +458,8 @@ switch upper(string(missionCfg.type))
         missionCodeShort = "lt";
     case "LUNAR_GATEWAY"
         missionCodeShort = "lg";
+    case "GATEWAY_IMPULSE"
+        missionCodeShort = "gi";
     case "PERIODIC_ORBIT"
         missionCodeShort = "po";
     otherwise
@@ -466,7 +503,9 @@ if strcmp(MISSION_TYPE, "LOW_THRUST_TRANSFER")
             R_k = diag([r_ang r_ang r_range]);
     end
 
-elseif strcmp(MISSION_TYPE, "LUNAR_GATEWAY") || strcmp(MISSION_TYPE, "PERIODIC_ORBIT")
+elseif strcmp(MISSION_TYPE, "LUNAR_GATEWAY") || ...
+        strcmp(MISSION_TYPE, "GATEWAY_IMPULSE") || ...
+        strcmp(MISSION_TYPE, "PERIODIC_ORBIT")
     pos_var  = (1 / LU)^2;
     vel_var  = (10 / (VU * 1000))^2;
     P_0 = diag([pos_var, pos_var, pos_var, vel_var, vel_var, vel_var]);
@@ -498,7 +537,7 @@ switch upper(string(missionCfg.type))
         costCfg.sigma_vel_acc = 0.1 / VU;
         costCfg.stability_acc = 1.0;
 
-    case "LUNAR_GATEWAY"
+    case {"LUNAR_GATEWAY", "GATEWAY_IMPULSE"}
         costCfg.pos_rmse_acc = 1 / LU;
         costCfg.vel_rmse_acc = 1.0e-3 / VU;
         costCfg.sigma_pos_acc = 1 / LU;
@@ -609,7 +648,8 @@ else
 end
 
 % ---------------- Moon impact check ----------------
-if contains(string(missionCfg.type), "TRANSFER")
+if contains(string(missionCfg.type), "TRANSFER") || ...
+        missionCfg.type == "GATEWAY_IMPULSE"
     r_moon = [1 - mu, 0, 0];
     R_moon = 1737.1 / LU;   % LU
     h_min  = 100 / LU;    % example 100 km keep-out altitude
@@ -618,7 +658,7 @@ if contains(string(missionCfg.type), "TRANSFER")
     min_d_moon = min(d_moon);
 
     if min_d_moon <= (R_moon + h_min)
-        error('Low-thrust trajectory violates Moon keep-out zone. Min distance = %.6e LU.', min_d_moon);
+        error('Target trajectory violates Moon keep-out zone. Min distance = %.6e LU.', min_d_moon);
     end
 end
 
