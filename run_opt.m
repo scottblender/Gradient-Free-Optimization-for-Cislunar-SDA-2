@@ -263,20 +263,29 @@ switch missionCfg.type
         missionCfg.periodic.Nperiods   = 1;
 
     case "LOW_THRUST_TRANSFER"
-        referencePath = fullfile(projectRoot, ...
-    "data", "transfer_reference.mat");
+        referencePath = fullfile(projectPaths.data, ...
+            "transfer_reference.mat");
+        assert(isfile(referencePath), ...
+            "Transfer reference file was not found: %s", referencePath);
+
         Sref = load(referencePath, "transferRef");
         transferRef = Sref.transferRef;
+
+        assert(ismember("Id", string(T1.Properties.VariableNames)), ...
+            "The orbit catalog does not contain the JPL Id column.");
+        catalogIds = string(T1.Id);
+
         missionCfg.transfer.depOrbitID = ...
-            transferRef.dep.orbitID;
+            string(transferRef.dep.Id);
         missionCfg.transfer.depOrbitIndex = find( ...
-            T1.orbitID == missionCfg.transfer.depOrbitID, 1);
+            catalogIds == missionCfg.transfer.depOrbitID, 1);
         missionCfg.transfer.depSlot = ...
             transferRef.dep.slot;
+
         missionCfg.transfer.arrOrbitID = ...
-            transferRef.arr.orbitID;
+            string(transferRef.arr.Id);
         missionCfg.transfer.arrOrbitIndex = find( ...
-            T1.orbitID == missionCfg.transfer.arrOrbitID, 1);
+            catalogIds == missionCfg.transfer.arrOrbitID, 1);
         missionCfg.transfer.arrSlot = ...
             transferRef.arr.slot;
         assert(~isempty(missionCfg.transfer.depOrbitIndex), ...
@@ -1009,8 +1018,8 @@ if useFEBudget
         if ismember('sourceFile',T1.Properties.VariableNames)
             observers.source_file = string(T1.sourceFile(orbit_indices));
         end
-        if ismember('orbitID',T1.Properties.VariableNames)
-            observers.orbit_id = string(T1.orbitID(orbit_indices));
+        if ismember('Id',T1.Properties.VariableNames)
+            observers.orbit_id = string(T1.Id(orbit_indices));
         end
 
         % One diagnostic EKF pass, outside the search budget.
@@ -1259,7 +1268,7 @@ for k = 1:num_obs
     t_raw  = times{iOrb}(:);
     s_raw  = states{iOrb};
     Tper   = tf(iOrb);
-    t_phase = (slot_indices(k)-1) / (slots_per_orbit-1) * Tper;
+    t_phase = (slot_indices(k)-1) * Tper / slots_per_orbit;
     [~, j] = min(abs(t_raw - t_phase));
 
     plot3(ax, s_raw(j,1), s_raw(j,2), s_raw(j,3), 'o', ...

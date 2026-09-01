@@ -255,24 +255,22 @@ fprintf("Keeping %d total orbits after family selection.\n", ...
 
 T = T(keepMask,:);
 
-T.orbitID = strings(height(T),1);
+assert(ismember("Id", string(T.Properties.VariableNames)), ...
+    "The selected catalog does not contain the JPL Id column.");
 
-for i = 1:height(T)
+catalogIds = string(T.Id);
+assert(all(strlength(catalogIds) > 0), ...
+    "One or more selected orbits have an empty Id.");
+assert(numel(unique(catalogIds)) == height(T), ...
+    "The selected catalog contains duplicate Id values.");
 
-    orbitKey = [ ...
-        T.state{i}(1,:), ...
-        T.period_TU(i)];
-
-    T.orbitID(i) = "orb_" + study_hash(orbitKey);
-end
-
-% finally, sort orbits by z-amplitude
+% Deterministic final ordering. Id remains attached to the physical orbit.
 T = sortrows(T, ...
     ["orbitFamily", "apoluneAltitude_km", ...
-     "period_TU", "orbitID"]);
+     "period_TU", "Id"]);
 
-referencePath = fullfile(projectRoot, ...
-    "data", "transfer_reference.mat");
+referencePath = fullfile(projectPaths.data, ...
+    "transfer_reference.mat");
 
 if isfile(referencePath)
 
@@ -285,11 +283,11 @@ if isfile(referencePath)
     transferRef.arr.newIndex = ...
         find_reference_orbit(T, transferRef.arr.state0);
 
-    transferRef.dep.orbitID = ...
-        T.orbitID(transferRef.dep.newIndex);
+    transferRef.dep.Id = ...
+        string(T.Id(transferRef.dep.newIndex));
 
-    transferRef.arr.orbitID = ...
-        T.orbitID(transferRef.arr.newIndex);
+    transferRef.arr.Id = ...
+        string(T.Id(transferRef.arr.newIndex));
 
     save(referencePath, "transferRef");
 
@@ -299,6 +297,13 @@ if isfile(referencePath)
     fprintf("  Arrival:   row %d, slot %d\n", ...
         transferRef.arr.newIndex, transferRef.arr.slot);
 end
+
+catalogPath = fullfile(projectPaths.data, ...
+    "JPL_CR3BP_OrbitCatalog.mat");
+
+save(catalogPath, "T", "t_lg", "s_lg", "dt_lg", "-v7.3");
+fprintf("Saved orbit catalog to:\n  %s\n", catalogPath);
+
 toc
 
 

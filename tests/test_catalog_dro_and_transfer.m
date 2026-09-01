@@ -69,7 +69,7 @@ fprintf("Selected catalog orbits: %d\n\n", height(T));
 % ---------------- Required catalog columns ----------------
 requiredColumns = [
     "orbitFamily"
-    "orbitID"
+    "Id"
     "state"
     "time"
     "periluneAltitude_km"
@@ -97,11 +97,11 @@ stability = get_table_column(T, [
 ]);
 
 families = string(T.orbitFamily);
-orbitIDs = string(T.orbitID);
+orbitIDs = string(T.Id);
 
 % ---------------- General catalog checks ----------------
 assert(all(strlength(orbitIDs) > 0), ...
-    "One or more catalog orbits have an empty orbitID.");
+    "One or more catalog orbits have an empty Id.");
 
 assert(numel(unique(orbitIDs)) == height(T), ...
     "The catalog contains duplicate orbit identifiers.");
@@ -472,7 +472,7 @@ function orbitIndex = validate_transfer_reference( ...
     stateTolerance, periodTolerance)
 
     requiredFields = [
-        "orbitID"
+        "Id"
         "state0"
         "period"
         "slot"
@@ -484,7 +484,8 @@ function orbitIndex = validate_transfer_reference( ...
             label, requiredFields(i));
     end
 
-    matches = find(orbitIDs == string(reference.orbitID));
+    referenceID = string(reference.Id);
+    matches = find(orbitIDs == referenceID);
 
     assert(numel(matches) == 1, ...
         ["%s orbit ID must match exactly one catalog row. " ...
@@ -496,7 +497,7 @@ function orbitIndex = validate_transfer_reference( ...
     if isfield(reference, "newIndex")
 
         assert(reference.newIndex == orbitIndex, ...
-            ["%s stored newIndex is %d, but orbitID resolves " ...
+            ["%s stored newIndex is %d, but Id resolves " ...
              "to row %d."], ...
             label, reference.newIndex, orbitIndex);
     end
@@ -529,7 +530,7 @@ function orbitIndex = validate_transfer_reference( ...
     fprintf("%s transfer orbit:\n", label);
     fprintf("  Catalog row:    %d\n", orbitIndex);
     fprintf("  Slot:           %d\n", reference.slot);
-    fprintf("  Orbit ID:       %s\n", reference.orbitID);
+    fprintf("  Orbit ID:       %s\n", referenceID);
     fprintf("  State error:    %.6e\n", stateError);
     fprintf("  Period error:   %.6e TU\n", periodError);
 end
