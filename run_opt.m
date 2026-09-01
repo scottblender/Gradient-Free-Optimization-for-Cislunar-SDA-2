@@ -296,13 +296,7 @@ switch missionCfg.type
             (missionCfg.impulse.deltaV_m_s / 1000) / VU;
 
     case "LOW_THRUST_TRANSFER"
-        referencePath = fullfile(projectPaths.data, ...
-            "transfer_reference.mat");
-        assert(isfile(referencePath), ...
-            "Transfer reference file was not found: %s", referencePath);
-
-        Sref = load(referencePath, "transferRef");
-        transferRef = Sref.transferRef;
+        transferRef = low_thrust_case_config(T1);
 
         assert(ismember("orbitID", string(T1.Properties.VariableNames)), ...
             "The orbit catalog does not contain orbitID.");
