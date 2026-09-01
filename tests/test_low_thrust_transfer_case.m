@@ -10,12 +10,7 @@ paths = setup_project();
 catalogData = load(paths.catalog, 'T');
 T = catalogData.T;
 
-referencePath = fullfile(paths.data, 'transfer_reference.mat');
-assert(isfile(referencePath), ...
-    'Transfer reference file was not found: %s', referencePath);
-
-referenceData = load(referencePath, 'transferRef');
-transferRef = referenceData.transferRef;
+transferRef = low_thrust_case_config(T);
 
 assert(isfield(transferRef,'targetStateDefinition') && ...
     string(transferRef.targetStateDefinition) == ...
