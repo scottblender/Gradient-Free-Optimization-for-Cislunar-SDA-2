@@ -188,38 +188,46 @@ parfor k=1:N
 end
 T.orbitFamily = orbitFamilies;
 
-% exclude orbits near the LG trajectory
-nearLG_thresh = 5e-3;   % LU (tune). 0.005 LU ~ 1900 km
+% Exclude observer orbits whose complete geometry is too similar to
+% either the nominal Lunar Gateway orbit or its north-south mirror. The
+% mirrored comparison prevents a flipped Gateway-like NRHO from entering
+% the observer database.
+nearLG_thresh = 1.5e-2;  % LU mean curve distance (~5766 km)
 
 rLG = s_lg(:,1:3);
-states_local = T.state;      % cell array
-N_local      = numel(states_local);
+rLGMirror = rLG;
+rLGMirror(:,3) = -rLGMirror(:,3);
+
+states_local = T.state;
+N_local = numel(states_local);
+nearLG_score_nominal = nan(N_local,1);
+nearLG_score_mirrored = nan(N_local,1);
 nearLG_score = nan(N_local,1);
 nearLG = false(N_local,1);
 
 parfor j = 1:N_local
-    s = states_local{j}; % Mx6 integrated trajectory
-    r = s(:,1:3);
+    r = states_local{j}(:,1:3);
 
-    % Compute mean of point-to-curve min distance (cheap proximity metric)
-    M = size(r,1);
-    dmin = zeros(M,1);
-    for k = 1:M
-        diffs = rLG - r(k,:);              % NL x 3
-        d2    = sum(diffs.^2, 2);          % NL x 1
-        dmin(k) = sqrt(min(d2));           % scalar
-    end
-    score = mean(dmin);
+    nominalScore = mean_curve_distance(r,rLG);
+    mirroredScore = mean_curve_distance(r,rLGMirror);
+    score = min(nominalScore,mirroredScore);
 
+    nearLG_score_nominal(j) = nominalScore;
+    nearLG_score_mirrored(j) = mirroredScore;
     nearLG_score(j) = score;
-    nearLG(j) = (score < nearLG_thresh);
+    nearLG(j) = score < nearLG_thresh;
 end
 
+T.nearLG_score_nominal = nearLG_score_nominal;
+T.nearLG_score_mirrored = nearLG_score_mirrored;
 T.nearLG_score = nearLG_score;
 T.nearLG = nearLG;
 
-fprintf('Excluding %d/%d as near-LG (thresh=%.3g LU)\n', nnz(T.nearLG), height(T), nearLG_thresh);
-T = T(~T.nearLG, :);
+fprintf([ ...
+    'Excluding %d/%d as Gateway-like using nominal and mirrored ' ...
+    'geometry (threshold = %.3g LU).\n'], ...
+    nnz(T.nearLG),height(T),nearLG_thresh);
+T = T(~T.nearLG,:);
 
 % ---------------- Orbit-family selection ----------------
 K = 50;
@@ -339,6 +347,23 @@ toc
 
 
 % --- HELPER FUNCTIONS --- %
+
+function score = mean_curve_distance(candidatePosition,referencePosition)
+% Mean nearest-neighbor distance from a candidate orbit to a reference
+% curve. This is phase independent and retains the original inexpensive
+% screening definition.
+
+numberOfPoints = size(candidatePosition,1);
+minimumDistance = zeros(numberOfPoints,1);
+
+for k = 1:numberOfPoints
+    difference = referencePosition-candidatePosition(k,:);
+    minimumDistance(k) = sqrt(min(sum(difference.^2,2)));
+end
+
+score = mean(minimumDistance);
+end
+
 % Function to detect if orbit will collide with the moon
 function [value, isTerminal, direction] = moonImpactEvent(t,s,mu,R_moon)
 % t - integration time
