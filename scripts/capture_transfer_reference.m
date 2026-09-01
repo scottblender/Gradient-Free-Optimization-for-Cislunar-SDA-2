@@ -15,10 +15,14 @@ arrIndex = 400;
 
 periods = T.("Period (TU) ");
 
-assert(ismember("Id", string(T.Properties.VariableNames)), ...
-    "The catalog does not contain the JPL Id column.");
+tableNames = string(T.Properties.VariableNames);
+idMatch = find(strcmpi(strtrim(tableNames), "id"));
 
-catalogIds = string(T.Id);
+assert(numel(idMatch) == 1, ...
+    'Expected exactly one catalog Id column, but found %d.', ...
+    numel(idMatch));
+
+catalogIds = string(T.(tableNames(idMatch)));
 assert(numel(unique(catalogIds)) == height(T), ...
     "The catalog contains duplicate Id values.");
 

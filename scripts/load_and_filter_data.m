@@ -20,6 +20,19 @@ parfor i = 1:length(files)
 end
 T = vertcat(data{:}); % concatenate all data into one table
 
+% Normalize the source identifier column once, before expensive propagation.
+tableNames = string(T.Properties.VariableNames);
+idMatch = find(strcmpi(strtrim(tableNames), "id"));
+
+assert(numel(idMatch) == 1, ...
+    'Expected exactly one source Id column, but found %d.', ...
+    numel(idMatch));
+
+sourceIdName = tableNames(idMatch);
+if sourceIdName ~= "Id"
+    T.Id = T.(sourceIdName);
+end
+
 % JPL Constants
 mu = 1.215058560962404E-2;
 LU = 384400;     % km
