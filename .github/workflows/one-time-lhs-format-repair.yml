@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Repair MATLAB format strings
+      - name: Repair targeted MATLAB format strings
         run: python .github/one_time_lhs_format_repair.py
       - name: Commit repair
         run: |
