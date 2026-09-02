@@ -9,7 +9,9 @@ function paths = setup_project()
     paths.tests = fullfile(paths.root, 'tests');
     paths.data = fullfile(paths.root, 'data');
     paths.results = fullfile(paths.root, 'results');
-    paths.runs = fullfile(paths.results, 'runs');
+    % Compatibility alias used by existing study/processing code. Study
+    % folders now live directly under results/ instead of results/runs/.
+    paths.runs = paths.results;
     paths.orbitCache = fullfile(paths.data, 'cache', 'orbits');
     paths.transferCache = fullfile(paths.data, 'cache', 'transfers');
     paths.targetCaseDatabase = fullfile(paths.data, 'TargetCaseDatabase.mat');
