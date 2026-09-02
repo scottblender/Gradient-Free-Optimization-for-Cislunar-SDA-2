@@ -329,25 +329,18 @@ for mission = missions
         curve = loaded.curves(idx);
 
         meanCommon = curve.mean(commonFE);
-        stdCommon = curve.std(commonFE);
-        validBand = isfinite(meanCommon) & isfinite(stdCommon);
-        if any(validBand)
-            xBand = commonFE(validBand);
-            lowerBand = meanCommon(validBand)-stdCommon(validBand);
-            upperBand = meanCommon(validBand)+stdCommon(validBand);
-            fill(ax,[xBand;flipud(xBand)],[lowerBand;flipud(upperBand)], ...
-                colors(a,:),'FaceAlpha',0.10,'EdgeColor','none', ...
-                'HandleVisibility','off');
-        end
-
         validLine = isfinite(meanCommon);
         xLine = commonFE(validLine);
         yLine = meanCommon(validLine);
-        markerStep = max(1,round(numel(xLine)/10));
-        lineHandles(a) = plot(ax,xLine,yLine,'-o', ...
-            'Color',colors(a,:),'LineWidth',2.0,'MarkerSize',4.5, ...
-            'MarkerIndices',1:markerStep:numel(xLine), ...
+
+        % Best-so-far is an incumbent process, so a stair-step trace is more
+        % faithful than linear interpolation between common FE checkpoints.
+        lineHandles(a) = stairs(ax,xLine,yLine, ...
+            'Color',colors(a,:),'LineWidth',2.15, ...
             'DisplayName',optimizers(a));
+        plot(ax,xLine,yLine,'o', ...
+            'Color',colors(a,:),'MarkerFaceColor',colors(a,:), ...
+            'MarkerSize',4.3,'HandleVisibility','off');
     end
 
     xlim(ax,[commonFE(1) commonFE(end)]);
@@ -582,7 +575,7 @@ moonRadius = 1737.1/LU;
 [xL1,xL2] = collinear_lagrange_points(mu);
 
 % Match the manuscript study-definition target-case figures exactly:
-% 7.2 x 6.5 in, perspective projection, view(-37.5,30).
+% perspective projection and view(-37.5,30).
 fig = create_paper_figure(7.2,6.2, ...
     mission_label(bestRun.Mission)+" best-run trajectory");
 ax = axes(fig);
@@ -590,11 +583,13 @@ hold(ax,'on');
 box(ax,'on');
 axis(ax,'equal');
 
+% Plot the truth first and de-emphasize it. The estimate is the result of
+% interest, so it is drawn second, solid, thicker, and visually dominant.
 hTruth = plot3(ax,truth(:,1),truth(:,2),truth(:,3), ...
-    'Color',[0.85 0.20 0.15],'LineWidth',2.6, ...
+    '--','Color',[0.55 0.55 0.55],'LineWidth',1.25, ...
     'DisplayName','Truth trajectory');
 hEstimate = plot3(ax,estimate(:,1),estimate(:,2),estimate(:,3), ...
-    '--','Color',[0.05 0.35 0.80],'LineWidth',2.0, ...
+    '-','Color',[0.00 0.28 0.85],'LineWidth',2.9, ...
     'DisplayName','EKF estimate');
 
 [sx,sy,sz] = sphere(30);
@@ -639,8 +634,8 @@ ylabel(ax,'y (LU)','FontWeight','bold');
 zlabel(ax,'z (LU)','FontWeight','bold');
 apply_figure_style(ax);
 
-lgd = legend(ax,[hTruth hEstimate hMoon hL1 hL2 hStart hEnd], ...
-    {'Truth trajectory','EKF estimate','Moon','L1','L2','Start','End'}, ...
+lgd = legend(ax,[hEstimate hTruth hMoon hL1 hL2 hStart hEnd], ...
+    {'EKF estimate','Truth trajectory','Moon','L1','L2','Start','End'}, ...
     'Location','northoutside','Orientation','horizontal', ...
     'NumColumns',4,'Box','on');
 format_legend(lgd,11);
