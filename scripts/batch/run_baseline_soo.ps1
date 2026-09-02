@@ -2,7 +2,8 @@
 param(
     [string]$MatlabExe = "",
     [int]$EvalBudget = 6000,
-    [int[]]$Seeds = (0..19)
+    [int[]]$Seeds = (0..19),
+    [switch]$Pilot
 )
 
 $ErrorActionPreference = "Stop"
@@ -132,13 +133,36 @@ exit(0);
 
 # GA-only reproduction/sensitivity study from the original paper.
 $StudyId = "reviewer2_baseline_v1"
+$StudyFolder = "BASELINE"
 $MeasurementModels = @("ANGLES_ONLY", "ANGLES_RANGE")
 $MissionTypes = @("LOW_THRUST_TRANSFER", "LUNAR_GATEWAY", "GATEWAY_IMPULSE")
 $ObserverCounts = @(3, 5, 7, 10)
 $GatewayPeriods = @(1, 3, 5)
 
-$BaselineRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") "BASELINE"
+if ($Pilot) {
+    if (-not $PSBoundParameters.ContainsKey("EvalBudget")) { $EvalBudget = 120 }
+    if (-not $PSBoundParameters.ContainsKey("Seeds")) { $Seeds = @(0) }
+
+    $StudyId = "reviewer2_baseline_pilot_v1"
+    $StudyFolder = "BASELINE_PILOT"
+    $MeasurementModels = @("ANGLES_ONLY")
+    $ObserverCounts = @(3)
+    $GatewayPeriods = @(1)
+}
+
+$BaselineRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") $StudyFolder
 New-Item -ItemType Directory -Force -Path $BaselineRoot | Out-Null
+
+$TotalRuns = 0
+foreach ($meas in $MeasurementModels) {
+    foreach ($mission in $MissionTypes) {
+        foreach ($nObs in $ObserverCounts) {
+            $periodList = if ($mission -eq "LUNAR_GATEWAY") { $GatewayPeriods } else { @(1) }
+            $TotalRuns += $periodList.Count * $Seeds.Count
+        }
+    }
+}
+$CompletedRuns = 0
 
 foreach ($meas in $MeasurementModels) {
     $measCode = Get-MeasCode $meas
@@ -161,6 +185,10 @@ foreach ($meas in $MeasurementModels) {
                     }
                     $runDir = Join-Path $missionRoot $runName
 
+                    $CompletedRuns++
+                    $percent = [math]::Round(100 * $CompletedRuns / $TotalRuns, 1)
+                    Write-Progress -Activity "Baseline GA study" -Status "$CompletedRuns of $TotalRuns | $mission | $meas | seed $seed" -PercentComplete $percent
+
                     Write-Host "`nBaseline GA: [$mission] [$meas] $runName"
                     Write-Host "FE budget: $EvalBudget | optimizer seed: $seed | measurement seed: $MeasurementNoiseSeed"
 
@@ -173,6 +201,7 @@ foreach ($meas in $MeasurementModels) {
     }
 }
 
+Write-Progress -Activity "Baseline GA study" -Completed
 Write-Host "`nBaseline GA runs complete."
 Write-Host "Baseline -> $BaselineRoot"
 # -------------------------------------------------------

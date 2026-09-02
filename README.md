@@ -116,9 +116,43 @@ low-thrust and Gateway-impulse cases and repeats every configuration for seeds
 .\scripts\batch\run_comparison_soo.ps1
 ```
 
-Both launchers accept `-MatlabExe`, `-EvalBudget`, and `-Seeds`. Completed
-runs are skipped safely; an incomplete run must be inspected or moved instead
-of being silently overwritten.
+Both launchers accept `-MatlabExe`, `-EvalBudget`, `-Seeds`, and `-Pilot`.
+They show completed-run progress in PowerShell. Completed runs are skipped
+safely; an incomplete run must be inspected or moved instead of being silently
+overwritten.
+
+Before starting the full studies, run the fast configuration/regression checks:
+
+```matlab
+setup_project;
+test_project_structure;
+test_fe_study_configuration;
+test_ga_evaluation_counts(120);
+test_visibility_keepout_definition;
+test_low_thrust_transfer_case;
+test_gateway_impulse_case;
+test_results_processing;
+```
+
+Then exercise the exact batch entry points with their small pilot matrices:
+
+```powershell
+.\scripts\batch\run_baseline_soo.ps1 -Pilot
+.\scripts\batch\run_comparison_soo.ps1 -Pilot
+```
+
+Without overrides, the baseline pilot performs three 120-FE GA runs (one per
+fixed target case), and the comparison pilot performs fifteen 120-FE runs
+(five optimizers by three target cases), all with optimizer seed 0. Pilot output
+is isolated under `BASELINE_PILOT` and `COMPARISON_PILOT`, so it cannot be
+mistaken for the manuscript study. Process the comparison pilot with:
+
+```matlab
+paths = setup_project();
+process_fe_convergence( ...
+    fullfile(paths.runs,'COMPARISON_PILOT'), ...
+    "reviewer2_comparison_pilot_v1",0,120,false);
+```
 
 After the studies finish, aggregate the data and convergence histories with:
 
@@ -148,6 +182,8 @@ than inventing values, and saves aggregate data without saving figures.
 | Interpolated orbit cache | `data/cache/orbits/` |
 | Transfer truth cache | `data/cache/transfers/` |
 | Individual optimization runs | `results/runs/<timestamp>/...` |
+| PowerShell baseline pilot | `results/runs/BASELINE_PILOT/runs_GA/...` |
+| PowerShell comparison pilot | `results/runs/COMPARISON_PILOT/runs_<algorithm>/...` |
 | PowerShell baseline study | `results/runs/BASELINE/runs_GA/...` |
 | PowerShell comparison study | `results/runs/COMPARISON/runs_<algorithm>/...` |
 | Orbit catalog figures | `results/database_figs/` |

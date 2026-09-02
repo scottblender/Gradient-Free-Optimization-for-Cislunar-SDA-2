@@ -5,206 +5,174 @@ function launch_optimization_gui()
 
     projectPaths = setup_project();
 
-    figW = 1180;
-    figH = 800;
+    screen = get(groot,'ScreenSize');
+    figW = min(1000, max(760, screen(3)-80));
+    figH = min(680, max(520, screen(4)-110));
+    figX = max(20, round((screen(3)-figW)/2));
+    figY = max(40, round((screen(4)-figH)/2));
 
     fig = uifigure( ...
         'Name','Optimization Launcher', ...
-        'Position',[100 100 figW figH]);
+        'Position',[figX figY figW figH], ...
+        'Resize','off');
 
     % ===================== LEFT: CONTROLS =====================
-    leftW = 540;
+    leftW = min(450, max(350, round(0.43*figW)));
     leftPanel = uipanel(fig, ...
         'Title','Run Configuration', ...
         'Position',[10 10 leftW figH-20], ...
         'Scrollable','on');
 
-    contentH = 1040;
-    y  = contentH - 50;
-    dy = 42;
-    labelX = 20;
-    fieldX = 210;
-    fieldW = 290;
+    contentH = 760;
+    y  = contentH - 42;
+    dy = 36;
+    labelX = 18;
+    fieldX = 165;
+    fieldW = leftW - fieldX - 20;
 
-    % ---------------- Mission Type ----------------
-    lblMission = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Mission Type');
+    lblMission = uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Mission Type');
     ddMission = uidropdown(leftPanel, ...
         'Position',[fieldX y fieldW 22], ...
         'Items',{'LOW_THRUST_TRANSFER','LUNAR_GATEWAY','GATEWAY_IMPULSE','PERIODIC_ORBIT'}, ...
         'Value','LOW_THRUST_TRANSFER');
 
     y = y - dy;
-
-    % ---------------- Optimizer ----------------
-    lblOpt = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Optimizer');
+    uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Optimizer');
     ddOpt = uidropdown(leftPanel, ...
         'Position',[fieldX y fieldW 22], ...
         'Items',{'GA','PSO','BAYESIAN','ABC','ACO'}, ...
         'Value','GA');
 
     y = y - dy;
-
-    % ---------------- Number of Observers ----------------
-    lblNumObs = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Num Observers');
+    uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Num Observers');
     efNumObs = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y fieldW 22], ...
-        'Value','3');
+        'Position',[fieldX y fieldW 22], 'Value','3');
 
     y = y - dy;
-
-    % ---------------- Max Evaluations ----------------
-    lblMaxEvals = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Max Evals');
+    uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Max Evaluations');
     efMaxEvals = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y fieldW 22], ...
-        'Value','6000');
+        'Position',[fieldX y fieldW 22], 'Value','6000');
 
     y = y - dy;
-
-    % ---------------- EKF DT ----------------
-    lblEkfDt = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','EKF DT');
+    uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','EKF Step (TU)');
     efEkfDt = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y fieldW 22], ...
-        'Value','0.01');
+        'Position',[fieldX y fieldW 22], 'Value','0.01');
 
     y = y - dy;
-
-    % ---------------- Number of Periods ----------------
-    lblNPeriods = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','N Periods');
+    lblNPeriods = uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Num Periods');
     efNPeriods = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y fieldW 22], ...
-        'Value','1');
+        'Position',[fieldX y fieldW 22], 'Value','1');
 
     y = y - dy;
-
-    % ---------------- Seed ----------------
-    lblSeed = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Seed');
+    uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Optimizer Seed');
     efSeed = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y fieldW 22], ...
-        'Value','0');
+        'Position',[fieldX y fieldW 22], 'Value','0');
 
     y = y - dy;
-
-    % ---------------- Run Directory ----------------
-    lblRunDir = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Run Directory');
+    uilabel(leftPanel, 'Position',[labelX y 140 22], 'Text','Run Directory');
     efRunDir = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y 250 22], ...
+        'Position',[fieldX y fieldW-36 22], ...
         'Value', fullfile(projectPaths.runs, ...
             ['gui_' char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'))]));
-
-    btnBrowseRunDir = uibutton(leftPanel, 'push', ...
-        'Position',[fieldX+260 y 30 22], ...
+    uibutton(leftPanel, 'push', ...
+        'Position',[fieldX+fieldW-31 y 30 22], ...
         'Text','...', ...
         'ButtonPushedFcn', @(~,~) browseRunDir());
 
-    y = y - dy - 8;
-
-    % ---------------- Checkboxes ----------------
+    y = y - dy - 2;
     cbScreen = uicheckbox(leftPanel, ...
-        'Position',[labelX y 180 22], ...
-        'Text','Use Screening', ...
-        'Value',true);
-
-    y = y - dy + 6;
-
+        'Position',[labelX y 135 22], 'Text','Use Screening', 'Value',true);
     cbJ1 = uicheckbox(leftPanel, ...
-        'Position',[labelX y 100 22], ...
-        'Text','Use J1', ...
-        'Value',true);
-
+        'Position',[labelX+145 y 65 22], 'Text','J1', 'Value',true);
     cbJ2 = uicheckbox(leftPanel, ...
-        'Position',[labelX+120 y 100 22], ...
-        'Text','Use J2', ...
-        'Value',true);
-
+        'Position',[labelX+215 y 65 22], 'Text','J2', 'Value',true);
     cbJ3 = uicheckbox(leftPanel, ...
-        'Position',[labelX+240 y 100 22], ...
-        'Text','Use J3', ...
-        'Value',true);
+        'Position',[labelX+285 y 65 22], 'Text','J3', 'Value',true);
 
-    y = y - 55;
-
-    % ---------------- Info box ----------------
+    y = y - 112;
     txtInfo = uitextarea(leftPanel, ...
-        'Position',[20 y-140 490 140], ...
+        'Position',[18 y leftW-36 98], ...
         'Editable','off', ...
         'Value',{ ...
-            'This launcher sets environment variables and starts a NEW MATLAB batch process.', ...
-            'It uses -logfile to make detached runs more robust.', ...
-            'Stop Batch Runs kills OTHER MATLAB processes started with -batch.', ...
-            'Your current GUI session is left alone.', ...
-            'MAX_EVALS is the stopping criterion for every optimizer.', ...
-            'NPERIODS applies to LUNAR_GATEWAY and PERIODIC_ORBIT only.', ...
-            'GATEWAY_IMPULSE uses the fixed 10 m/s, 1.5 TU target case.'});
+            'Starts a separate MATLAB batch process.', ...
+            'MAX_EVALS is the only optimizer stopping budget.', ...
+            'Measurement-noise seed is fixed at 1001.', ...
+            'Saved study runs contain data only; plots are disabled.', ...
+            'Gateway impulse: 10 m/s prograde, propagated 1.5 TU.'});
 
-    y = y - 190;
-
-    % ---------------- Buttons row 1 ----------------
-    btnLaunch = uibutton(leftPanel, 'push', ...
-        'Position',[30 y 140 36], ...
-        'Text','Launch Run', ...
+    y = y - 48;
+    gap = 8;
+    btnW = floor((leftW-36-2*gap)/3);
+    uibutton(leftPanel, 'push', ...
+        'Position',[18 y btnW 34], ...
+        'Text','Launch', ...
         'ButtonPushedFcn', @(~,~) launchRun());
-
-    btnShowCmd = uibutton(leftPanel, 'push', ...
-        'Position',[190 y 140 36], ...
+    uibutton(leftPanel, 'push', ...
+        'Position',[18+btnW+gap y btnW 34], ...
         'Text','Show Command', ...
         'ButtonPushedFcn', @(~,~) showCommand());
-
-    btnRefresh = uibutton(leftPanel, 'push', ...
-        'Position',[350 y 140 36], ...
-        'Text','Refresh Monitor', ...
+    uibutton(leftPanel, 'push', ...
+        'Position',[18+2*(btnW+gap) y btnW 34], ...
+        'Text','Refresh', ...
         'ButtonPushedFcn', @(~,~) updateMonitor());
 
-    y = y - 52;
-
-    % ---------------- Buttons row 2 ----------------
-    btnStopAll = uibutton(leftPanel, 'push', ...
-        'Position',[30 y 220 36], ...
-        'Text','Stop Batch Runs', ...
+    y = y - 46;
+    btnW2 = floor((leftW-36-gap)/2);
+    uibutton(leftPanel, 'push', ...
+        'Position',[18 y btnW2 34], ...
+        'Text','Stop Runs', ...
         'ButtonPushedFcn', @(~,~) stopBatchRuns());
-
-    btnFresh = uibutton(leftPanel, 'push', ...
-        'Position',[270 y 220 36], ...
-        'Text','Stop Batch Runs + Launch Fresh', ...
+    uibutton(leftPanel, 'push', ...
+        'Position',[18+btnW2+gap y btnW2 34], ...
+        'Text','Stop + Launch Fresh', ...
         'ButtonPushedFcn', @(~,~) stopAndLaunchFresh());
 
     % ===================== RIGHT: MONITOR =====================
     rightX = leftW + 20;
     rightW = figW - rightX - 10;
-
     monitorPanel = uipanel(fig, ...
         'Title','Run Monitor', ...
         'Position',[rightX 10 rightW figH-20]);
 
-    topY = figH - 90;
-
-    uilabel(monitorPanel, 'Position',[15 topY 110 22], 'Text','Latest Log');
+    topY = figH - 75;
+    uilabel(monitorPanel, 'Position',[15 topY 70 22], 'Text','Latest Log');
     efLogFile = uieditfield(monitorPanel, 'text', ...
-        'Position',[90 topY rightW-170 22], ...
-        'Editable','off', ...
-        'Value','');
-
-    btnBrowseLog = uibutton(monitorPanel, 'push', ...
-        'Position',[rightW-65 topY 40 22], ...
+        'Position',[85 topY rightW-145 22], ...
+        'Editable','off', 'Value','');
+    uibutton(monitorPanel, 'push', ...
+        'Position',[rightW-50 topY 35 22], ...
         'Text','...', ...
         'ButtonPushedFcn', @(~,~) browseLogFile());
 
-    statusY = topY - 40;
-    lblStatus   = uilabel(monitorPanel, 'Position',[15 statusY 250 22], 'Text','Status: idle');
-    lblUpdated  = uilabel(monitorPanel, 'Position',[280 statusY 250 22], 'Text','Last update: --');
+    colW = floor((rightW-45)/2);
+    col2X = 25 + colW;
+    statusY = topY - 34;
+    lblStatus  = uilabel(monitorPanel, 'Position',[15 statusY colW 22], 'Text','Status: idle');
+    lblUpdated = uilabel(monitorPanel, 'Position',[col2X statusY colW 22], 'Text','Last update: --');
 
-    statusY = statusY - 28;
-    lblBestCost = uilabel(monitorPanel, 'Position',[15 statusY 250 22], 'Text','Best cost: --');
-    lblRuntime  = uilabel(monitorPanel, 'Position',[280 statusY 250 22], 'Text','Runtime: --');
+    statusY = statusY - 26;
+    lblBestCost = uilabel(monitorPanel, 'Position',[15 statusY colW 22], 'Text','Best cost: --');
+    lblRuntime  = uilabel(monitorPanel, 'Position',[col2X statusY colW 22], 'Text','Runtime: --');
 
-    statusY = statusY - 28;
-    lblRmsePos = uilabel(monitorPanel, 'Position',[15 statusY 250 22], 'Text','RMSE pos (km): --');
-    lblRmseVel = uilabel(monitorPanel, 'Position',[280 statusY 250 22], 'Text','RMSE vel (km/s): --');
+    statusY = statusY - 26;
+    lblRmsePos = uilabel(monitorPanel, 'Position',[15 statusY colW 22], 'Text','RMSE pos (km): --');
+    lblRmseVel = uilabel(monitorPanel, 'Position',[col2X statusY colW 22], 'Text','RMSE vel (km/s): --');
 
-    statusY = statusY - 28;
-    lblDetP = uilabel(monitorPanel, 'Position',[15 statusY 450 22], 'Text','Mean det(P_pos) (km^6): --');
+    statusY = statusY - 26;
+    lblSigmaPos = uilabel(monitorPanel, ...
+        'Position',[15 statusY rightW-30 22], ...
+        'Text','Effective position uncertainty (km): --');
 
+    lblFE = uilabel(monitorPanel, ...
+        'Position',[15 statusY-26 rightW-30 22], ...
+        'Text','Function evaluations: 0 / --');
+    gaugeFE = uigauge(monitorPanel, 'linear', ...
+        'Position',[15 statusY-54 rightW-30 38], ...
+        'Limits',[0 1], 'Value',0, 'MajorTicks',[0 1]);
+
+    logTop = statusY - 67;
     txtLog = uitextarea(monitorPanel, ...
-        'Position',[15 15 rightW-30 figH-270], ...
+        'Position',[15 15 rightW-30 max(180,logTop-20)], ...
         'Editable','off', ...
         'FontName','Consolas', ...
         'Value', {''} );
@@ -407,7 +375,10 @@ function launch_optimization_gui()
             end
             txtLog.Value = cellstr(splitlines(txtTail));
 
-            bestCost = parseLastMatch(txt, 'Cost:\s*([\-+0-9.eE]+)');
+            bestCost = parseLastMatch(txt, 'bestJ\s*=\s*([\-+0-9.eE]+)');
+            if isempty(bestCost)
+                bestCost = parseLastMatch(txt, 'Cost:\s*([\-+0-9.eE]+)');
+            end
             if isempty(bestCost)
                 bestCost = parseLastMatch(txt, 'min_cost\s*=\s*([\-+0-9.eE]+)');
             end
@@ -438,12 +409,64 @@ function launch_optimization_gui()
                 lblRmseVel.Text = 'RMSE vel (km/s): --';
             end
 
-            detP = parseLastMatch(txt, 'Mean det\(P_pos\) \(km\^6\):\s*([\-+0-9.eE]+)');
-            if ~isempty(detP)
-                lblDetP.Text = ['Mean det(P_pos) (km^6): ' detP];
-            else
-                lblDetP.Text = 'Mean det(P_pos) (km^6): --';
+            feVal = parseLastMatch(txt, 'Search FE\s*=\s*([0-9]+)');
+            if isempty(feVal)
+                feVal = parseLastMatch(txt, 'FE\s*=\s*([0-9]+)');
             end
+            maxFE = str2double(efMaxEvals.Value);
+            currentFE = str2double(feVal);
+            if ~isfinite(maxFE) || maxFE < 1
+                maxFE = 1;
+            end
+            if ~isfinite(currentFE) || currentFE < 0
+                currentFE = 0;
+            end
+
+            % Completed runs retain authoritative metrics in the saved state.
+            stateFile = fullfile(efRunDir.Value,'data','optimization_run.mat');
+            if isfile(stateFile)
+                try
+                    saved = load(stateFile,'runState');
+                    if isfield(saved,'runState')
+                        rs = saved.runState;
+                        if isfield(rs,'bestJ') && isfinite(rs.bestJ)
+                            lblBestCost.Text = sprintf('Best cost: %.12g',rs.bestJ);
+                        end
+                        if isfield(rs,'runtime_s') && isfinite(rs.runtime_s)
+                            lblRuntime.Text = sprintf('Runtime: %.2f s',rs.runtime_s);
+                        end
+                        if isfield(rs,'nEvaluations') && isfinite(rs.nEvaluations)
+                            currentFE = rs.nEvaluations;
+                        end
+                        if isfield(rs,'maxEvaluations') && isfinite(rs.maxEvaluations)
+                            maxFE = rs.maxEvaluations;
+                        end
+                        if isfield(rs,'metrics')
+                            metrics = rs.metrics;
+                            if isfield(metrics,'rmse_pos_km')
+                                lblRmsePos.Text = sprintf('RMSE pos (km): %.6g',metrics.rmse_pos_km);
+                            end
+                            if isfield(metrics,'rmse_vel_kms')
+                                lblRmseVel.Text = sprintf('RMSE vel (km/s): %.6g',metrics.rmse_vel_kms);
+                            end
+                            if isfield(metrics,'mean_effective_sigma_pos_km')
+                                lblSigmaPos.Text = sprintf( ...
+                                    'Effective position uncertainty (km): %.6g', ...
+                                    metrics.mean_effective_sigma_pos_km);
+                            end
+                        end
+                    end
+                catch
+                    % The batch process may be replacing the MAT-file.
+                end
+            end
+
+            maxFE = max(1,round(maxFE));
+            currentFE = max(0,min(round(currentFE),maxFE));
+            gaugeFE.Limits = [0 maxFE];
+            gaugeFE.MajorTicks = unique([0 round(maxFE/2) maxFE]);
+            gaugeFE.Value = currentFE;
+            lblFE.Text = sprintf('Function evaluations: %d / %d',currentFE,maxFE);
 
             drawnow limitrate;
 
@@ -461,7 +484,11 @@ function launch_optimization_gui()
         lblRuntime.Text  = 'Runtime: --';
         lblRmsePos.Text  = 'RMSE pos (km): --';
         lblRmseVel.Text  = 'RMSE vel (km/s): --';
-        lblDetP.Text     = 'Mean det(P_pos) (km^6): --';
+        lblSigmaPos.Text = 'Effective position uncertainty (km): --';
+        lblFE.Text       = 'Function evaluations: 0 / --';
+        gaugeFE.Limits   = [0 1];
+        gaugeFE.MajorTicks = [0 1];
+        gaugeFE.Value    = 0;
         txtLog.Value     = {''};
         drawnow;
     end
@@ -496,6 +523,8 @@ function cmd = buildLaunchCommand(params)
         'setenv(''EKF_DT'',''%s'');' ...
         'setenv(''NPERIODS'',''%s'');' ...
         'setenv(''SEED'',''%s'');' ...
+        'setenv(''MEAS_NOISE_SEED'',''1001'');' ...
+        'setenv(''MAKE_PLOTS'',''0'');' ...
         'setenv(''RUN_DIR'',''%s'');' ...
         'setenv(''USE_SCREENING'',''%s'');' ...
         'setenv(''USE_J1'',''%s'');' ...
@@ -538,7 +567,7 @@ function logFile = findLatestLog(runDir)
         return;
     end
 
-    files1 = dir(fullfile(runDir, '**', 'safe_output_fallback.txt'));
+    files1 = dir(fullfile(runDir, '**', 'safe_output_fallback_*.txt'));
     files2 = dir(fullfile(runDir, '**', 'matlab_diary_*.txt'));
     files3 = dir(fullfile(runDir, '**', 'gui_launch_*.log'));
     files  = [files1; files2; files3];

@@ -37,14 +37,12 @@ assert(isfinite(Jcheck) && abs(Jcheck-runState.bestJ) <= ...
     1e-9*max(1,abs(runState.bestJ)), ...
     'Saved best design does not reproduce its optimization cost.');
 
-detPos = zeros(N,1);
 effPos = zeros(N,1);
 effVel = zeros(N,1);
 for k = 1:N
     P = squeeze(covariance(k,:,:));
     P = (P+P')/2;
-    detPos(k) = max(det(P(1:3,1:3)),realmin);
-    effPos(k) = detPos(k)^(1/6);
+    effPos(k) = max(det(P(1:3,1:3)),realmin)^(1/6);
     effVel(k) = max(det(P(4:6,4:6)),realmin)^(1/6);
 end
 
@@ -55,8 +53,6 @@ m.peak_pos_error_km = max(posError);
 m.peak_vel_error_kms = max(velError);
 m.mean_effective_sigma_pos_km = mean(effPos)*LU;
 m.mean_effective_sigma_vel_kms = mean(effVel)*VU;
-% Position covariance-volume diagnostic reported in manuscript result tables.
-m.mean_detPpos_km6 = mean(detPos)*LU^6;
 m.mean_stability = mean(observers.stability_index);
 m.J1_normalized = (m.rmse_pos_km/LU)/s.cost.pos_rmse_acc + ...
     (m.rmse_vel_kms/VU)/s.cost.vel_rmse_acc;

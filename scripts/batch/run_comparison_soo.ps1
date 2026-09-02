@@ -2,7 +2,8 @@
 param(
     [string]$MatlabExe = "",
     [int]$EvalBudget = 6000,
-    [int[]]$Seeds = (0..19)
+    [int[]]$Seeds = (0..19),
+    [switch]$Pilot
 )
 
 $ErrorActionPreference = "Stop"
@@ -133,14 +134,36 @@ exit(0);
 # Reviewer-facing optimizer comparison:
 # 5 methods x 3 target cases x 20 seeds = 300 runs by default.
 $StudyId = "reviewer2_comparison_v1"
+$StudyFolder = "COMPARISON"
 $Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
 $MeasurementModels = @("ANGLES_ONLY")
 $MissionTypes = @("LUNAR_GATEWAY", "LOW_THRUST_TRANSFER", "GATEWAY_IMPULSE")
 $ObserverCounts = @(3)
 $GatewayPeriods = @(1)
 
-$ComparisonRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") "COMPARISON"
+if ($Pilot) {
+    if (-not $PSBoundParameters.ContainsKey("EvalBudget")) { $EvalBudget = 120 }
+    if (-not $PSBoundParameters.ContainsKey("Seeds")) { $Seeds = @(0) }
+
+    $StudyId = "reviewer2_comparison_pilot_v1"
+    $StudyFolder = "COMPARISON_PILOT"
+}
+
+$ComparisonRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") $StudyFolder
 New-Item -ItemType Directory -Force -Path $ComparisonRoot | Out-Null
+
+$TotalRuns = 0
+foreach ($alg in $Algs) {
+    foreach ($meas in $MeasurementModels) {
+        foreach ($mission in $MissionTypes) {
+            foreach ($nObs in $ObserverCounts) {
+                $periodList = if ($mission -eq "LUNAR_GATEWAY") { $GatewayPeriods } else { @(1) }
+                $TotalRuns += $periodList.Count * $Seeds.Count
+            }
+        }
+    }
+}
+$CompletedRuns = 0
 
 foreach ($alg in $Algs) {
     $algCode = $alg.ToLower()
@@ -165,6 +188,10 @@ foreach ($alg in $Algs) {
                         }
                         $runDir = Join-Path $missionRoot $runName
 
+                        $CompletedRuns++
+                        $percent = [math]::Round(100 * $CompletedRuns / $TotalRuns, 1)
+                        Write-Progress -Activity "Optimizer comparison study" -Status "$CompletedRuns of $TotalRuns | $alg | $mission | seed $seed" -PercentComplete $percent
+
                         Write-Host "`nComparison: [$alg] [$mission] [$meas] $runName"
                         Write-Host "FE budget: $EvalBudget | optimizer seed: $seed | measurement seed: $MeasurementNoiseSeed"
 
@@ -178,6 +205,7 @@ foreach ($alg in $Algs) {
     }
 }
 
+Write-Progress -Activity "Optimizer comparison study" -Completed
 Write-Host "`nComparison runs complete."
 Write-Host "Comparison -> $ComparisonRoot"
 # ---------------------------------------------------------
