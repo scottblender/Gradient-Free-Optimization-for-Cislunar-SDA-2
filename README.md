@@ -145,7 +145,23 @@ Without overrides, the baseline pilot performs three 120-FE GA runs (one per
 fixed target case), and the comparison pilot performs fifteen 120-FE runs
 (five optimizers by three target cases), all with optimizer seed 0. Pilot output
 is isolated under `BASELINE_PILOT` and `COMPARISON_PILOT`, so it cannot be
-mistaken for the manuscript study. Process the comparison pilot with:
+mistaken for the manuscript study.
+
+For one end-to-end check of the comparison pipeline, including all five
+optimizers, all three fixed cases, and seeds 0--2, run:
+
+```matlab
+report = run_reviewer2_pipeline_pilot;
+```
+
+This launches or resumes 45 runs at 120 FE, processes and validates every saved
+result, prints mean +/- sample-standard-deviation tables, and creates EPS/PNG
+preview figures under the newest `COMPARISON_PILOT/FE_DATA_*/paper_preview`
+folder. To reprocess completed runs without launching MATLAB workers again, use
+`run_reviewer2_pipeline_pilot(false,true)`. These are explicitly pilot
+statistics; the full 20-seed study must replace them in the manuscript.
+
+Process the one-seed comparison pilot manually with:
 
 ```matlab
 paths = setup_project();
