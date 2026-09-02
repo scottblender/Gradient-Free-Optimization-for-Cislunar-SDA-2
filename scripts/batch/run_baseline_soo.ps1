@@ -135,9 +135,42 @@ catch ME
 end
 "@
 
-        & "$MatlabExe" -batch $cmd *> "console.log"
-        if ($LASTEXITCODE -ne 0) {
-            throw "MATLAB failed with exit code $LASTEXITCODE. See $RunDir\console.log"
+        # Write the MATLAB entry point to a temporary script so paths with
+        # spaces do not depend on PowerShell/native-command quoting rules.
+        $batchEntry = Join-Path $RunDir "_batch_entry.m"
+        $stdoutLog = Join-Path $RunDir "console.stdout.log"
+        $stderrLog = Join-Path $RunDir "console.stderr.log"
+        $consoleLog = Join-Path $RunDir "console.log"
+
+        Set-Content -Path $batchEntry -Value $cmd -Encoding UTF8
+        $batchEntryMatlab = $batchEntry.Replace("'", "''")
+        $batchCommand = "run('$batchEntryMatlab')"
+
+        try {
+            $process = Start-Process `
+                -FilePath $MatlabExe `
+                -ArgumentList @("-batch", "`"$batchCommand`"") `
+                -WorkingDirectory $RunDir `
+                -RedirectStandardOutput $stdoutLog `
+                -RedirectStandardError $stderrLog `
+                -NoNewWindow `
+                -Wait `
+                -PassThru
+
+            $matlabExitCode = $process.ExitCode
+
+            if (Test-Path $consoleLog) { Remove-Item $consoleLog -Force }
+            if (Test-Path $stdoutLog) { Get-Content $stdoutLog | Add-Content $consoleLog }
+            if (Test-Path $stderrLog) { Get-Content $stderrLog | Add-Content $consoleLog }
+
+            if ($matlabExitCode -ne 0) {
+                throw "MATLAB failed with exit code $matlabExitCode. See $consoleLog"
+            }
+        }
+        finally {
+            Remove-Item $batchEntry -Force -ErrorAction SilentlyContinue
+            Remove-Item $stdoutLog -Force -ErrorAction SilentlyContinue
+            Remove-Item $stderrLog -Force -ErrorAction SilentlyContinue
         }
     }
     finally {
@@ -166,7 +199,7 @@ if ($Pilot) {
     $GatewayPeriods = @(1)
 }
 
-$BaselineRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") $StudyFolder
+$BaselineRoot = Join-Path (Join-Path $ProjectRoot "results") $StudyFolder
 New-Item -ItemType Directory -Force -Path $BaselineRoot | Out-Null
 
 $TotalRuns = 0
