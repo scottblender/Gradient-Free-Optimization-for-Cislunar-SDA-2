@@ -10,7 +10,9 @@ $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $RunOpt = Join-Path $ProjectRoot "run_opt.m"
+$BatchEntry = Join-Path $ProjectRoot "scripts\batch\run_batch_entry.m"
 if (-not (Test-Path $RunOpt)) { throw "Cannot find run_opt.m at: $RunOpt" }
+if (-not (Test-Path $BatchEntry)) { throw "Cannot find MATLAB batch entry at: $BatchEntry" }
 
 if ([string]::IsNullOrWhiteSpace($MatlabExe)) {
     $matlabCommand = Get-Command matlab.exe -ErrorAction SilentlyContinue
@@ -32,8 +34,7 @@ if ($Seeds.Count -eq 0 -or ($Seeds | Where-Object { $_ -lt 0 }).Count -gt 0) {
     throw "Seeds must contain nonnegative integers."
 }
 
-$ProjectRootMatlab = $ProjectRoot.Replace("'", "''")
-$RunOptMatlab = $RunOpt.Replace("'", "''")
+$BatchEntryMatlab = $BatchEntry.Replace("'", "''")
 $MeasurementNoiseSeed = 1001
 
 function Get-MissionCode {
@@ -103,50 +104,14 @@ function Invoke-MatlabRun {
     $env:IMPULSE_DIRECTION = "PROGRADE"
     $env:IMPULSE_DURATION_TU = "1.5"
     $env:RUN_DIR = $RunDir
+    $env:PROJECT_ROOT = $ProjectRoot
 
     Push-Location $RunDir
     try {
-        $cmd = @"
-try
-    cd(getenv('RUN_DIR'));
-    addpath('$ProjectRootMatlab');
-    setup_project;
-    run('$RunOptMatlab');
-
-    % Explicitly release process workers before -batch tears down MATLAB.
-    p = gcp('nocreate');
-    if ~isempty(p)
-        fprintf('Shutting down parallel pool before MATLAB exit...\n');
-        delete(p);
-        fprintf('Parallel pool shut down successfully.\n');
-    end
-catch ME
-    % Best-effort pool cleanup also applies when run_opt throws normally.
-    try
-        p = gcp('nocreate');
-        if ~isempty(p)
-            delete(p);
-        end
-    catch
-    end
-
-    disp(getReport(ME,'extended'));
-    rethrow(ME);
-end
-"@
-
-        # Write the MATLAB entry point to a temporary script so paths with
-        # spaces do not depend on PowerShell/native-command quoting rules.
-        $batchEntry = Join-Path $RunDir "_batch_entry.m"
         $stdoutLog = Join-Path $RunDir "console.stdout.log"
         $stderrLog = Join-Path $RunDir "console.stderr.log"
         $consoleLog = Join-Path $RunDir "console.log"
-
-        # Windows PowerShell's UTF8 encoding writes a BOM that MATLAB can
-        # reject as an invalid leading character in a generated .m file.
-        Set-Content -Path $batchEntry -Value $cmd -Encoding ASCII
-        $batchEntryMatlab = $batchEntry.Replace("'", "''")
-        $batchCommand = "run('$batchEntryMatlab')"
+        $batchCommand = "run('$BatchEntryMatlab')"
 
         try {
             $process = Start-Process `
@@ -170,7 +135,6 @@ end
             }
         }
         finally {
-            Remove-Item $batchEntry -Force -ErrorAction SilentlyContinue
             Remove-Item $stdoutLog -Force -ErrorAction SilentlyContinue
             Remove-Item $stderrLog -Force -ErrorAction SilentlyContinue
         }
