@@ -84,10 +84,15 @@ function Invoke-MatlabRun {
 
     if ($hasState -or $hasTracking) {
         $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $archiveDir = "$RunDir`_INCOMPLETE_$stamp"
+        $archiveRoot = Join-Path (Join-Path $ProjectRoot "results") "_INCOMPLETE_RUNS"
+        $archiveStudy = Join-Path $archiveRoot $StudyId
+        New-Item -ItemType Directory -Force -Path $archiveStudy | Out-Null
+
+        $runLeaf = Split-Path -Leaf $RunDir
+        $archiveDir = Join-Path $archiveStudy "$($runLeaf)_$stamp"
         $suffix = 1
         while (Test-Path $archiveDir) {
-            $archiveDir = "$RunDir`_INCOMPLETE_$stamp`_$suffix"
+            $archiveDir = Join-Path $archiveStudy "$($runLeaf)_$stamp`_$suffix"
             $suffix++
         }
 
