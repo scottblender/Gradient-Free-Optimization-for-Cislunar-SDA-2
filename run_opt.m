@@ -197,7 +197,6 @@ v = getenv("MEAS_MODEL");
 if ~isempty(v)
     measCfg.type = upper(string(v));
 end
-
 if measCfg.type ~= "ANGLES_ONLY" && measCfg.type ~= "ANGLES_RANGE"
     error("Unknown MEAS_MODEL: %s", measCfg.type);
 end
@@ -609,6 +608,8 @@ reset_fe_history();
 history = table();
 actualEvals = NaN;
 solverFunccount = NaN;
+parallelOverflowEvals = 0;
+budgetRuntime_s = NaN;
 
 % ---------------- Reproducibility metadata ----------------
 solverSettingsText = "";
@@ -642,6 +643,8 @@ settings = struct('mission',missionCfg,'measurements',measCfg, ...
     'theta0',theta0,'i_sun',i_sun,'mu',mu,'LU',LU,'TU',TU, ...
     'EKF_DT',EKF_DT,'slotsPerOrbit',slots_per_orbit, ...
     'slotDefinition',"equal_time_no_endpoint_v1", ...
+    'feBudgetDefinition',"admitted_completed_evaluations_v1", ...
+    'parallelBoOverflowPolicy',"truncate_after_budget_v1", ...
     'odeRelTol',ode_opts.RelTol,'odeAbsTol',ode_opts.AbsTol, ...
     'useParallel',USE_PARALLEL,'workerCount',workerCount);
 
@@ -784,25 +787,57 @@ try
             boSettings = struct('UseParallel',USE_PARALLEL, ...
                 'IsObjectiveDeterministic',true, ...
                 'AcquisitionFunctionName',"expected-improvement-plus", ...
-                'MaxObjectiveEvaluations',FE_BUDGET,'PlotFcn',[]);
+                'MaxObjectiveEvaluations',FE_BUDGET, ...
+                'BudgetPolicy',"parallel_overflow_truncate_v1", ...
+                'OutputFcn',"bo_outfun",'PlotFcn',[]);
             solverSettingsText = string(evalc('disp(boSettings)'));
             results = bayesopt(ObjFcn, vars, ...
                 'UseParallel', USE_PARALLEL, ...
                 'IsObjectiveDeterministic', true, ...
                 'AcquisitionFunctionName', 'expected-improvement-plus', ...
                 'MaxObjectiveEvaluations', FE_BUDGET, ...
+                'OutputFcn', @(boResults,state) ...
+                    bo_outfun(boResults,state,FE_BUDGET,RunTimer), ...
                 'PlotFcn', []);
 
-            objectiveErrorCount = nnz(results.ErrorTrace == 1);
-            x_best = table2array(results.XAtMinObjective);
-            min_cost = results.MinObjective;
-            actualEvals = results.NumObjectiveEvaluations;
-            solverFunccount = actualEvals;
+            solverFunccount = results.NumObjectiveEvaluations;
+            assert(solverFunccount >= FE_BUDGET, ...
+                'Bayesian optimization stopped before the requested FE budget.');
 
+            % Parallel bayesopt can finish evaluations that were already in
+            % flight when the budget boundary was reached. Only the first
+            % FE_BUDGET completed evaluations are admitted to the comparison.
+            budgetObjective = results.ObjectiveTrace(1:FE_BUDGET);
+            budgetX = results.XTrace(1:FE_BUDGET,:);
+            budgetErrors = results.ErrorTrace(1:FE_BUDGET);
+            objectiveErrorCount = nnz(budgetErrors == 1);
+
+            objectiveForBest = budgetObjective;
+            objectiveForBest(~isfinite(objectiveForBest)) = Inf;
+            [min_cost,bestIdx] = min(objectiveForBest);
+            assert(isfinite(min_cost), ...
+                'No finite Bayesian objective value within the FE budget.');
+            x_best = table2array(budgetX(bestIdx,:));
+
+            actualEvals = FE_BUDGET;
+            parallelOverflowEvals = solverFunccount - FE_BUDGET;
             history = table( ...
-                (1:actualEvals)', ...
-                results.ObjectiveMinimumTrace(:), ...
+                (1:FE_BUDGET)', ...
+                cummin(objectiveForBest(:)), ...
                 'VariableNames', {'fe','bestJ'});
+
+            budgetRuntime_s = getappdata(0,'OPT_BO_BUDGET_RUNTIME');
+            if isempty(budgetRuntime_s) || ~isfinite(budgetRuntime_s)
+                if numel(results.IterationTimeTrace) >= FE_BUDGET
+                    budgetRuntime_s = sum(results.IterationTimeTrace(1:FE_BUDGET));
+                else
+                    budgetRuntime_s = NaN;
+                end
+            end
+
+            safe_printf(['Bayesian FE budget admitted: %d | solver calls: %d ' ...
+                '| parallel overflow: %d\n'], ...
+                actualEvals,solverFunccount,parallelOverflowEvals);
 
         case 'ABC'
             safe_printf('Starting Artificial Bee Colony Optimization...\n');
@@ -856,8 +891,15 @@ catch ME
 end
 
 % ---------------- Runtime / final optimization results ----------------
-TotalRuntime = toc(RunTimer);
-safe_printf('Total Runtime: %.2f seconds\n', TotalRuntime);
+SolverWallRuntime_s = toc(RunTimer);
+if OPTIMIZER_MODE ~= "BAYESIAN" || ~isfinite(budgetRuntime_s)
+    budgetRuntime_s = SolverWallRuntime_s;
+end
+safe_printf('Budget Runtime: %.2f seconds\n', budgetRuntime_s);
+if OPTIMIZER_MODE == "BAYESIAN" && solverFunccount > actualEvals
+    safe_printf('Solver Wall Runtime (including BO overflow): %.2f seconds\n', ...
+        SolverWallRuntime_s);
+end
 
 % Preserve a partial callback history when GA/PSO throws.
 if isempty(history) && ismember(OPTIMIZER_MODE,["GA","PSO"])
@@ -870,10 +912,13 @@ runState.solverFunctionEvaluations = solverFunccount;
 runState.solverCallDifference = solverFunccount-actualEvals;
 runState.postSearchFunctionEvaluations = ...
     max(0,solverFunccount-actualEvals);
+runState.parallelOverflowEvaluations = parallelOverflowEvals;
 runState.bestX = x_best;
 runState.bestJ = min_cost;
 runState.history = history;
-runState.runtime_s = TotalRuntime;
+runState.runtime_s = budgetRuntime_s;
+runState.budgetRuntime_s = budgetRuntime_s;
+runState.solverWallRuntime_s = SolverWallRuntime_s;
 runState.solverExitFlag = solverExitFlag;
 runState.solverOutput = solverOutput;
 runState.solverSettingsText = solverSettingsText;
@@ -952,10 +997,10 @@ catch ME
 end
 
 safe_printf(['Search FE = %d/%d | solver calls = %d ' ...
-    '(post-search = %d) | bestJ = %.12g | %s\n'], ...
+    '(extra solver calls = %d, BO overflow = %d) | bestJ = %.12g | %s\n'], ...
     actualEvals,FE_BUDGET,solverFunccount, ...
-    runState.postSearchFunctionEvaluations,min_cost, ...
-    runState.termination);
+    runState.postSearchFunctionEvaluations, ...
+    runState.parallelOverflowEvaluations,min_cost,runState.termination);
 safe_printf('Saved data only: %s\n',DataDir);
 safe_printf('RUN END: %s\n',string(datetime('now')));
 diary off
@@ -1086,9 +1131,25 @@ function stop = pso_outfun(values,state,FE_BUDGET)
     stop = values.funccount >= FE_BUDGET;
 end
 
+function stop = bo_outfun(results,state,FE_BUDGET,RunTimer)
+    stop = false;
+
+    if strcmp(state,'iteration') && ...
+            results.NumObjectiveEvaluations >= FE_BUDGET
+        tBudget = getappdata(0,'OPT_BO_BUDGET_RUNTIME');
+        if isempty(tBudget) || ~isfinite(tBudget)
+            setappdata(0,'OPT_BO_BUDGET_RUNTIME',toc(RunTimer));
+        end
+        % Prevent new BO work from being scheduled. Evaluations that are
+        % already active can still finish and are recorded as overflow.
+        stop = true;
+    end
+end
+
 function reset_fe_history()
     setappdata(0,'OPT_FE_HISTORY',zeros(0,2));
     setappdata(0,'OPT_GA_BEST',struct('J',Inf,'x',[]));
+    setappdata(0,'OPT_BO_BUDGET_RUNTIME',NaN);
 end
 
 function append_fe_history(fe, bestJ)
