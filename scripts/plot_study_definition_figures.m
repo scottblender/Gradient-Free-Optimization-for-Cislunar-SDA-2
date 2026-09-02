@@ -923,7 +923,16 @@ figureFiles = strings(3,1);
 cGateway = [0.85,0.27,0.22];
 cTransfer = [0.27,0.31,0.86];
 cImpulse = [0.55,0.30,0.72];
-cNominal = cGateway;
+
+% Simulate different line alpha values by blending against the white
+% figure background. This remains reliable in vector EPS output.
+nominalAlpha = 0.45;
+postImpulseAlpha = 0.95;
+cNominal = nominalAlpha*cGateway+ ...
+    (1-nominalAlpha)*[1,1,1];
+cPostImpulse = postImpulseAlpha*cImpulse+ ...
+    (1-postImpulseAlpha)*[1,1,1];
+
 cReference = [0.48,0.48,0.48];
 cPoint = [0.80,0.80,0.80];
 
@@ -964,7 +973,8 @@ export_publication_eps(figTransfer,figureFiles(2)); close(figTransfer);
 figImpulse = publication_figure(7.2,6.5);
 ax = axes(figImpulse); prepare_axes(ax);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1),sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3),'--','Color',cNominal,'LineWidth',2.2);
-hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3),'-','Color',cImpulse,'LineWidth',3.0);
+hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3), ...
+    '-','Color',cPostImpulse,'LineWidth',3.0);
 hBurn = plot3(ax,sImpulse(1,1),sImpulse(1,2),sImpulse(1,3),'p','MarkerSize',12,'MarkerFaceColor',[0.95,0.65,0.15],'MarkerEdgeColor','k','LineWidth',1.2);
 hMoon = draw_moon(ax,mu,LU);
 hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
