@@ -74,13 +74,32 @@ function Invoke-MatlabRun {
     $dataDir = Join-Path $RunDir "data"
     $stateFile = Join-Path $dataDir "optimization_run.mat"
     $trackingFile = Join-Path $dataDir "tracking_data.mat"
+    $hasState = Test-Path $stateFile
+    $hasTracking = Test-Path $trackingFile
 
-    if (Test-Path $trackingFile) {
+    # A run is complete only when both result files exist. This makes the
+    # study resumable after a MATLAB/Windows/power interruption without
+    # deleting previously completed runs.
+    if ($hasState -and $hasTracking) {
         Write-Host "Skipping completed run -> $RunDir"
         return
     }
-    if (Test-Path $stateFile) {
-        throw "Incomplete run exists at $RunDir. Inspect or move it before resuming."
+
+    # Preserve an interrupted/partial run for diagnosis, then rerun the same
+    # case from a clean directory. The archived folder is never considered a
+    # study run because its name no longer matches the deterministic run path.
+    if ($hasState -or $hasTracking) {
+        $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $archiveDir = "$RunDir`_INCOMPLETE_$stamp"
+        $suffix = 1
+        while (Test-Path $archiveDir) {
+            $archiveDir = "$RunDir`_INCOMPLETE_$stamp`_$suffix"
+            $suffix++
+        }
+
+        Write-Warning "Incomplete run detected. Archiving before retry: $RunDir"
+        Move-Item -Path $RunDir -Destination $archiveDir
+        Write-Host "Archived incomplete run -> $archiveDir"
     }
 
     New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
