@@ -112,11 +112,27 @@ try
     addpath('$ProjectRootMatlab');
     setup_project;
     run('$RunOptMatlab');
+
+    % Explicitly release process workers before -batch tears down MATLAB.
+    p = gcp('nocreate');
+    if ~isempty(p)
+        fprintf('Shutting down parallel pool before MATLAB exit...\n');
+        delete(p);
+        fprintf('Parallel pool shut down successfully.\n');
+    end
 catch ME
+    % Best-effort pool cleanup also applies when run_opt throws normally.
+    try
+        p = gcp('nocreate');
+        if ~isempty(p)
+            delete(p);
+        end
+    catch
+    end
+
     disp(getReport(ME,'extended'));
-    exit(1);
+    rethrow(ME);
 end
-exit(0);
 "@
 
         & "$MatlabExe" -batch $cmd *> "console.log"
