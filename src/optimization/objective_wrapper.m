@@ -1,6 +1,6 @@
 function [J_total, entry] = objective_wrapper(inputs, orbit_database_in, stabilities_in, ...
     s_target, t_target, P0, Q, R, mu, LU, ...
-    sunFcn, sun_min, moon_min, earth_min, ...
+    sunFcn, sun_exclusion, moon_exclusion, earth_exclusion, ...
     opt_flag, solverName, dq, useScreening, costFlags, costCfg, measCfg)
 
     % ---------------- defaults ----------------
@@ -72,7 +72,7 @@ function [J_total, entry] = objective_wrapper(inputs, orbit_database_in, stabili
         [s_ekf, cov, screeningCount, ~] = cr3bp_ekf( ...
             observer_ICs, s_target, t_target, ...
             P0, Q, R, mu, LU, ...
-            sunFcn, sun_min, moon_min, earth_min, useScreening, measCfg);
+            sunFcn, sun_exclusion, moon_exclusion, earth_exclusion, useScreening, measCfg);
 
         [J_total, J_1, J_2, J_3] = compute_cost( ...
             s_target, s_ekf, cov, stabilities_vec, opt_flag, costFlags, costCfg);
@@ -99,9 +99,10 @@ function [J_total, entry] = objective_wrapper(inputs, orbit_database_in, stabili
     entry.useJ3 = logical(costFlags.J3);
 
     entry.meas_model = char(measCfg.type);
-    entry.sun_min_deg   = rad2deg(sun_min);
-    entry.moon_min_deg  = rad2deg(moon_min);
-    entry.earth_min_deg = rad2deg(earth_min);
+    entry.visibility_model = 'CENTER_REFERENCED_MAX';
+    entry.sun_exclusion_deg   = rad2deg(sun_exclusion);
+    entry.moon_exclusion_deg  = rad2deg(moon_exclusion);
+    entry.earth_exclusion_deg = rad2deg(earth_exclusion);
 
     if strcmpi(opt_flag, "SOO")
         entry.J_total = J_total;

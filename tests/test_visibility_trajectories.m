@@ -6,9 +6,10 @@ EKF_DT = 0.01;
 gateway_periods = 1;
 slots_per_orbit = 50;
 
-sun_min   = deg2rad(20);
-moon_min  = deg2rad(10);
-earth_min = deg2rad(10);    % Test setting only
+% Absolute minimum LOS separations measured from each body center.
+sun_exclusion   = deg2rad(20);
+moon_exclusion  = deg2rad(10);
+earth_exclusion = deg2rad(10);    % Test setting only
 
 % Observer selection: each row is [orbit_index, slot_index].
 % Leave empty to test the first orbit from each family at five slots.
@@ -267,7 +268,7 @@ for m = 1:numel(case_names)
             % Existing combined screening.
             ok_exclusion = calc_exclusion( ...
                 r_target, r_observer, r_sun, ...
-                mu, sun_min, moon_min);
+                mu, sun_exclusion, moon_exclusion);
 
             old_visibility(k,j) = ...
                 old_geometry(k,j) && ok_exclusion;
@@ -275,12 +276,12 @@ for m = 1:numel(case_names)
             % New combined screening without Earth exclusion.
             new_visibility(k,j) = calc_visibility( ...
                 r_target, r_observer, r_sun, ...
-                mu, LU, sun_min, moon_min, 0);
+                mu, LU, sun_exclusion, moon_exclusion, 0);
 
             % New combined screening with Earth exclusion.
             earth_visibility(k,j) = calc_visibility( ...
                 r_target, r_observer, r_sun, ...
-                mu, LU, sun_min, moon_min, earth_min);
+                mu, LU, sun_exclusion, moon_exclusion, earth_exclusion);
         end
 
         fprintf('Observer %d/%d: orbit %d, slot %d complete.\n', ...

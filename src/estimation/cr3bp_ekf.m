@@ -1,6 +1,6 @@
 function [s_ekf, cov, screeningCount, availableObsCount] = cr3bp_ekf( ...
     observer_ICs, s_target, t_target, P0, Q, R, mu, LU, ...
-    sunFcn, sun_min, moon_min, earth_min, useScreening, measCfg)
+    sunFcn, sun_exclusion, moon_exclusion, earth_exclusion, useScreening, measCfg)
 
 if nargin < 13 || isempty(useScreening)
     useScreening = true;   % default ON
@@ -100,7 +100,7 @@ for k = 2:num_steps
 
         ok = calc_visibility( ...
             r_target_truth, r_obs, r_sun, ...
-            mu, LU, sun_min, moon_min, earth_min);
+            mu, LU, sun_exclusion, moon_exclusion, earth_exclusion);
 
         % count valid observers for plotting
         if ok

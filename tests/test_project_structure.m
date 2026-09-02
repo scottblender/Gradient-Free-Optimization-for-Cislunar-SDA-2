@@ -50,6 +50,7 @@ function test_project_structure()
         'process_comparison_results', 'scripts/process_comparison_results.m'
         'print_observer_ics_from_experiment_summary', 'scripts/print_observer_ics_from_experiment_summary.m'
         'test_observer_catalog', 'tests/test_observer_catalog.m'
+        'test_visibility_keepout_definition', 'tests/test_visibility_keepout_definition.m'
         'test_visibility_trajectories', 'tests/test_visibility_trajectories.m'
     };
 

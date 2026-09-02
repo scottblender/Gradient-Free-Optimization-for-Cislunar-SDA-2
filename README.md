@@ -27,6 +27,22 @@ existing function names and calls remain unchanged.
 | `data/` | Local orbit catalog, optional raw CSV inputs, and generated caches |
 | `results/` | Generated run folders, figures, reports, and logs |
 
+## Visibility convention
+
+`calc_visibility` applies one center-referenced angular framework to the
+Earth, Moon, and Sun. For each body, the configured exclusion angle is an
+absolute minimum line-of-sight separation from the body center. The effective
+keep-out boundary is
+
+```text
+theta_keepout = max(theta_occultation, theta_exclusion).
+```
+
+Setting the exclusion angle to zero therefore recovers physical occultation.
+The separate `calc_occlusion` and `calc_exclusion` functions are retained
+only as independent regression references; optimization uses
+`calc_visibility`.
+
 ## Getting started
 
 Open the project root in MATLAB, then run:

@@ -1,6 +1,9 @@
 function [occE, occM] = calc_occlusion(r_target, r_observer, mu, LU, pad_km)
-    % calc_occlusion - Computes whether or not the earth or moon occlude
-    % the LOS between the observer and target using a spherical model
+    % calc_occlusion - Legacy Earth/Moon segment-sphere reference
+    %
+    % This function is retained only for visibility regression tests.
+    % Optimization uses calc_visibility. It determines whether the Earth
+    % or Moon occludes the observer-target LOS using a spherical model.
     %
     % Inputs:
     %   r_target - position of the target spacecraft [rtx,rty,rtz] LU

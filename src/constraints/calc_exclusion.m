@@ -1,37 +1,36 @@
-function [vis, alpha_sun, alpha_moon] = calc_exclusion(r_target, r_observer, r_sun, mu, sun_min, moon_min)
-    % calc_exclusion - Computes lunar and sun exclusion angles and if
-    % target is visible
+function [vis, alpha_sun, alpha_moon] = calc_exclusion( ...
+    r_target, r_observer, r_sun, mu, ...
+    sun_exclusion, moon_exclusion)
+    % calc_exclusion - Legacy center-referenced exclusion reference
+    %
+    % This function is retained only for visibility regression tests.
+    % Optimization uses calc_visibility.
     %
     % Inputs:
-    %   r_target - position of the target spacecraft [rtx,rty,rtz] LU
-    %   r_observer - position of the observer spacecraft [rox, roy, roz] LU
-    %   r_sun - position of the sun in LU
-    %   mu - EM graviational constant
-    %   sun_min - minimum separation angle of the sun
-    %   moon_min - minimum separation angle of the moon
+    %   r_target - target position [LU]
+    %   r_observer - observer position [LU]
+    %   r_sun - Sun position [LU]
+    %   mu - Earth-Moon mass ratio
+    %   sun_exclusion - minimum Sun-center separation [rad]
+    %   moon_exclusion - minimum Moon-center separation [rad]
     %
-    % Output:
-    %   vis - boolean if state is visible or not
-    %   alpha_sun - sun exclusion angle in rad
-    %   alpha_moon - lunar exclusion angle in rad
-    
-    % line of sight 
-    los = r_target - r_observer;
-    nlos = norm(los);
-    u_los = los/nlos;
+    % Outputs:
+    %   vis - true when both exclusion constraints are satisfied
+    %   alpha_sun - LOS/Sun-center separation [rad]
+    %   alpha_moon - LOS/Moon-center separation [rad]
 
-    % moon direction (CR3BP)
-    r_moon = [1-mu; 0; 0];
-    u_moon = (r_moon - r_observer)/norm((r_moon - r_observer));
-    
-    % sun direction
-    u_sun = (r_sun - r_observer)/norm((r_sun - r_observer));
+    los = r_target-r_observer;
+    u_los = los/norm(los);
 
-    % angles 
-    alpha_sun = acos(clamp(dot(u_los, u_sun),-1,1));
-    alpha_moon = acos(clamp(dot(u_los, u_moon),-1,1));
+    r_moon = [1-mu;0;0];
+    u_moon = (r_moon-r_observer)/norm(r_moon-r_observer);
+    u_sun = (r_sun-r_observer)/norm(r_sun-r_observer);
 
-    vis = (alpha_moon >= moon_min) && (alpha_sun >= sun_min);
+    alpha_sun = acos(clamp(dot(u_los,u_sun),-1,1));
+    alpha_moon = acos(clamp(dot(u_los,u_moon),-1,1));
+
+    vis = (alpha_moon >= moon_exclusion) && ...
+          (alpha_sun >= sun_exclusion);
 end
 
 function y = clamp(x,a,b)
