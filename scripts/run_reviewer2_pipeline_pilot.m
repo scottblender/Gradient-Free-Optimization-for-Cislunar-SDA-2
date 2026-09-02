@@ -7,7 +7,9 @@ function report = run_reviewer2_pipeline_pilot(runOptimizations,saveFigures)
 %
 % The script then validates the saved schema, aligns convergence by function
 % evaluations, prints mean +/- sample-standard-deviation tables, and creates
-% paper-style preview figures. Pilot output is isolated from the full study.
+% paper-style preview figures. For each case, the lowest-objective run across
+% every optimizer and seed supplies the trajectory and EKF diagnostic plots.
+% Pilot output is isolated from the full study.
 %
 % Usage:
 %   report = run_reviewer2_pipeline_pilot;
@@ -94,17 +96,23 @@ runMetrics = readtable(metricsFile, ...
 paperResults = build_paper_results( ...
     summary,runMetrics,missions,optimizers,seeds,budget);
 [objectiveTable,trackingTable] = format_paper_tables(paperResults);
+bestRuns = select_best_observed_runs(summary,runMetrics,missions);
 
 fprintf('\n--- Pilot objective/runtime results (mean +/- sample std) ---\n');
 disp(objectiveTable);
 fprintf('\n--- Pilot tracking/design results (mean +/- sample std) ---\n');
 disp(trackingTable);
+fprintf('\n--- Best observed runs used for trajectory/EKF plots ---\n');
+disp(bestRuns(:, ...
+    {'Mission','Optimizer','Seed','BestObjective'}));
 
 writetable(paperResults,fullfile(analysisDir,'pilot_paper_results.csv'));
 writetable(objectiveTable, ...
     fullfile(analysisDir,'pilot_objective_table_formatted.csv'));
 writetable(trackingTable, ...
     fullfile(analysisDir,'pilot_tracking_table_formatted.csv'));
+writetable(bestRuns, ...
+    fullfile(analysisDir,'pilot_best_observed_runs.csv'));
 
 figureDir = "";
 if saveFigures
@@ -122,6 +130,7 @@ plot_grouped_result(paperResults,missions,optimizers, ...
     'pilot_runtime',figureDir,saveFigures);
 plot_cost_component_preview( ...
     paperResults,missions,optimizers,figureDir,saveFigures);
+plot_best_run_tracking(bestRuns,figureDir,saveFigures);
 
 report = struct();
 report.studyID = studyID;
@@ -133,6 +142,7 @@ report.figureDirectory = figureDir;
 report.summary = summary;
 report.inventory = inventory;
 report.paperResults = paperResults;
+report.bestObservedRuns = bestRuns;
 
 fprintf('\nFull-pipeline pilot passed.\n');
 fprintf('Processed data: %s\n',analysisDir);
@@ -425,6 +435,286 @@ if saveFigures
 end
 end
 
+function bestRuns = select_best_observed_runs(summary,runMetrics,missions)
+missionColumn = strings(numel(missions),1);
+optimizerColumn = strings(numel(missions),1);
+seedColumn = nan(numel(missions),1);
+objectiveColumn = nan(numel(missions),1);
+optimizationFile = strings(numel(missions),1);
+trackingFile = strings(numel(missions),1);
+
+for k = 1:numel(missions)
+    mission = missions(k);
+    keys = unique(summary.comparison_key(summary.mission == mission));
+    assert(numel(keys) == 1, ...
+        'Expected one comparison identity for %s.',mission);
+
+    candidates = runMetrics(runMetrics.comparison_key == keys,:);
+    assert(~isempty(candidates), ...
+        'No completed runs are available for %s.',mission);
+    candidates = sortrows(candidates,{'bestJ','optimizer','seed'});
+    selected = candidates(1,:);
+
+    optimizationPath = string(selected.run_file);
+    trackingPath = string(fullfile(fileparts(optimizationPath), ...
+        'tracking_data.mat'));
+    assert(isfile(optimizationPath) && isfile(trackingPath), ...
+        'The selected best run is missing saved tracking data.');
+
+    missionColumn(k) = mission;
+    optimizerColumn(k) = selected.optimizer;
+    seedColumn(k) = selected.seed;
+    objectiveColumn(k) = selected.bestJ;
+    optimizationFile(k) = optimizationPath;
+    trackingFile(k) = trackingPath;
+end
+
+bestRuns = table( ...
+    missionColumn,optimizerColumn,seedColumn,objectiveColumn, ...
+    optimizationFile,trackingFile, ...
+    'VariableNames',{ ...
+    'Mission','Optimizer','Seed','BestObjective', ...
+    'OptimizationRunFile','TrackingDataFile'});
+end
+
+function plot_best_run_tracking(bestRuns,figureDir,saveFigures)
+for k = 1:height(bestRuns)
+    stateData = load(bestRuns.OptimizationRunFile(k),'runState');
+    trackingData = load(bestRuns.TrackingDataFile(k),'tracking');
+    runState = stateData.runState;
+    tracking = trackingData.tracking;
+
+    assert(size(tracking.truth,1) == numel(tracking.t_TU) && ...
+        isequal(size(tracking.truth),size(tracking.estimate)), ...
+        'Tracking truth and estimate arrays are inconsistent.');
+    assert(size(tracking.covariance,1) == numel(tracking.t_TU), ...
+        'Tracking covariance length is inconsistent.');
+
+    trajectoryFig = plot_best_trajectory( ...
+        runState,tracking,bestRuns(k,:));
+    errorFig = plot_best_ekf_errors( ...
+        runState,tracking,bestRuns(k,:));
+
+    if saveFigures
+        code = mission_code(bestRuns.Mission(k));
+        export_pilot_figure(trajectoryFig, ...
+            fullfile(figureDir,"pilot_best_trajectory_"+code));
+        export_pilot_figure(errorFig, ...
+            fullfile(figureDir,"pilot_best_ekf_errors_"+code));
+    end
+end
+end
+
+function fig = plot_best_trajectory(runState,tracking,bestRun)
+truth = tracking.truth(:,1:3);
+estimate = tracking.estimate(:,1:3);
+mu = runState.settings.mu;
+LU = runState.settings.LU;
+moonCenter = [1-mu,0,0];
+moonRadius = 1737.1/LU;
+[xL1,xL2] = collinear_lagrange_points(mu);
+
+[width,height] = paper_figure_size(1,1,false);
+width = max(width,6.5);
+height = max(height,4.8);
+fig = create_paper_figure(width,height, ...
+    mission_label(bestRun.Mission)+" best-run trajectory");
+ax = axes(fig);
+hold(ax,'on');
+box(ax,'on');
+
+hTruth = plot3(ax,truth(:,1),truth(:,2),truth(:,3), ...
+    'Color',[0.85 0.20 0.15],'LineWidth',2.1, ...
+    'DisplayName','Truth');
+hEstimate = plot3(ax,estimate(:,1),estimate(:,2),estimate(:,3), ...
+    '--','Color',[0.05 0.35 0.80],'LineWidth',1.6, ...
+    'DisplayName','EKF estimate');
+
+[sx,sy,sz] = sphere(28);
+hMoon = surf(ax,moonCenter(1)+moonRadius*sx, ...
+    moonCenter(2)+moonRadius*sy,moonCenter(3)+moonRadius*sz, ...
+    'FaceColor',[0.65 0.65 0.65], ...
+    'EdgeColor','none','FaceAlpha',1.0, ...
+    'DisplayName','Moon');
+
+hL1 = plot3(ax,xL1,0,0,'^','MarkerSize',8, ...
+    'MarkerFaceColor',[0.85 0.85 0.85], ...
+    'MarkerEdgeColor',[0.45 0.45 0.45], ...
+    'DisplayName','L1 point');
+hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',8, ...
+    'MarkerFaceColor',[0.85 0.85 0.85], ...
+    'MarkerEdgeColor',[0.45 0.45 0.45], ...
+    'DisplayName','L2 point');
+
+plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
+    'MarkerSize',7,'MarkerFaceColor',[0.20 0.70 0.25], ...
+    'MarkerEdgeColor','k','HandleVisibility','off');
+plot3(ax,truth(end,1),truth(end,2),truth(end,3),'s', ...
+    'MarkerSize',7,'MarkerFaceColor',[0.20 0.35 0.90], ...
+    'MarkerEdgeColor','k','HandleVisibility','off');
+
+allPoints = [truth;estimate;moonCenter; ...
+    moonCenter+[moonRadius 0 0];moonCenter-[moonRadius 0 0]; ...
+    moonCenter+[0 moonRadius 0];moonCenter-[0 moonRadius 0]; ...
+    moonCenter+[0 0 moonRadius];moonCenter-[0 0 moonRadius]; ...
+    xL1 0 0;xL2 0 0];
+xlim(ax,padded_limits(allPoints(:,1),0.08));
+ylim(ax,padded_limits(allPoints(:,2),0.10));
+zlim(ax,padded_limits(allPoints(:,3),0.10));
+daspect(ax,[1 1 1]);
+axis(ax,'vis3d');
+view(ax,132,24);
+grid(ax,'off');
+
+xlabel(ax,'x (LU)','FontWeight','bold');
+ylabel(ax,'y (LU)','FontWeight','bold');
+zlabel(ax,'z (LU)','FontWeight','bold');
+title(ax,sprintf('%s: best observed run (%s, seed %d)', ...
+    mission_label(bestRun.Mission),bestRun.Optimizer,bestRun.Seed), ...
+    'FontWeight','bold','FontSize',13);
+legend(ax,[hTruth hEstimate hMoon hL1 hL2], ...
+    'Location','northoutside','NumColumns',3, ...
+    'FontSize',12,'FontWeight','bold');
+apply_figure_style(ax);
+ax.PositionConstraint = 'outerposition';
+end
+
+function fig = plot_best_ekf_errors(runState,tracking,bestRun)
+t = tracking.t_TU(:);
+errors = tracking.estimate-tracking.truth;
+N = numel(t);
+LU = runState.settings.LU;
+VU = LU/runState.settings.TU;
+nObservers = runState.settings.mission.optimization.numObservers;
+
+sigma = zeros(N,6);
+for k = 1:N
+    covariance = squeeze(tracking.covariance(k,:,:));
+    covariance = (covariance+covariance')/2;
+    sigma(k,:) = sqrt(max(real(diag(covariance)),0))';
+end
+
+errors(:,1:3) = errors(:,1:3)*LU;
+errors(:,4:6) = errors(:,4:6)*VU;
+sigma(:,1:3) = sigma(:,1:3)*LU;
+sigma(:,4:6) = sigma(:,4:6)*VU;
+bounds = 3*sigma;
+
+available = tracking.availableObsCount(:);
+assert(numel(available) == N, ...
+    'Available-observer history length is inconsistent.');
+if all(isnan(available))
+    available = zeros(N,1);
+else
+    available = fillmissing(available,'previous');
+    available = fillmissing(available,'next');
+end
+available = max(0,min(nObservers,available));
+
+[width,height] = paper_figure_size(2,3,true);
+fig = create_paper_figure(width,height, ...
+    mission_label(bestRun.Mission)+" best-run EKF errors");
+layout = tiledlayout(fig,2,3, ...
+    'TileSpacing','compact','Padding','compact');
+axesHandles = gobjects(6,1);
+coordinateNames = ["x","y","z","v_x","v_y","v_z"];
+
+for component = 1:6
+    ax = nexttile(layout);
+    axesHandles(component) = ax;
+    hold(ax,'on');
+    box(ax,'on');
+
+    yLimits = padded_limits([ ...
+        errors(:,component);bounds(:,component);-bounds(:,component)],0.06);
+    availabilityImage = image(ax, ...
+        'XData',[t(1) t(end)], ...
+        'YData',yLimits, ...
+        'CData',[available';available'], ...
+        'CDataMapping','scaled');
+    availabilityImage.AlphaData = 1.0;
+    set(ax,'YDir','normal');
+    clim(ax,[0 max(1,nObservers)]);
+
+    hError = plot(ax,t,errors(:,component), ...
+        'Color',[0.12 0.40 0.68],'LineWidth',1.0, ...
+        'DisplayName','EKF error');
+    hBound = plot(ax,t,bounds(:,component), ...
+        'Color',[0.75 0.18 0.13],'LineWidth',1.35, ...
+        'DisplayName','\pm 3\sigma bound');
+    plot(ax,t,-bounds(:,component), ...
+        'Color',[0.75 0.18 0.13],'LineWidth',1.35, ...
+        'HandleVisibility','off');
+
+    xlim(ax,[t(1) t(end)]);
+    ylim(ax,yLimits);
+    grid(ax,'on');
+    if component <= 3
+        ylabel(ax,sprintf('$e_{%s}$ (km)',coordinateNames(component)), ...
+            'Interpreter','latex','FontWeight','bold');
+    else
+        ylabel(ax,sprintf('$e_{%s}$ (km/s)',coordinateNames(component)), ...
+            'Interpreter','latex','FontWeight','bold');
+        xlabel(ax,'t (TU)','FontWeight','bold');
+    end
+    if component == 1
+        legend(ax,[hError hBound],'Location','north', ...
+            'FontSize',12,'FontWeight','bold');
+    end
+    apply_figure_style(ax);
+end
+
+availabilityGray = linspace(0.76,1.0,256)';
+colormap(fig,repmat(availabilityGray,1,3));
+colorbarHandle = colorbar(axesHandles(end));
+colorbarHandle.Layout.Tile = 'east';
+colorbarHandle.Ticks = 0:nObservers;
+colorbarHandle.Label.String = 'Available observers';
+colorbarHandle.Label.FontWeight = 'bold';
+colorbarHandle.FontName = 'Times New Roman';
+colorbarHandle.FontSize = 12;
+colorbarHandle.FontWeight = 'bold';
+
+title(layout,sprintf('%s: best observed run (%s, seed %d)', ...
+    mission_label(bestRun.Mission),bestRun.Optimizer,bestRun.Seed), ...
+    'FontName','Times New Roman','FontWeight','bold','FontSize',13);
+end
+
+function [xL1,xL2] = collinear_lagrange_points(mu)
+equilibrium = @(x) x ...
+    -(1-mu)*(x+mu)./abs(x+mu).^3 ...
+    -mu*(x-1+mu)./abs(x-1+mu).^3;
+xL1 = fzero(equilibrium,1-mu-0.15);
+xL2 = fzero(equilibrium,1-mu+0.15);
+end
+
+function limits = padded_limits(values,fraction)
+values = values(isfinite(values));
+assert(~isempty(values),'Cannot size axes from empty data.');
+lower = min(values);
+upper = max(values);
+span = upper-lower;
+if span <= 100*eps(max(1,max(abs(values))))
+    span = max(0.02,0.05*max(1,abs(mean(values))));
+end
+padding = fraction*span;
+limits = [lower-padding,upper+padding];
+end
+
+function [width,height] = paper_figure_size(rows,columns,hasColorbar)
+width = min(7.5,0.45+2.20*columns+0.35*double(hasColorbar));
+height = min(7.0,0.70+1.95*rows);
+end
+
+function fig = create_paper_figure(width,height,name)
+fig = figure('Color','w','Name',char(name), ...
+    'Units','inches','Position',[1 1 width height], ...
+    'PaperUnits','inches','PaperSize',[width height], ...
+    'PaperPosition',[0 0 width height], ...
+    'PaperPositionMode','manual');
+movegui(fig,'center');
+end
+
 function apply_figure_style(ax)
 set(ax,'FontName','Times New Roman','FontSize',12, ...
     'FontWeight','bold','LineWidth',1.0);
@@ -433,6 +723,14 @@ end
 function export_pilot_figure(fig,stem)
 drawnow;
 stem = string(stem);
+oldUnits = fig.Units;
+fig.Units = 'inches';
+position = fig.Position;
+fig.PaperUnits = 'inches';
+fig.PaperSize = position(3:4);
+fig.PaperPosition = [0 0 position(3:4)];
+fig.PaperPositionMode = 'manual';
+fig.Units = oldUnits;
 print(fig,char(stem+".eps"),'-depsc','-painters');
 exportgraphics(fig,char(stem+".png"),'Resolution',300);
 end

@@ -117,7 +117,8 @@ low-thrust and Gateway-impulse cases and repeats every configuration for seeds
 ```
 
 Both launchers accept `-MatlabExe`, `-EvalBudget`, `-Seeds`, and `-Pilot`.
-They show completed-run progress in PowerShell. Completed runs are skipped
+Pilot and full runs use the same parallel-optimization path. They show
+completed-run progress in PowerShell. Completed runs are skipped
 safely; an incomplete run must be inspected or moved instead of being silently
 overwritten.
 
@@ -141,6 +142,13 @@ Then exercise the exact batch entry points with their small pilot matrices:
 .\scripts\batch\run_comparison_soo.ps1 -Pilot
 ```
 
+If Windows blocks direct `.ps1` execution, use a process-scoped bypass without
+changing the machine or user policy:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\batch\run_baseline_soo.ps1 -Pilot
+```
+
 Without overrides, the baseline pilot performs three 120-FE GA runs (one per
 fixed target case), and the comparison pilot performs fifteen 120-FE runs
 (five optimizers by three target cases), all with optimizer seed 0. Pilot output
@@ -154,11 +162,15 @@ optimizers, all three fixed cases, and seeds 0--2, run:
 report = run_reviewer2_pipeline_pilot;
 ```
 
-This launches or resumes 45 runs at 120 FE, processes and validates every saved
-result, prints mean +/- sample-standard-deviation tables, and creates EPS/PNG
-preview figures under the newest `COMPARISON_PILOT/FE_DATA_*/paper_preview`
-folder. To reprocess completed runs without launching MATLAB workers again, use
-`run_reviewer2_pipeline_pilot(false,true)`. These are explicitly pilot
+This launches or resumes 45 parallel runs at 120 FE, processes and validates
+every saved result, prints mean +/- sample-standard-deviation tables, and
+creates EPS/PNG convergence, objective, runtime, and cost-component previews.
+For each target case, it also identifies the lowest-objective run across all
+optimizers and seeds and plots its truth/estimate trajectory and integrated EKF
+error, +/- 3-sigma, and available-observer diagnostics. The selected runs are
+recorded in `pilot_best_observed_runs.csv`; figures are saved under the newest
+`COMPARISON_PILOT/FE_DATA_*/paper_preview` folder. To reprocess completed runs without launching MATLAB workers again,
+use `run_reviewer2_pipeline_pilot(false,true)`. These are explicitly pilot
 statistics; the full 20-seed study must replace them in the manuscript.
 
 Process the one-seed comparison pilot manually with:
