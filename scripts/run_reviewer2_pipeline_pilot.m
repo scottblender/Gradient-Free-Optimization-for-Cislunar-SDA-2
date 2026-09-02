@@ -382,7 +382,9 @@ colors = lines(numel(optimizers));
 for a = 1:numel(optimizers)
     bars(a).FaceColor = colors(a,:);
     bars(a).DisplayName = optimizers(a);
-    errorbar(ax,bars(a).XEndPoints,values(:,a),errors(:,a), ...
+    upperErrors = max(errors(:,a),0);
+    lowerErrors = min(upperErrors,max(values(:,a),0));
+    errorbar(ax,bars(a).XEndPoints,values(:,a),lowerErrors,upperErrors, ...
         'k.','LineWidth',1.15,'CapSize',7,'HandleVisibility','off');
 end
 
@@ -444,12 +446,14 @@ for m = 1:numel(missions)
     bars.FaceColor = 'flat';
     bars.CData = colors;
     hold(ax,'on');
-    errorbar(ax,1:numel(optimizers),values,deviations, ...
+    upperDeviation = max(deviations,0);
+    lowerDeviation = min(upperDeviation,max(values,0));
+    errorbar(ax,1:numel(optimizers),values,lowerDeviation,upperDeviation, ...
         'k.','LineWidth',1.0,'CapSize',6,'HandleVisibility','off');
 
     % Each mission receives an independent y-scale so a large low-thrust
     % value cannot visually flatten the Gateway or impulse bars.
-    ymax = max(values+max(deviations,0),[],'omitnan');
+    ymax = max(values+upperDeviation,[],'omitnan');
     if isfinite(ymax) && ymax > 0
         ylim(ax,[0,1.10*ymax]);
     end
