@@ -142,7 +142,9 @@ end
         $stderrLog = Join-Path $RunDir "console.stderr.log"
         $consoleLog = Join-Path $RunDir "console.log"
 
-        Set-Content -Path $batchEntry -Value $cmd -Encoding UTF8
+        # Windows PowerShell's UTF8 encoding writes a BOM that MATLAB can
+        # reject as an invalid leading character in a generated .m file.
+        Set-Content -Path $batchEntry -Value $cmd -Encoding ASCII
         $batchEntryMatlab = $batchEntry.Replace("'", "''")
         $batchCommand = "run('$batchEntryMatlab')"
 
