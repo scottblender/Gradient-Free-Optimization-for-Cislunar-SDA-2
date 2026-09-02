@@ -320,9 +320,9 @@ for mission = missions
         validBand = isfinite(curve.mean) & isfinite(curve.std);
         if any(validBand)
             xBand = curve.fe(validBand);
-            lower = curve.mean(validBand)-curve.std(validBand);
-            upper = curve.mean(validBand)+curve.std(validBand);
-            fill(ax,[xBand;flipud(xBand)],[lower;flipud(upper)], ...
+            lowerBand = curve.mean(validBand)-curve.std(validBand);
+            upperBand = curve.mean(validBand)+curve.std(validBand);
+            fill(ax,[xBand;flipud(xBand)],[lowerBand;flipud(upperBand)], ...
                 colors(a,:),'FaceAlpha',0.12,'EdgeColor','none', ...
                 'HandleVisibility','off');
         end
