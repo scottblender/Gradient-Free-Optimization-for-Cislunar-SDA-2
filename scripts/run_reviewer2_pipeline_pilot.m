@@ -289,6 +289,15 @@ assert(numel(files) == numel(missions), ...
     'Expected one convergence data file per target case.');
 colors = lines(numel(optimizers));
 
+% All methods are displayed at the same FE checkpoints. Population methods
+% do not have a meaningful incumbent before their first batch completes, and
+% BO should not receive a visual advantage merely because it records every FE.
+checkpointStep = 60;
+commonFE = (checkpointStep:checkpointStep:budget)';
+if isempty(commonFE) || commonFE(end) ~= budget
+    commonFE = unique([commonFE;budget]);
+end
+
 for mission = missions
     match = "";
     loaded = struct();
@@ -305,38 +314,57 @@ for mission = missions
     assert(strlength(match) > 0, ...
         'No convergence data found for %s.',mission);
 
-    fig = figure('Color','w','Units','inches', ...
-        'Position',[1 1 6.5 4.25]);
+    fig = create_paper_figure(7.2,4.8, ...
+        mission_label(mission)+" convergence");
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
     grid(ax,'on');
 
     curveOptimizers = upper(string({loaded.curves.optimizer}));
+    lineHandles = gobjects(numel(optimizers),1);
     for a = 1:numel(optimizers)
         idx = find(curveOptimizers == optimizers(a),1);
         assert(~isempty(idx),'Missing %s convergence curve.',optimizers(a));
         curve = loaded.curves(idx);
-        validBand = isfinite(curve.mean) & isfinite(curve.std);
+
+        meanCommon = curve.mean(commonFE);
+        stdCommon = curve.std(commonFE);
+        validBand = isfinite(meanCommon) & isfinite(stdCommon);
         if any(validBand)
-            xBand = curve.fe(validBand);
-            lowerBand = curve.mean(validBand)-curve.std(validBand);
-            upperBand = curve.mean(validBand)+curve.std(validBand);
+            xBand = commonFE(validBand);
+            lowerBand = meanCommon(validBand)-stdCommon(validBand);
+            upperBand = meanCommon(validBand)+stdCommon(validBand);
             fill(ax,[xBand;flipud(xBand)],[lowerBand;flipud(upperBand)], ...
-                colors(a,:),'FaceAlpha',0.12,'EdgeColor','none', ...
+                colors(a,:),'FaceAlpha',0.10,'EdgeColor','none', ...
                 'HandleVisibility','off');
         end
-        stairs(ax,curve.fe,curve.mean,'Color',colors(a,:), ...
-            'LineWidth',1.8,'DisplayName',optimizers(a));
+
+        validLine = isfinite(meanCommon);
+        xLine = commonFE(validLine);
+        yLine = meanCommon(validLine);
+        markerStep = max(1,round(numel(xLine)/10));
+        lineHandles(a) = plot(ax,xLine,yLine,'-o', ...
+            'Color',colors(a,:),'LineWidth',2.0,'MarkerSize',4.5, ...
+            'MarkerIndices',1:markerStep:numel(xLine), ...
+            'DisplayName',optimizers(a));
     end
 
-    xlim(ax,[1 budget]);
+    xlim(ax,[0 budget]);
+    if budget <= 600
+        xticks(ax,unique([0;commonFE]));
+    end
     xlabel(ax,'Function evaluations','FontWeight','bold');
     ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
-    title(ax,sprintf('%s: three-seed pilot',mission_label(mission)), ...
-        'FontWeight','bold');
-    legend(ax,'Location','best','FontSize',12,'FontWeight','bold');
+    title(ax,sprintf('%s: common %d-FE checkpoints', ...
+        mission_label(mission),checkpointStep),'FontWeight','bold');
     apply_figure_style(ax);
+
+    lgd = legend(ax,lineHandles,cellstr(optimizers), ...
+        'Location','northoutside','Orientation','horizontal', ...
+        'NumColumns',numel(optimizers),'Box','on');
+    format_legend(lgd,11);
+    reserve_top_legend_space(ax);
 
     if saveFigures
         stem = fullfile(figureDir, ...
@@ -349,36 +377,40 @@ end
 function plot_grouped_result(results,missions,optimizers, ...
     meanVariable,stdVariable,yLabel,fileStem,figureDir,saveFigures)
 
-fig = figure('Color','w','Units','inches','Position',[1 1 7.5 3.5]);
-layout = tiledlayout(fig,1,numel(missions), ...
-    'TileSpacing','compact','Padding','compact');
+fig = create_paper_figure(7.4,4.7,string(fileStem));
+ax = axes(fig);
+hold(ax,'on');
+box(ax,'on');
+grid(ax,'on');
+
+[values,errors,missionLabels] = grouped_metric_arrays( ...
+    results,missions,optimizers,meanVariable,stdVariable);
+
+bars = bar(ax,values,'grouped','LineWidth',0.9);
 colors = lines(numel(optimizers));
-
-for m = 1:numel(missions)
-    ax = nexttile(layout);
-    rows = results(results.Mission == missions(m),:);
-    [~,order] = ismember(optimizers,rows.Optimizer);
-    rows = rows(order,:);
-
-    values = rows.(meanVariable);
-    errors = rows.(stdVariable);
-    bars = bar(ax,1:numel(optimizers),values,0.72,'FaceColor','flat');
-    bars.CData = colors;
-    hold(ax,'on');
-    errorbar(ax,1:numel(optimizers),values,errors, ...
-        'k.','LineWidth',1.2,'CapSize',7);
-    grid(ax,'on');
-    box(ax,'on');
-    xticks(ax,1:numel(optimizers));
-    xticklabels(ax,optimizers);
-    xtickangle(ax,25);
-    title(ax,mission_label(missions(m)),'FontWeight','bold');
-    if m == 1
-        ylabel(ax,yLabel,'FontWeight','bold');
-    end
-    apply_figure_style(ax);
+for a = 1:numel(optimizers)
+    bars(a).FaceColor = colors(a,:);
+    bars(a).DisplayName = optimizers(a);
+    errorbar(ax,bars(a).XEndPoints,values(:,a),errors(:,a), ...
+        'k.','LineWidth',1.15,'CapSize',7,'HandleVisibility','off');
 end
-title(layout,'Three-seed, 120-FE pilot','FontWeight','bold','FontSize',13);
+
+xticks(ax,1:numel(missions));
+xticklabels(ax,missionLabels);
+xtickangle(ax,0);
+ylabel(ax,yLabel,'FontWeight','bold');
+if contains(lower(string(fileStem)),"runtime")
+    title(ax,'Optimization runtime by target case','FontWeight','bold');
+else
+    title(ax,'Final objective by target case','FontWeight','bold');
+end
+apply_figure_style(ax);
+
+lgd = legend(ax,bars,cellstr(optimizers), ...
+    'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',numel(optimizers),'Box','on');
+format_legend(lgd,11);
+reserve_top_legend_space(ax);
 
 if saveFigures
     export_pilot_figure(fig,fullfile(figureDir,fileStem));
@@ -394,44 +426,66 @@ labels = ["Position RMSE (km)", ...
     "Effective position uncertainty (km)","Mean stability index"];
 colors = lines(numel(optimizers));
 
-fig = figure('Color','w','Units','inches','Position',[1 1 7.5 6.2]);
-layout = tiledlayout(fig,numel(variables),numel(missions), ...
-    'TileSpacing','compact','Padding','compact');
+fig = create_paper_figure(7.5,8.2,'Pilot objective components');
+layout = tiledlayout(fig,3,1,'TileSpacing','compact','Padding','compact');
+legendBars = gobjects(numel(optimizers),1);
 
 for v = 1:numel(variables)
-    for m = 1:numel(missions)
-        ax = nexttile(layout);
-        rows = results(results.Mission == missions(m),:);
-        [~,order] = ismember(optimizers,rows.Optimizer);
-        rows = rows(order,:);
+    ax = nexttile(layout);
+    hold(ax,'on');
+    box(ax,'on');
+    grid(ax,'on');
 
-        values = rows.(variables(v));
-        deviations = rows.(errors(v));
-        bars = bar(ax,1:numel(optimizers),values,0.72,'FaceColor','flat');
-        bars.CData = colors;
-        hold(ax,'on');
-        errorbar(ax,1:numel(optimizers),values,deviations, ...
-            'k.','LineWidth',1.1,'CapSize',6);
-        grid(ax,'on');
-        box(ax,'on');
-        xticks(ax,1:numel(optimizers));
-        xticklabels(ax,optimizers);
-        xtickangle(ax,25);
+    [values,deviations,missionLabels] = grouped_metric_arrays( ...
+        results,missions,optimizers,variables(v),errors(v));
+    bars = bar(ax,values,'grouped','LineWidth',0.85);
+    for a = 1:numel(optimizers)
+        bars(a).FaceColor = colors(a,:);
+        bars(a).DisplayName = optimizers(a);
+        errorbar(ax,bars(a).XEndPoints,values(:,a),deviations(:,a), ...
+            'k.','LineWidth',1.0,'CapSize',6,'HandleVisibility','off');
         if v == 1
-            title(ax,mission_label(missions(m)),'FontWeight','bold');
+            legendBars(a) = bars(a);
         end
-        if m == 1
-            ylabel(ax,labels(v),'FontWeight','bold');
-        end
-        apply_figure_style(ax);
+    end
+
+    xticks(ax,1:numel(missions));
+    xticklabels(ax,missionLabels);
+    xtickangle(ax,0);
+    ylabel(ax,labels(v),'FontWeight','bold');
+    apply_figure_style(ax);
+    if v < numel(variables)
+        ax.XTickLabel = [];
     end
 end
-title(layout,'Pilot objective components and design stability', ...
-    'FontWeight','bold','FontSize',13);
+
+title(layout,'Pilot tracking accuracy, uncertainty, and design stability', ...
+    'FontName','Times New Roman','FontWeight','bold','FontSize',14);
+lgd = legend(legendBars,cellstr(optimizers), ...
+    'Orientation','horizontal','NumColumns',numel(optimizers),'Box','on');
+lgd.Layout.Tile = 'north';
+format_legend(lgd,11);
 
 if saveFigures
     export_pilot_figure(fig, ...
         fullfile(figureDir,'pilot_cost_components'));
+end
+end
+
+function [values,errors,missionLabels] = grouped_metric_arrays( ...
+    results,missions,optimizers,meanVariable,stdVariable)
+
+values = nan(numel(missions),numel(optimizers));
+errors = nan(size(values));
+missionLabels = strings(numel(missions),1);
+for m = 1:numel(missions)
+    rows = results(results.Mission == missions(m),:);
+    [found,order] = ismember(optimizers,rows.Optimizer);
+    assert(all(found),'Missing optimizer result for %s.',missions(m));
+    rows = rows(order,:);
+    values(m,:) = rows.(meanVariable).';
+    errors(m,:) = rows.(stdVariable).';
+    missionLabels(m) = mission_label(missions(m));
 end
 end
 
@@ -514,44 +568,45 @@ moonCenter = [1-mu,0,0];
 moonRadius = 1737.1/LU;
 [xL1,xL2] = collinear_lagrange_points(mu);
 
-[width,height] = paper_figure_size(1,1,false);
-width = max(width,6.5);
-height = max(height,4.8);
-fig = create_paper_figure(width,height, ...
+% Match the manuscript study-definition target-case figures exactly:
+% 7.2 x 6.5 in, perspective projection, view(-37.5,30).
+fig = create_paper_figure(7.2,6.5, ...
     mission_label(bestRun.Mission)+" best-run trajectory");
 ax = axes(fig);
 hold(ax,'on');
 box(ax,'on');
+axis(ax,'equal');
 
 hTruth = plot3(ax,truth(:,1),truth(:,2),truth(:,3), ...
-    'Color',[0.85 0.20 0.15],'LineWidth',2.1, ...
-    'DisplayName','Truth');
+    'Color',[0.85 0.20 0.15],'LineWidth',2.6, ...
+    'DisplayName','Truth trajectory');
 hEstimate = plot3(ax,estimate(:,1),estimate(:,2),estimate(:,3), ...
-    '--','Color',[0.05 0.35 0.80],'LineWidth',1.6, ...
+    '--','Color',[0.05 0.35 0.80],'LineWidth',2.0, ...
     'DisplayName','EKF estimate');
 
-[sx,sy,sz] = sphere(28);
+[sx,sy,sz] = sphere(30);
 hMoon = surf(ax,moonCenter(1)+moonRadius*sx, ...
     moonCenter(2)+moonRadius*sy,moonCenter(3)+moonRadius*sz, ...
-    'FaceColor',[0.65 0.65 0.65], ...
-    'EdgeColor','none','FaceAlpha',1.0, ...
+    'FaceColor',[0.72 0.72 0.72], ...
+    'EdgeColor','none','FaceLighting','gouraud', ...
     'DisplayName','Moon');
+camlight(ax,'headlight');
+material(ax,'dull');
 
-hL1 = plot3(ax,xL1,0,0,'^','MarkerSize',8, ...
-    'MarkerFaceColor',[0.85 0.85 0.85], ...
-    'MarkerEdgeColor',[0.45 0.45 0.45], ...
-    'DisplayName','L1 point');
-hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',8, ...
-    'MarkerFaceColor',[0.85 0.85 0.85], ...
-    'MarkerEdgeColor',[0.45 0.45 0.45], ...
-    'DisplayName','L2 point');
-
-plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
-    'MarkerSize',7,'MarkerFaceColor',[0.20 0.70 0.25], ...
-    'MarkerEdgeColor','k','HandleVisibility','off');
-plot3(ax,truth(end,1),truth(end,2),truth(end,3),'s', ...
-    'MarkerSize',7,'MarkerFaceColor',[0.20 0.35 0.90], ...
-    'MarkerEdgeColor','k','HandleVisibility','off');
+hL1 = plot3(ax,xL1,0,0,'^','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80 0.80 0.80], ...
+    'MarkerEdgeColor','k','LineWidth',1.1, ...
+    'DisplayName','L1');
+hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80 0.80 0.80], ...
+    'MarkerEdgeColor','k','LineWidth',1.1, ...
+    'DisplayName','L2');
+hStart = plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
+    'MarkerSize',8,'MarkerFaceColor',[0.20 0.70 0.25], ...
+    'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','Start');
+hEnd = plot3(ax,truth(end,1),truth(end,2),truth(end,3),'s', ...
+    'MarkerSize',8,'MarkerFaceColor',[0.20 0.35 0.90], ...
+    'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','End');
 
 allPoints = [truth;estimate;moonCenter; ...
     moonCenter+[moonRadius 0 0];moonCenter-[moonRadius 0 0]; ...
@@ -561,9 +616,9 @@ allPoints = [truth;estimate;moonCenter; ...
 xlim(ax,padded_limits(allPoints(:,1),0.08));
 ylim(ax,padded_limits(allPoints(:,2),0.10));
 zlim(ax,padded_limits(allPoints(:,3),0.10));
-daspect(ax,[1 1 1]);
 axis(ax,'vis3d');
-view(ax,132,24);
+ax.Projection = 'perspective';
+view(ax,-37.5,30);
 grid(ax,'off');
 
 xlabel(ax,'x (LU)','FontWeight','bold');
@@ -572,11 +627,17 @@ zlabel(ax,'z (LU)','FontWeight','bold');
 title(ax,sprintf('%s: best observed run (%s, seed %d)', ...
     mission_label(bestRun.Mission),bestRun.Optimizer,bestRun.Seed), ...
     'FontWeight','bold','FontSize',13);
-legend(ax,[hTruth hEstimate hMoon hL1 hL2], ...
-    'Location','northoutside','NumColumns',3, ...
-    'FontSize',12,'FontWeight','bold');
 apply_figure_style(ax);
+
+lgd = legend(ax,[hTruth hEstimate hMoon hL1 hL2 hStart hEnd], ...
+    {'Truth trajectory','EKF estimate','Moon','L1','L2','Start','End'}, ...
+    'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',4,'Box','on');
+format_legend(lgd,11);
 ax.PositionConstraint = 'outerposition';
+ax.OuterPosition = [0.02 0.04 0.96 0.80];
+drawnow;
+ax.LooseInset = max(ax.TightInset,0.035);
 end
 
 function fig = plot_best_ekf_errors(runState,tracking,bestRun)
@@ -611,13 +672,14 @@ else
 end
 available = max(0,min(nObservers,available));
 
-[width,height] = paper_figure_size(2,3,true);
-fig = create_paper_figure(width,height, ...
+fig = create_paper_figure(7.5,5.8, ...
     mission_label(bestRun.Mission)+" best-run EKF errors");
 layout = tiledlayout(fig,2,3, ...
     'TileSpacing','compact','Padding','compact');
 axesHandles = gobjects(6,1);
 coordinateNames = ["x","y","z","v_x","v_y","v_z"];
+hErrorLegend = gobjects(1);
+hBoundLegend = gobjects(1);
 
 for component = 1:6
     ax = nexttile(layout);
@@ -637,14 +699,18 @@ for component = 1:6
     clim(ax,[0 max(1,nObservers)]);
 
     hError = plot(ax,t,errors(:,component), ...
-        'Color',[0.12 0.40 0.68],'LineWidth',1.0, ...
+        'Color',[0.12 0.40 0.68],'LineWidth',1.25, ...
         'DisplayName','EKF error');
     hBound = plot(ax,t,bounds(:,component), ...
-        'Color',[0.75 0.18 0.13],'LineWidth',1.35, ...
-        'DisplayName','\pm 3\sigma bound');
+        'Color',[0.75 0.18 0.13],'LineWidth',1.45, ...
+        'DisplayName','+/- 3 sigma');
     plot(ax,t,-bounds(:,component), ...
-        'Color',[0.75 0.18 0.13],'LineWidth',1.35, ...
+        'Color',[0.75 0.18 0.13],'LineWidth',1.45, ...
         'HandleVisibility','off');
+    if component == 1
+        hErrorLegend = hError;
+        hBoundLegend = hBound;
+    end
 
     xlim(ax,[t(1) t(end)]);
     ylim(ax,yLimits);
@@ -657,10 +723,6 @@ for component = 1:6
             'Interpreter','latex','FontWeight','bold');
         xlabel(ax,'t (TU)','FontWeight','bold');
     end
-    if component == 1
-        legend(ax,[hError hBound],'Location','north', ...
-            'FontSize',12,'FontWeight','bold');
-    end
     apply_figure_style(ax);
 end
 
@@ -672,8 +734,13 @@ colorbarHandle.Ticks = 0:nObservers;
 colorbarHandle.Label.String = 'Available observers';
 colorbarHandle.Label.FontWeight = 'bold';
 colorbarHandle.FontName = 'Times New Roman';
-colorbarHandle.FontSize = 12;
+colorbarHandle.FontSize = 11;
 colorbarHandle.FontWeight = 'bold';
+
+lgd = legend([hErrorLegend hBoundLegend],{'EKF error','+/- 3 sigma'}, ...
+    'Orientation','horizontal','NumColumns',2,'Box','on');
+lgd.Layout.Tile = 'north';
+format_legend(lgd,11);
 
 title(layout,sprintf('%s: best observed run (%s, seed %d)', ...
     mission_label(bestRun.Mission),bestRun.Optimizer,bestRun.Seed), ...
@@ -691,19 +758,14 @@ end
 function limits = padded_limits(values,fraction)
 values = values(isfinite(values));
 assert(~isempty(values),'Cannot size axes from empty data.');
-lower = min(values);
-upper = max(values);
-span = upper-lower;
+lowerValue = min(values);
+upperValue = max(values);
+span = upperValue-lowerValue;
 if span <= 100*eps(max(1,max(abs(values))))
     span = max(0.02,0.05*max(1,abs(mean(values))));
 end
 padding = fraction*span;
-limits = [lower-padding,upper+padding];
-end
-
-function [width,height] = paper_figure_size(rows,columns,hasColorbar)
-width = min(7.5,0.45+2.20*columns+0.35*double(hasColorbar));
-height = min(7.0,0.70+1.95*rows);
+limits = [lowerValue-padding,upperValue+padding];
 end
 
 function fig = create_paper_figure(width,height,name)
@@ -711,13 +773,32 @@ fig = figure('Color','w','Name',char(name), ...
     'Units','inches','Position',[1 1 width height], ...
     'PaperUnits','inches','PaperSize',[width height], ...
     'PaperPosition',[0 0 width height], ...
-    'PaperPositionMode','manual');
+    'PaperPositionMode','manual','Renderer','painters', ...
+    'InvertHardcopy','off');
 movegui(fig,'center');
 end
 
 function apply_figure_style(ax)
 set(ax,'FontName','Times New Roman','FontSize',12, ...
-    'FontWeight','bold','LineWidth',1.0);
+    'FontWeight','bold','LineWidth',1.2,'Layer','top');
+ax.XLabel.FontSize = 14;
+ax.YLabel.FontSize = 14;
+ax.ZLabel.FontSize = 14;
+end
+
+function format_legend(lgd,fontSize)
+lgd.FontName = 'Times New Roman';
+lgd.FontSize = fontSize;
+lgd.FontWeight = 'bold';
+lgd.ItemTokenSize = [16 9];
+end
+
+function reserve_top_legend_space(ax)
+ax.Units = 'normalized';
+ax.PositionConstraint = 'outerposition';
+ax.OuterPosition = [0.04 0.06 0.92 0.78];
+drawnow;
+ax.LooseInset = max(ax.TightInset,0.025);
 end
 
 function export_pilot_figure(fig,stem)
