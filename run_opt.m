@@ -4,7 +4,7 @@ clear; close all; clc;
 % ---------------- Results output ----------------
 MAKE_PLOTS = strcmp(getenv("MAKE_PLOTS"),"1"); % Display only; never saved.
 STUDY_ID = string(getenv("STUDY_ID"));
-if strlength(STUDY_ID) == 0, STUDY_ID = "reviewer2_pilot_v2"; end
+if strlength(STUDY_ID) == 0, STUDY_ID = "manual_fe_run"; end
 
 % ---------------- Figure defaults ----------------
 set(groot, ...
@@ -37,7 +37,7 @@ t_lg = S.t_lg;
 s_lg = S.s_lg;
 
 % ---------------- Optimizer inputs ----------------
-% Options: 'GA', 'PSO', 'BAYESIAN', 'GAMULTIOBJ', 'DMOPSO', 'ABC', 'ACO'
+% Supported SOO methods: GA, PSO, BAYESIAN, ABC, and ACO.
 OPTIMIZER_MODE = 'GA';
 
 envMode = getenv("OPTIMIZER_MODE");
@@ -57,14 +57,10 @@ end
 validateattributes(FE_BUDGET, {'numeric'}, ...
     {'scalar','real','finite','integer','positive'});
 
-% Iteration limits are safeguards only. SOO stopping is controlled
-% by FE_BUDGET for GA, PSO, Bayesian optimization, ABC, and ACO.
-MAX_ITERS = 100000;
-v = getenv("MAX_ITERS");
-if ~isempty(v), MAX_ITERS = str2double(v); end
-
-useFEBudget = ismember(OPTIMIZER_MODE, ...
-    ["GA","PSO","BAYESIAN","ABC","ACO"]);
+% All supported optimizers stop on the same objective-function-evaluation budget.
+supportedOptimizers = ["GA","PSO","BAYESIAN","ABC","ACO"];
+assert(ismember(OPTIMIZER_MODE,supportedOptimizers), ...
+    "Unknown OPTIMIZER_MODE: %s",OPTIMIZER_MODE);
 
 USE_PARALLEL = true;
 v = getenv("USE_PARALLEL_OPT");
@@ -215,14 +211,9 @@ switch measCfg.type
         measCode = "UNK";
 end
 
-% ---------------- Data logging ----------------
+% ---------------- Objective callback ----------------
+% FE histories are recorded by the optimizer-specific callbacks below.
 dq = [];
-
-if ~useFEBudget
-    dq = parallel.pool.DataQueue;
-    assignin('base', 'OptimizationLog', {});
-    afterEach(dq, @(data) append_log(data));
-end
 
 opt_flag          = 'SOO';
 const_stabilities = parallel.pool.Constant(stabilities);
@@ -375,19 +366,15 @@ if strlength(string(RunDir)) == 0
     cd(RunDir);
 end
 
-FigDir  = fullfile(RunDir, "figs");
 DataDir = fullfile(RunDir, "data");
 LogDir  = fullfile(RunDir, "logs");
 
 TransferCacheDir = projectPaths.transferCache;
 
-if ~useFEBudget && ~exist(FigDir,'dir'), mkdir(FigDir); end
 if ~exist(DataDir,'dir'), mkdir(DataDir); end
-if useFEBudget
-    assert(~isfile(fullfile(DataDir,'optimization_run.mat')) && ...
-        ~isfile(fullfile(DataDir,'tracking_data.mat')), ...
-        'Run output already exists. Choose a new RUN_DIR; do not overwrite runs.');
-end
+assert(~isfile(fullfile(DataDir,'optimization_run.mat')) && ...
+    ~isfile(fullfile(DataDir,'tracking_data.mat')), ...
+    'Run output already exists. Choose a new RUN_DIR; do not overwrite runs.');
 if ~exist(LogDir,'dir'), mkdir(LogDir); end
 if ~exist(TransferCacheDir,'dir'), mkdir(TransferCacheDir); end
 
@@ -407,7 +394,6 @@ end
 FILE_TAG = sprintf('%s_%s_o%d', char(RUN_TAG), char(missionCodeShort), missionCfg.optimization.numObservers);
 
 % ---------------- Output / log files ----------------
-EXCEL_FILE = fullfile(DataDir, sprintf('ExperimentSummary_%s.xlsx', FILE_TAG));
 setenv('SAFE_FALLBACK_FILE', fullfile(LogDir, sprintf('safe_output_fallback_%s.txt', FILE_TAG)));
 
 try
@@ -597,11 +583,7 @@ s_unique_truth = s_truth(idx_u_truth, :);
 
 F_truth = griddedInterpolant(t_unique_truth, s_unique_truth, 'spline');
 s_target_ekf = F_truth(t_target_ekf);
-% SOO settings/time grid are saved in optimization_run.mat/tracking_data.mat.
-if ~useFEBudget
-    save(fullfile(DataDir,'measurement_config.mat'), ...
-        'measCfg','R_k','t_target_ekf','seedVal');
-end
+% Settings and the time grid are saved in optimization_run.mat/tracking_data.mat.
 
 % ---------------- Objective function wrapper ----------------
 RawObjFcn = @(x) objective_wrapper( ...
@@ -634,68 +616,66 @@ objectiveErrorCount = 0;
 x_best = [];
 min_cost = Inf;
 
-if useFEBudget
-    codeFiles = ["run_opt.m"; "scripts/save_tracking_results.m"];
-    srcFiles = dir(fullfile(projectPaths.src,'**','*.m'));
-    for k = 1:numel(srcFiles)
-        absoluteName = fullfile(srcFiles(k).folder,srcFiles(k).name);
-        relativeName = erase(string(absoluteName),string(thisDir)+filesep);
-        codeFiles(end+1,1) = replace(relativeName,filesep,"/");
-    end
-    codeFiles = sort(codeFiles);
-    codeHashes = strings(size(codeFiles));
-    for k = 1:numel(codeFiles)
-        codeHashes(k) = study_hash(fullfile(thisDir,codeFiles(k)),"file");
-    end
-    workerCount = 0;
-    if USE_PARALLEL
-        pool = gcp('nocreate');
-        workerCount = pool.NumWorkers;
-    end
-    settings = struct('mission',missionCfg,'measurements',measCfg, ...
-        'cost',costCfg,'costFlags',costFlags,'P0',P_0,'Q',Q_k,'R',R_k, ...
-        'useScreening',useScreening, ...
-        'visibilityDefinition',"center_referenced_max_v1", ...
-        'sun_exclusion',sun_exclusion, ...
-        'moon_exclusion',moon_exclusion,'earth_exclusion',earth_exclusion, ...
-        'theta0',theta0,'i_sun',i_sun,'mu',mu,'LU',LU,'TU',TU, ...
-        'EKF_DT',EKF_DT,'slotsPerOrbit',slots_per_orbit, ...
-        'slotDefinition',"equal_time_no_endpoint_v1", ...
-        'odeRelTol',ode_opts.RelTol,'odeAbsTol',ode_opts.AbsTol, ...
-        'useParallel',USE_PARALLEL,'workerCount',workerCount);
-
-    runState = struct();
-    runState.schemaVersion = 2;
-    runState.studyID = STUDY_ID;
-    runState.optimizer = OPTIMIZER_MODE;
-    runState.runTag = string(RUN_TAG);
-    runState.optimizerSeed = seedVal;
-    runState.measurementNoiseSeed = measCfg.noiseSeed;
-    runState.maxEvaluations = FE_BUDGET;
-    runState.searchEvaluationBudget = FE_BUDGET;
-    runState.settings = settings;
-    runState.truthInfo = truthInfo;
-    runState.catalogHash = catalogHash;
-    runState.truthHash = study_hash({t_target_ekf,s_target_ekf});
-    runState.codeHash = study_hash({codeFiles,codeHashes});
-    runState.matlabVersion = string(version);
-    runState.platform = string(computer);
-    runState.host = string(getenv('COMPUTERNAME'));
-    if runState.host == "", runState.host = string(getenv('HOSTNAME')); end
-    runState.toolboxes = ver;
-    runState.comparison = struct('settings',settings, ...
-        'budget',FE_BUDGET,'catalogHash',catalogHash, ...
-        'truthHash',runState.truthHash,'codeHash',runState.codeHash, ...
-        'matlabVersion',runState.matlabVersion);
-    runState.comparisonKey = study_hash(runState.comparison);
-    runState.status = "running";
-    runState.termination = "running";
-    runState.validationStatus = "not_run";
-    runState.validationEvaluations = 0;
-    runState.created = string(datetime('now','Format','yyyy-MM-dd HH:mm:ss'));
-    runStateFile = fullfile(DataDir,'optimization_run.mat');
-    save(runStateFile,'runState','-v7');
+codeFiles = ["run_opt.m"; "scripts/save_tracking_results.m"];
+srcFiles = dir(fullfile(projectPaths.src,'**','*.m'));
+for k = 1:numel(srcFiles)
+    absoluteName = fullfile(srcFiles(k).folder,srcFiles(k).name);
+    relativeName = erase(string(absoluteName),string(thisDir)+filesep);
+    codeFiles(end+1,1) = replace(relativeName,filesep,"/");
 end
+codeFiles = sort(codeFiles);
+codeHashes = strings(size(codeFiles));
+for k = 1:numel(codeFiles)
+    codeHashes(k) = study_hash(fullfile(thisDir,codeFiles(k)),"file");
+end
+workerCount = 0;
+if USE_PARALLEL
+    pool = gcp('nocreate');
+    workerCount = pool.NumWorkers;
+end
+settings = struct('mission',missionCfg,'measurements',measCfg, ...
+    'cost',costCfg,'costFlags',costFlags,'P0',P_0,'Q',Q_k,'R',R_k, ...
+    'useScreening',useScreening, ...
+    'visibilityDefinition',"center_referenced_max_v1", ...
+    'sun_exclusion',sun_exclusion, ...
+    'moon_exclusion',moon_exclusion,'earth_exclusion',earth_exclusion, ...
+    'theta0',theta0,'i_sun',i_sun,'mu',mu,'LU',LU,'TU',TU, ...
+    'EKF_DT',EKF_DT,'slotsPerOrbit',slots_per_orbit, ...
+    'slotDefinition',"equal_time_no_endpoint_v1", ...
+    'odeRelTol',ode_opts.RelTol,'odeAbsTol',ode_opts.AbsTol, ...
+    'useParallel',USE_PARALLEL,'workerCount',workerCount);
+
+runState = struct();
+runState.schemaVersion = 2;
+runState.studyID = STUDY_ID;
+runState.optimizer = OPTIMIZER_MODE;
+runState.runTag = string(RUN_TAG);
+runState.optimizerSeed = seedVal;
+runState.measurementNoiseSeed = measCfg.noiseSeed;
+runState.maxEvaluations = FE_BUDGET;
+runState.searchEvaluationBudget = FE_BUDGET;
+runState.settings = settings;
+runState.truthInfo = truthInfo;
+runState.catalogHash = catalogHash;
+runState.truthHash = study_hash({t_target_ekf,s_target_ekf});
+runState.codeHash = study_hash({codeFiles,codeHashes});
+runState.matlabVersion = string(version);
+runState.platform = string(computer);
+runState.host = string(getenv('COMPUTERNAME'));
+if runState.host == "", runState.host = string(getenv('HOSTNAME')); end
+runState.toolboxes = ver;
+runState.comparison = struct('settings',settings, ...
+    'budget',FE_BUDGET,'catalogHash',catalogHash, ...
+    'truthHash',runState.truthHash,'codeHash',runState.codeHash, ...
+    'matlabVersion',runState.matlabVersion);
+runState.comparisonKey = study_hash(runState.comparison);
+runState.status = "running";
+runState.termination = "running";
+runState.validationStatus = "not_run";
+runState.validationEvaluations = 0;
+runState.created = string(datetime('now','Format','yyyy-MM-dd HH:mm:ss'));
+runStateFile = fullfile(DataDir,'optimization_run.mat');
+save(runStateFile,'runState','-v7');
 
 RunTimer = tic;
 solverError = [];
@@ -824,40 +804,6 @@ try
                 results.ObjectiveMinimumTrace(:), ...
                 'VariableNames', {'fe','bestJ'});
 
-        case 'GAMULTIOBJ'
-            safe_printf('Starting Multi-Objective Genetic Algorithm (NSGA-II)...\n');
-
-            nVars = nVars_common;
-            LB = double(LB_common);
-            UB = double(UB_common);
-            IntCon = 1:nVars;
-            pop = 60;
-
-            options = optimoptions('gamultiobj', ...
-                'PopulationSize', pop, ...
-                'MaxGenerations', MAX_ITERS, ...
-                'ParetoFraction', 0.5, ...
-                'UseParallel', USE_PARALLEL, ...
-                'Display', 'iter', ...
-                'PlotFcn', @gaplotpareto);
-
-            [x_best, fval] = gamultiobj(ObjFcn, nVars, [], [], [], [], ...
-                LB, UB, [], IntCon, options);
-
-        case 'DMOPSO'
-            safe_printf('Starting Custom Multi-Objective PSO...\n');
-
-            nVars = nVars_common;
-            LB = double(LB_common);
-            UB = double(UB_common);
-            swarmSize = 60;
-            stallIters = inf;
-
-            [archive_X, archive_F] = dmopso( ...
-                ObjFcn, nVars, LB, UB, swarmSize, MAX_ITERS, stallIters);
-            fval = archive_F;
-            x_best = archive_X;
-
         case 'ABC'
             safe_printf('Starting Artificial Bee Colony Optimization...\n');
 
@@ -865,7 +811,6 @@ try
             UB = UB_common;
 
             abc_opts.ColonySize      = 60;
-            abc_opts.MaxIters        = FE_BUDGET;
             abc_opts.MaxEvals        = FE_BUDGET;
             abc_opts.Limit           = 20;
             abc_opts.StallIters      = inf;
@@ -886,7 +831,6 @@ try
             UB = UB_common;
 
             aco_opts.nAnts              = 60;
-            aco_opts.MaxIters           = FE_BUDGET;
             aco_opts.MaxEvals           = FE_BUDGET;
             aco_opts.alpha              = 1.0;
             aco_opts.beta               = 1.0;
@@ -915,511 +859,114 @@ end
 TotalRuntime = toc(RunTimer);
 safe_printf('Total Runtime: %.2f seconds\n', TotalRuntime);
 
-if useFEBudget
-    % Preserve a partial callback history when GA/PSO throws.
-    if isempty(history) && ismember(OPTIMIZER_MODE,["GA","PSO"])
-        history = get_fe_history();
-        if ~isempty(history), actualEvals = history.fe(end); end
-    end
-    runState.nEvaluations = actualEvals;
-    runState.searchFunctionEvaluations = actualEvals;
-    runState.solverFunctionEvaluations = solverFunccount;
-    runState.solverCallDifference = solverFunccount-actualEvals;
-    runState.postSearchFunctionEvaluations = ...
-        max(0,solverFunccount-actualEvals);
-    runState.bestX = x_best;
-    runState.bestJ = min_cost;
-    runState.history = history;
-    runState.runtime_s = TotalRuntime;
-    runState.solverExitFlag = solverExitFlag;
-    runState.solverOutput = solverOutput;
-    runState.solverSettingsText = solverSettingsText;
-    runState.objectiveErrorCount = objectiveErrorCount;
+% Preserve a partial callback history when GA/PSO throws.
+if isempty(history) && ismember(OPTIMIZER_MODE,["GA","PSO"])
+    history = get_fe_history();
+    if ~isempty(history), actualEvals = history.fe(end); end
+end
+runState.nEvaluations = actualEvals;
+runState.searchFunctionEvaluations = actualEvals;
+runState.solverFunctionEvaluations = solverFunccount;
+runState.solverCallDifference = solverFunccount-actualEvals;
+runState.postSearchFunctionEvaluations = ...
+    max(0,solverFunccount-actualEvals);
+runState.bestX = x_best;
+runState.bestJ = min_cost;
+runState.history = history;
+runState.runtime_s = TotalRuntime;
+runState.solverExitFlag = solverExitFlag;
+runState.solverOutput = solverOutput;
+runState.solverSettingsText = solverSettingsText;
+runState.objectiveErrorCount = objectiveErrorCount;
 
-    if ~isempty(solverError)
-        runState.status = "solver_failed";
-        runState.termination = "solver_failed";
-        runState.error = string(getReport(solverError,'extended','hyperlinks','off'));
-        save(runStateFile,'runState','-v7');
-        diary off
-        rethrow(solverError);
-    end
-    runState.termination = "solver_stopped";
-    if actualEvals == FE_BUDGET
-        runState.termination = "budget_reached";
-    end
-    runState.status = "optimized";
+if ~isempty(solverError)
+    runState.status = "solver_failed";
+    runState.termination = "solver_failed";
+    runState.error = string(getReport(solverError,'extended','hyperlinks','off'));
     save(runStateFile,'runState','-v7');
-    try
-        assert(objectiveErrorCount == 0, ...
-            'Objective errors occurred; inspect the saved run before comparison.');
-        assert(~isempty(history) && all(isfinite(history.fe)) && ...
-            all(history.fe > 0 & history.fe == round(history.fe)) && ...
-            all(diff(history.fe) > 0) && all(isfinite(history.bestJ)) && ...
-            all(diff(history.bestJ) <= 1e-12*max(1,abs(history.bestJ(1:end-1)))) && ...
-            history.fe(end) == actualEvals && ...
-            abs(history.bestJ(end)-min_cost) <= 1e-9*max(1,abs(min_cost)), ...
-            'Invalid convergence history or inconsistent best solution.');
-
-        x_best = round(x_best);
-        orbit_indices = x_best(1:2:end);
-        slot_indices = x_best(2:2:end);
-        num_obs = numel(orbit_indices);
-        observer_ICs = zeros(num_obs,6);
-        for k = 1:num_obs
-            observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
-        end
-        observers = table((1:num_obs)',orbit_indices(:),slot_indices(:), ...
-            string(T1.orbitFamily(orbit_indices)), ...
-            tf(orbit_indices),stabilities(orbit_indices),observer_ICs, ...
-            'VariableNames',{'observer_id','orbit_index','slot_index', ...
-            'orbit_family','period_TU','stability_index','initial_state'});
-        if ismember('sourceFile',T1.Properties.VariableNames)
-            observers.source_file = string(T1.sourceFile(orbit_indices));
-        end
-        if ismember('orbitID',T1.Properties.VariableNames)
-            observers.orbit_id = string(T1.orbitID(orbit_indices));
-        end
-
-        % One diagnostic EKF pass, outside the search budget.
-        runState.validationStatus = "running";
-        runState.validationEvaluations = 1;
-        save(runStateFile,'runState','-v7');
-        validationTimer = tic;
-        [s_ekf,cov,screeningCount_final,availableObsCount] = cr3bp_ekf( ...
-            observer_ICs,s_target_ekf,t_target_ekf,P_0,Q_k,R_k,mu,LU, ...
-            sunFcn,sun_exclusion,moon_exclusion,earth_exclusion,useScreening,measCfg);
-        runState.validationRuntime_s = toc(validationTimer);
-        runState.status = "completed";
-        runState = save_tracking_results(DataDir,runState, ...
-            t_target_ekf,s_target_ekf,s_ekf,cov,availableObsCount, ...
-            screeningCount_final,observers);
-    catch ME
-        runState.status = "validation_failed";
-        runState.validationStatus = "failed";
-        runState.error = string(getReport(ME,'extended','hyperlinks','off'));
-        save(runStateFile,'runState','-v7');
-        diary off
-        rethrow(ME);
-    end
-
-    safe_printf(['Search FE = %d/%d | solver calls = %d ' ...
-        '(post-search = %d) | bestJ = %.12g | %s\n'], ...
-        actualEvals,FE_BUDGET,solverFunccount, ...
-        runState.postSearchFunctionEvaluations,min_cost, ...
-        runState.termination);
-    safe_printf('Saved data only: %s\n',DataDir);
     diary off
-    if MAKE_PLOTS
-        try
-            preview_study_run(DataDir); % Display only, after data have been saved.
-        catch ME
-            warning('Study:PreviewFailed','Preview failed: %s',ME.message);
-        end
-    end
-    return; % Skip ALL legacy plots, figure exports, and Excel output for SOO.
+    rethrow(solverError);
 end
-
-% The legacy multiobjective path below is unchanged.
-if ~isempty(solverError), rethrow(solverError); end
-
-if strcmpi(opt_flag, 'SOO')
-    safe_printf('\n--- FINAL RESULTS (%s) ---\n', OPTIMIZER_MODE);
-    safe_printf('Orbits: %s\n', mat2str(x_best(1:2:end)));
-    safe_printf('Slots:  %s\n', mat2str(x_best(2:2:end)));
-    safe_printf('Cost:   %.4f\n', min_cost);
-    x_plot = x_best;
-else
-    f_min  = min(fval);
-    f_max  = max(fval);
-    f_norm = (fval - f_min) ./ (f_max - f_min);
-
-    dist_to_utopia = sqrt(sum(f_norm.^2, 2));
-    [~, idx_knee]  = min(dist_to_utopia);
-
-    knee_costs = fval(idx_knee, :);
-    knee_vars  = x_best(idx_knee, :);
-
-    safe_printf('\n--- KNEE POINT (Balanced Solution) ---\n');
-    safe_printf('Selected Row: %d\n', idx_knee);
-    safe_printf('RMSE (Log):   %.4f\n', knee_costs(1));
-    safe_printf('Det (Log):    %.4f\n', knee_costs(2));
-    safe_printf('Stability:    %.4f\n', knee_costs(3));
-    safe_printf('Orbits:       %s\n', mat2str(knee_vars(1:2:end)));
-    safe_printf('Slots:        %s\n', mat2str(knee_vars(2:2:end)));
-    x_plot = knee_vars;
+if actualEvals ~= FE_BUDGET
+    runState.status = "solver_failed";
+    runState.termination = "budget_not_reached";
+    save(runStateFile,'runState','-v7');
+    diary off
+    error('Optimizer stopped at %g FE; expected exactly %d FE.', ...
+        actualEvals,FE_BUDGET);
 end
-
-safe_printf('RUN END: %s\n', string(datetime('now')));
-drawnow;
-
-% ---------------- Parallel pool cleanup ----------------
+runState.termination = "budget_reached";
+runState.status = "optimized";
+save(runStateFile,'runState','-v7');
 try
-    p = gcp('nocreate');
-    if ~isempty(p)
-        delete(p);
+    assert(objectiveErrorCount == 0, ...
+        'Objective errors occurred; inspect the saved run before comparison.');
+    assert(~isempty(history) && all(isfinite(history.fe)) && ...
+        all(history.fe > 0 & history.fe == round(history.fe)) && ...
+        all(diff(history.fe) > 0) && all(isfinite(history.bestJ)) && ...
+        all(diff(history.bestJ) <= 1e-12*max(1,abs(history.bestJ(1:end-1)))) && ...
+        history.fe(end) == actualEvals && ...
+        abs(history.bestJ(end)-min_cost) <= 1e-9*max(1,abs(min_cost)), ...
+        'Invalid convergence history or inconsistent best solution.');
+
+    x_best = round(x_best);
+    orbit_indices = x_best(1:2:end);
+    slot_indices = x_best(2:2:end);
+    num_obs = numel(orbit_indices);
+    observer_ICs = zeros(num_obs,6);
+    for k = 1:num_obs
+        observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
     end
-catch
-end
-
-drawnow;
-pause(0.2);
-
-% ---------------- Recompile results to plot ----------------
-x_plot = round(x_plot);
-
-orbit_indices = x_plot(1:2:end);
-slot_indices  = x_plot(2:2:end);
-num_obs = numel(orbit_indices);
-
-for k = 1:num_obs
-    orbit_indices(k) = max(1, min(orbit_indices(k), numel(orbit_database)));
-    slot_indices(k)  = max(1, min(slot_indices(k), size(orbit_database{orbit_indices(k)},1)));
-end
-
-observer_ICs = zeros(num_obs,6);
-for k = 1:num_obs
-    observer_ICs(k,:) = orbit_database{orbit_indices(k)}(slot_indices(k),:);
-end
-
-try
-    [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf( ...
-    observer_ICs, s_target_ekf, t_target_ekf, ...
-    P_0, Q_k, R_k, mu, LU, ...
-    sunFcn, sun_exclusion, moon_exclusion, earth_exclusion, useScreening, measCfg);
-catch
-    [s_ekf, cov, screeningCount_final, availableObsCount] = cr3bp_ekf( ...
-    observer_ICs, s_target_ekf, t_target_ekf, ...
-    P_0, Q_k, R_k, mu, LU, ...
-    sunFcn, sun_exclusion, moon_exclusion, earth_exclusion, useScreening, measCfg);
-end
-
-safe_printf('\nFinal EKF screeningCount = %d\n', screeningCount_final);
-
-availableObsCount = sanitize_obs_count_vector(availableObsCount, numel(t_target_ekf), num_obs);
-
-% ---------------- Dense EKF replot grid ----------------
-t_plot = t_truth(:);
-
-[t_unique_ekf, idx_u_ekf] = unique(t_target_ekf(:));
-s_ekf_unique = s_ekf(idx_u_ekf,:);
-
-F_ekf_plot = griddedInterpolant(t_unique_ekf, s_ekf_unique, 'spline');
-s_ekf_plot = F_ekf_plot(t_plot);
-
-% ---------------- Observer metadata ----------------
-familyColName = "orbitFamily";
-obs_family = strings(num_obs,1);
-if strlength(familyColName) > 0
-    try
-        famCol = T1.(familyColName);
-        obs_family = string(famCol(orbit_indices));
-    catch
-        obs_family = strings(num_obs,1);
+    observers = table((1:num_obs)',orbit_indices(:),slot_indices(:), ...
+        string(T1.orbitFamily(orbit_indices)), ...
+        tf(orbit_indices),stabilities(orbit_indices),observer_ICs, ...
+        'VariableNames',{'observer_id','orbit_index','slot_index', ...
+        'orbit_family','period_TU','stability_index','initial_state'});
+    if ismember('sourceFile',T1.Properties.VariableNames)
+        observers.source_file = string(T1.sourceFile(orbit_indices));
     end
-end
-
-obsTbl = table( ...
-    (1:num_obs)', orbit_indices(:), slot_indices(:), obs_family(:), ...
-    tf(orbit_indices), stabilities(orbit_indices), ...
-    'VariableNames', {'observer_id','orbit_index','slot_index','orbit_family','period_TU','stability_index'} );
-
-% ---------------- Trajectory plot ----------------
-figW = 8;
-figH = 6;
-fig = figure('Color','w','Units','inches','Position',[1 1 figW figH], ...
-             'PaperUnits','inches','PaperPosition',[0 0 figW figH]);
-
-ax = axes(fig);
-hold(ax,'on');
-box(ax,'on');
-set(ax, 'TickLabelInterpreter','tex', 'Layer','top');
-ax.Projection = 'orthographic';
-view(ax, 32, 24);
-
-cEKF = 'red';
-
-hEKF = plot3(ax, s_ekf_plot(:,1), s_ekf_plot(:,2), s_ekf_plot(:,3), '-', ...
-    'LineWidth', 2.4, 'Color', cEKF);
-
-cmap = lines(max(1,num_obs));
-hObs = gobjects(num_obs,1);
-for k = 1:num_obs
-    iOrb   = orbit_indices(k);
-    s_raw  = states{iOrb};
-    hObs(k) = plot3(ax, s_raw(:,1), s_raw(:,2), s_raw(:,3), '-', ...
-        'Color', cmap(k,:), 'LineWidth', 1.8);
-end
-
-hStart  = gobjects(0);
-hEnd    = gobjects(0);
-
-isTransferMission = missionCfg.type == "LOW_THRUST_TRANSFER";
-
-if isTransferMission
-    hStart = plot3(ax, s_truth(1,1), s_truth(1,2), s_truth(1,3), 'o', ...
-        'MarkerSize', 9, 'MarkerFaceColor', [0.85 0.27 0.22], ...
-        'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
-    hEnd = plot3(ax, s_truth(end,1), s_truth(end,2), s_truth(end,3), 's', ...
-        'MarkerSize', 9, 'MarkerFaceColor', [0.27 0.31 0.86], ...
-        'MarkerEdgeColor', 'k', 'LineWidth', 1.0);
-end
-
-R_moon = 1737.1 / LU; 
-
-[Xs, Ys, Zs] = sphere(40);
-Xs = R_moon * Xs + (1 - mu);
-Ys = R_moon * Ys;
-Zs = R_moon * Zs;
-
-hM = surf(ax, Xs, Ys, Zs, ...
-    'FaceColor', [0.7 0.7 0.7], ...
-    'EdgeColor', 'None');
-
-[xL1, xL2] = cr3bp_L1L2(mu);
-hL1 = plot3(ax, xL1, 0, 0, 'k^', ...
-    'MarkerSize',8, 'MarkerFaceColor',[0.85 0.85 0.85], 'LineWidth',1.0);
-hL2 = plot3(ax, xL2, 0, 0, 'kv', ...
-    'MarkerSize',8, 'MarkerFaceColor',[0.85 0.85 0.85], 'LineWidth',1.0);
-
-for k = 1:num_obs
-    iOrb   = orbit_indices(k);
-    t_raw  = times{iOrb}(:);
-    s_raw  = states{iOrb};
-    Tper   = tf(iOrb);
-    t_phase = (slot_indices(k)-1) * Tper / slots_per_orbit;
-    [~, j] = min(abs(t_raw - t_phase));
-
-    plot3(ax, s_raw(j,1), s_raw(j,2), s_raw(j,3), 'o', ...
-        'MarkerSize',8, 'MarkerFaceColor', cmap(k,:), 'MarkerEdgeColor','k');
-end
-
-plot3(ax, s_truth(1,1), s_truth(1,2), s_truth(1,3), 'o', ...
-    'MarkerSize',8, 'MarkerFaceColor', 'red', 'MarkerEdgeColor','k');
-
-xlabel(ax,'x (LU)');
-ylabel(ax,'y (LU)');
-zlabel(ax,'z (LU)');
-
-xl = xlim(ax);
-yl = ylim(ax);
-zl = zlim(ax);
-
-xr = xl(2)-xl(1);
-yr = yl(2)-yl(1);
-zr = zl(2)-zl(1);
-
-tickStep = max([xr, yr, zr]) / 5;
-tickStep = max(tickStep, eps);
-
-pow10 = 10^floor(log10(tickStep));
-nice = tickStep / pow10;
-if     nice <= 1
-    nice = 1;
-elseif nice <= 2
-    nice = 2;
-elseif nice <= 2.5
-    nice = 2.5;
-elseif nice <= 5
-    nice = 5;
-else
-    nice = 10;
-end
-tickStep = nice * pow10;
-
-xTick0 = ceil(xl(1)/tickStep)*tickStep;
-yTick0 = ceil(yl(1)/tickStep)*tickStep;
-zTick0 = ceil(zl(1)/tickStep)*tickStep;
-
-ax.XTick = xTick0:tickStep:xl(2);
-ax.YTick = yTick0:tickStep:yl(2);
-ax.ZTick = zTick0:tickStep:zl(2);
-
-legHandles = [hEKF; hObs(:)];
-legLabels = cell(num_obs + 1, 1);
-legLabels{1} = 'EKF estimate';
-for k = 1:num_obs
-    legLabels{1+k} = sprintf('Observer %d orbit', k);
-end
-
-if isTransferMission
-    legHandles = [legHandles; hStart; hEnd];
-    legLabels  = [legLabels; {'Transfer start'; 'Transfer end'}];
-end
-
-legHandles = [legHandles; hM; hL1; hL2];
-legLabels  = [legLabels; {'Moon'; 'L1'; 'L2'}];
-
-lgd = legend(ax, legHandles, legLabels, 'Location','northeast');
-lgd.Box = 'on';
-lgd.ItemTokenSize = [18 12];
-if numel(legLabels) > 6
-    lgd.NumColumns = 2;
-end
-
-lgd.Units = 'normalized';
-pos = lgd.Position;
-pos(1) = pos(1) + 0.075;
-pos(2) = pos(2) + 0.04;
-lgd.Position = pos;
-
-axis(ax,'equal');
-axis(ax,'tight');
-ax.Units = 'normalized';
-ax.PositionConstraint = 'innerposition';
-
-pad = 0.10;
-ax.Position = [pad pad 1-2*pad 1-2*pad];
-
-ax.LooseInset = ax.TightInset + [0.02 0.02 0.02 0.02];
-axis(ax,'vis3d');
-
-exportgraphics(fig, fullfile(FigDir, sprintf('fig_traj3d_%s.pdf', FILE_TAG)), 'ContentType','image');
-savefig(fig, fullfile(FigDir, sprintf('fig_traj3d_%s.fig', FILE_TAG)));
-
-% ---------------- 3-sigma plots ----------------
-Nf = size(cov,1);
-sig = zeros(Nf,6);
-for k = 1:Nf
-    Pk = squeeze(cov(k,:,:));
-    sig(k,:) = sqrt(max(diag(Pk),0));
-end
-sig3 = 3*sig;
-
-t = t_target_ekf(:);
-err = s_ekf(:,1:6) - s_target_ekf(:,1:6);
-err_pos_km   = err(:,1:3) * LU;
-err_vel_kms  = err(:,4:6) * VU;
-sig3_pos_km  = sig3(:,1:3) * LU;
-sig3_vel_kms = sig3(:,4:6) * VU;
-
-cBound = [0.85 0.10 0.10];
-cErr   = [0.00 0.45 0.74];
-
-yLbls = { ...
-    'e_x (km)', ...
-    'e_y (km)', ...
-    'e_z (km)', ...
-    'e_{v_x} (km/s)', ...
-    'e_{v_y} (km/s)', ...
-    'e_{v_z} (km/s)'};
-
-err_all  = [err_pos_km,  err_vel_kms];
-sig3_all = [sig3_pos_km, sig3_vel_kms];
-
-plotSigFig = @(fName, xData, errData, sigData, yLbl) ...
-    create_sig_fig(fName, xData, errData, sigData, yLbl, figW, figH, ...
-                   cBound, cErr, FigDir, availableObsCount, num_obs);
-
-plotSigFig(sprintf('fig_3sig_x_%s.pdf',  FILE_TAG), t, err_pos_km(:,1),  sig3_pos_km(:,1),  'e_x (km)');
-plotSigFig(sprintf('fig_3sig_y_%s.pdf',  FILE_TAG), t, err_pos_km(:,2),  sig3_pos_km(:,2),  'e_y (km)');
-plotSigFig(sprintf('fig_3sig_z_%s.pdf',  FILE_TAG), t, err_pos_km(:,3),  sig3_pos_km(:,3),  'e_z (km)');
-plotSigFig(sprintf('fig_3sig_vx_%s.pdf', FILE_TAG), t, err_vel_kms(:,1), sig3_vel_kms(:,1), 'e_{v_x} (km/s)');
-plotSigFig(sprintf('fig_3sig_vy_%s.pdf', FILE_TAG), t, err_vel_kms(:,2), sig3_vel_kms(:,2), 'e_{v_y} (km/s)');
-plotSigFig(sprintf('fig_3sig_vz_%s.pdf', FILE_TAG), t, err_vel_kms(:,3), sig3_vel_kms(:,3), 'e_{v_z} (km/s)');
-
-gridFigW = 12;
-gridFigH = 6.8;
-create_sig_fig_grid(sprintf('fig_3sig_grid_%s.pdf', FILE_TAG), t, err_all, sig3_all, yLbls, ...
-    gridFigW, gridFigH, cBound, cErr, FigDir, availableObsCount, num_obs);
-
-% ---------------- EKF performance print statements ----------------
-rmse_pos = sqrt(mean(sum((s_ekf(:,1:3) - s_target_ekf(:,1:3)).^2,2)));
-rmse_vel = sqrt(mean(sum((s_ekf(:,4:6) - s_target_ekf(:,4:6)).^2,2)));
-
-rmse_pos_km  = rmse_pos * LU;
-rmse_vel_kms = rmse_vel * VU;
-
-detPpos = zeros(Nf,1);
-for k = 1:Nf
-    Pk = squeeze(cov(k,:,:));
-    Ppos = Pk(1:3,1:3);
-    detPpos(k) = det(Ppos);
-end
-detPpos_km6 = detPpos * (LU^6);
-
-mean_stability = mean(stabilities(orbit_indices));
-
-safe_printf('\n--- EKF PERFORMANCE ---\n');
-safe_printf('RMSE position (km):     %.6e\n', rmse_pos_km);
-safe_printf('RMSE velocity (km/s):   %.6e\n', rmse_vel_kms);
-safe_printf('Mean det(P_pos) (km^6): %.6e\n', mean(detPpos_km6));
-safe_printf('Mean stability:         %.6e\n', mean_stability);
-
-% ---------------- One Excel file ----------------
-try
-    if exist('min_cost','var')
-        minCostVal = min_cost;
-    else
-        minCostVal = NaN;
+    if ismember('orbitID',T1.Properties.VariableNames)
+        observers.orbit_id = string(T1.orbitID(orbit_indices));
     end
 
-    summaryRow = table( ...
-        string(RUN_TAG), string(OPTIMIZER_MODE), string(measCfg.type), seedVal, ...
-        logical(useScreening), logical(costFlags.J1), logical(costFlags.J2), logical(costFlags.J3), ...
-        MAX_ITERS, FE_BUDGET, TotalRuntime, screeningCount_final, ...
-        rmse_pos_km, rmse_vel_kms, mean(detPpos_km6), mean_stability, minCostVal, ...
-        'VariableNames', { ...
-            'run_tag','optimizer','measurement_model','seed', ...
-            'use_screening','use_J1','use_J2','use_J3', ...
-            'max_iters','max_evals','runtime_s','screeningCount_final', ...
-            'rmse_pos_km','rmse_vel_kms','mean_detPpos_km6','mean_stability','min_cost' ...
-        });
-
-    summaryRow.visibility_model = "CENTER_REFERENCED_MAX";
-    summaryRow.sun_exclusion_deg = sun_exclusion_deg;
-    summaryRow.moon_exclusion_deg = moon_exclusion_deg;
-    summaryRow.earth_exclusion_deg = earth_exclusion_deg;
-    summaryRow.measurement_noise_seed = measCfg.noiseSeed;
-    summaryRow.parallel_objective = logical(USE_PARALLEL);
-
-    if useFEBudget
-        summaryRow.actual_evals = actualEvals;
-        summaryRow.solver_funccount = solverFunccount;
-        summaryRow.nonsearch_evals = max(0, solverFunccount - actualEvals);
-        summaryRow.termination = termination;
-    end
-
-    if isfile(EXCEL_FILE)
-        writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary', 'WriteMode','append');
-    else
-        writetable(summaryRow, EXCEL_FILE, 'Sheet','Summary');
-    end
-
-    if useFEBudget
-        histTbl = history;
-    else
-        logCell = evalin('base','OptimizationLog');
-        if iscell(logCell) && ~isempty(logCell)
-            logStruct = vertcat(logCell{:});
-            histTbl = struct2table(logStruct, "AsArray", true);
-        else
-            histTbl = table();
-        end
-    end
-
-    sheetName = matlab.lang.makeValidName(RUN_TAG);
-    sheetName = replace(sheetName,"_","");
-    if strlength(sheetName) > 31
-        sheetName = extractBefore(sheetName, 32);
-    end
-    writetable(histTbl, EXCEL_FILE, 'Sheet', char(sheetName));
-
-    obsSheet = matlab.lang.makeValidName(RUN_TAG + "_obs");
-    obsSheet = replace(obsSheet,"_","");
-    if strlength(obsSheet) > 31
-        obsSheet = extractBefore(obsSheet, 32);
-    end
-    writetable(obsTbl, EXCEL_FILE, 'Sheet', char(obsSheet));
-
+    % One diagnostic EKF pass, outside the search budget.
+    runState.validationStatus = "running";
+    runState.validationEvaluations = 1;
+    save(runStateFile,'runState','-v7');
+    validationTimer = tic;
+    [s_ekf,cov,screeningCount_final,availableObsCount] = cr3bp_ekf( ...
+        observer_ICs,s_target_ekf,t_target_ekf,P_0,Q_k,R_k,mu,LU, ...
+        sunFcn,sun_exclusion,moon_exclusion,earth_exclusion,useScreening,measCfg);
+    runState.validationRuntime_s = toc(validationTimer);
+    runState.status = "completed";
+    runState = save_tracking_results(DataDir,runState, ...
+        t_target_ekf,s_target_ekf,s_ekf,cov,availableObsCount, ...
+        screeningCount_final,observers);
 catch ME
-    safe_printf(2,"WARNING: failed to write ExperimentSummary file: %s\n", ME.message);
+    runState.status = "validation_failed";
+    runState.validationStatus = "failed";
+    runState.error = string(getReport(ME,'extended','hyperlinks','off'));
+    save(runStateFile,'runState','-v7');
+    diary off
+    rethrow(ME);
 end
 
-try
-    diary off
-catch
+safe_printf(['Search FE = %d/%d | solver calls = %d ' ...
+    '(post-search = %d) | bestJ = %.12g | %s\n'], ...
+    actualEvals,FE_BUDGET,solverFunccount, ...
+    runState.postSearchFunctionEvaluations,min_cost, ...
+    runState.termination);
+safe_printf('Saved data only: %s\n',DataDir);
+safe_printf('RUN END: %s\n',string(datetime('now')));
+diary off
+if MAKE_PLOTS
+    try
+        preview_study_run(DataDir); % Display only, after data have been saved.
+    catch ME
+        warning('Study:PreviewFailed','Preview failed: %s',ME.message);
+    end
 end
+return;
 
 % ---------------- Helper functions ----------------
 
@@ -1455,241 +1002,6 @@ function s = local_num_str(x)
     s = replace(s, "-", "m");
 end
 
-function s = local_vec_str(v)
-    v = v(:).';
-    c = strings(1, numel(v));
-    for i = 1:numel(v)
-        c(i) = string(sprintf('%.6g', v(i)));
-    end
-    s = strjoin(c, "_");
-end
-
-function obsCount = sanitize_obs_count_vector(obsCount, N, num_obs)
-    if isempty(obsCount)
-        obsCount = NaN(N,1);
-        return;
-    end
-
-    obsCount = obsCount(:);
-    if numel(obsCount) ~= N
-        obsCount = NaN(N,1);
-        return;
-    end
-
-    obsCount = round(obsCount);
-    obsCount = max(0, min(num_obs, obsCount));
-end
-
-function cmap = make_obscount_cmap(maxObs)
-    maxObs = max(0, round(maxObs));
-    nBands = maxObs + 1;
-
-    if nBands == 1
-        grayVals = 1.0;
-    else
-        grayVals = linspace(0.40, 1.00, nBands).';
-    end
-
-    cmap = [grayVals grayVals grayVals];
-end
-
-function create_sig_fig(fName, t, err, sig3, yLbl, w, h, cBnd, cErr, outDir, obsCount, maxObs)
-    make_one_sig_fig( ...
-        fullfile(outDir, fName), ...
-        t, err, sig3, yLbl, w, h, cBnd, cErr, obsCount, maxObs, false);
-
-    [~, base, ext] = fileparts(fName);
-    fNameZoom = fullfile(outDir, base + "_zoom" + ext);
-
-    make_one_sig_fig( ...
-        fNameZoom, ...
-        t, err, sig3, yLbl, w, h, cBnd, cErr, obsCount, maxObs, true);
-end
-
-function make_one_sig_fig(savePath, t, err, sig3, yLbl, w, h, cBnd, cErr, obsCount, maxObs, doZoom)
-    f = figure('Color','w','Units','inches','Position',[1 1 w h], ...
-               'PaperUnits','inches','PaperPosition',[0 0 w h]);
-    ax = axes(f);
-    hold(ax,'on');
-    box(ax,'on');
-    set(ax,'TickLabelInterpreter','tex', 'Layer','top');
-
-    yMax = max(abs([err(:); sig3(:)]));
-    if doZoom
-        vals = abs([err(:); sig3(:)]);
-        vals = vals(isfinite(vals));
-        if ~isempty(vals)
-            yMax = prctile(vals, 98);
-        end
-    end
-
-    if ~isfinite(yMax) || yMax <= 0
-        yMax = 1;
-    end
-    yPad = 0.08 * yMax;
-    yLims = [-yMax-yPad, yMax+yPad];
-
-    if ~isempty(obsCount) && ~all(isnan(obsCount))
-        obsCount = obsCount(:).';
-        bg = repmat(obsCount, 2, 1);
-
-        imagesc(ax, t(:).', yLims, bg);
-        set(ax, 'YDir', 'normal');
-
-        cmap = make_obscount_cmap(maxObs);
-        colormap(ax, cmap);
-        clim(ax, [-0.5, maxObs + 0.5]);
-    end
-
-    hB = plot(ax, t,  sig3, '-', 'Color', cBnd);
-         plot(ax, t, -sig3, '-', 'Color', cBnd);
-    hE = plot(ax, t,  err,  '-', 'Color', cErr);
-
-    xlabel(ax, 't (TU)');
-    ylabel(ax, yLbl);
-    xlim(ax, [t(1) t(end)]);
-    ylim(ax, yLims);
-
-    lgd = legend(ax, [hE, hB], {'EKF error', '\pm 3\sigma bound'}, ...
-        'Location', 'northeast');
-    lgd.Box = 'on';
-    lgd.ItemTokenSize = [18 12];
-
-    if ~isempty(obsCount) && ~all(isnan(obsCount))
-        cb = colorbar(ax);
-        cb.Location = 'eastoutside';
-        cb.Label.String = 'Available observers';
-        cb.Ticks = 0:maxObs;
-        cb.TickLabels = string(0:maxObs);
-        cb.TickDirection = 'out';
-
-        ax.Units = 'normalized';
-        ax.Position = [0.12 0.14 0.68 0.80];
-
-        cb.Units = 'normalized';
-        cb.Position = [0.84 0.14 0.03 0.80];
-        pos = cb.Position;
-        pos(1) = pos(1) + 0.01;
-        cb.Position = pos;
-    end
-
-    exportgraphics(f, savePath, 'ContentType','image');
-    savefig(f, replace(savePath, '.pdf', '.fig'));
-    close(f);
-end
-
-function create_sig_fig_grid(fName, t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, outDir, obsCount, maxObs)
-    make_one_sig_grid_fig( ...
-        fullfile(outDir, fName), ...
-        t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, obsCount, maxObs, false);
-
-    [~, base, ext] = fileparts(fName);
-    fNameZoom = fullfile(outDir, base + "_zoom" + ext);
-
-    make_one_sig_grid_fig( ...
-        fNameZoom, ...
-        t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, obsCount, maxObs, true);
-end
-
-function make_one_sig_grid_fig(savePath, t, errMat, sig3Mat, yLbls, w, h, cBnd, cErr, obsCount, maxObs, doZoom)
-    f = figure('Color','w','Units','inches','Position',[1 1 w h], ...
-               'PaperUnits','inches','PaperPosition',[0 0 w h]);
-
-    tl = tiledlayout(f, 2, 3, 'TileSpacing','compact', 'Padding','compact');
-
-    ax = gobjects(6,1);
-    hE = gobjects(6,1);
-    hB = gobjects(6,1);
-
-    for i = 1:6
-        ax(i) = nexttile(tl);
-        hold(ax(i),'on');
-        box(ax(i),'on');
-        set(ax(i),'TickLabelInterpreter','tex', 'Layer','top');
-
-        err  = errMat(:,i);
-        sig3 = sig3Mat(:,i);
-
-        yMax = max(abs([err(:); sig3(:)]));
-        if doZoom
-            vals = abs([err(:); sig3(:)]);
-            vals = vals(isfinite(vals));
-            if ~isempty(vals)
-                yMax = prctile(vals, 98);
-            end
-        end
-
-        if ~isfinite(yMax) || yMax <= 0
-            yMax = 1;
-        end
-        yPad = 0.08 * yMax;
-        yLims = [-yMax-yPad, yMax+yPad];
-
-        if ~isempty(obsCount) && ~all(isnan(obsCount))
-            obsCountRow = obsCount(:).';
-            bg = repmat(obsCountRow, 2, 1);
-
-            imagesc(ax(i), t(:).', yLims, bg);
-            set(ax(i), 'YDir', 'normal');
-
-            cmap = make_obscount_cmap(maxObs);
-            colormap(ax(i), cmap);
-            clim(ax(i), [-0.5, maxObs + 0.5]);
-        end
-
-        hB(i) = plot(ax(i), t,  sig3, '-', 'Color', cBnd);
-                  plot(ax(i), t, -sig3, '-', 'Color', cBnd);
-        hE(i) = plot(ax(i), t,  err,  '-', 'Color', cErr);
-
-        ylabel(ax(i), yLbls{i});
-        xlim(ax(i), [t(1) t(end)]);
-        ylim(ax(i), yLims);
-
-        if i > 3
-            xlabel(ax(i), 't (TU)');
-        end
-    end
-
-    lgd = legend(ax(1), [hE(1), hB(1)], {'EKF error', '\pm 3\sigma bound'}, ...
-        'Location', 'northeast');
-    lgd.Box = 'on';
-    lgd.ItemTokenSize = [18 12];
-
-    if ~isempty(obsCount) && ~all(isnan(obsCount))
-        cb = colorbar(ax(6));
-        cb.Label.String = 'Available observers';
-        cb.Ticks = 0:maxObs;
-        cb.TickLabels = string(0:maxObs);
-        cb.TickDirection = 'out';
-
-        try
-            cb.Layout.Tile = 'east';
-        catch
-            cb.Units = 'normalized';
-            cb.Position = [0.92 0.14 0.02 0.76];
-        end
-    end
-
-    exportgraphics(f, savePath, 'ContentType','image');
-    savefig(f, replace(savePath, '.pdf', '.fig'));
-    close(f);
-end
-
-function [xL1, xL2] = cr3bp_L1L2(mu)
-    f = @(x) x ...
-        - (1-mu)*(x + mu)./abs(x + mu).^3 ...
-        - mu*(x - (1-mu))./abs(x - (1-mu)).^3;
-
-    delta = (mu/3)^(1/3);
-    x2 = 1 - mu;
-
-    x0_L1 = x2 - delta;
-    x0_L2 = x2 + delta;
-
-    opts = optimset('Display','off');
-    xL1 = fzero(f, x0_L1, opts);
-    xL2 = fzero(f, x0_L2, opts);
-end
 
 function safe_printf(varargin)
     try
@@ -1714,26 +1026,6 @@ function safe_printf(varargin)
     end
 end
 
-function safe_disp(x)
-    try
-        if ischar(x) || isstring(x)
-            msg = char(string(x));
-        else
-            msg = evalc('disp(x)');
-        end
-
-        try
-            fprintf('%s', msg);
-            if isempty(msg) || msg(end) ~= newline
-                fprintf('\n');
-            end
-        catch
-        end
-
-        append_fallback_output(msg);
-    catch
-    end
-end
 
 function append_fallback_output(msg)
     try
@@ -1821,11 +1113,4 @@ function T = get_fe_history()
     else
         T = array2table(H, 'VariableNames', {'fe','bestJ'});
     end
-end
-
-
-function append_log(data)
-    logCell = evalin('base', 'OptimizationLog');
-    logCell{end+1,1} = data;
-    assignin('base', 'OptimizationLog', logCell);
 end

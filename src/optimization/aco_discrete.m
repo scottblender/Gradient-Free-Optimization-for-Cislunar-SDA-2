@@ -9,7 +9,6 @@ function [xval, fval, nEvals, history] = aco_discrete(ObjFcn, LB, UB, opts)
 % ---------------- defaults ----------------
 if nargin < 4 || isempty(opts), opts = struct(); end
 if ~isfield(opts,'nAnts'),        opts.nAnts = 40; end
-if ~isfield(opts,'MaxIters'),     opts.MaxIters = inf; end
 if ~isfield(opts,'MaxEvals'),     opts.MaxEvals = inf; end
 if ~isfield(opts,'alpha'),        opts.alpha = 1.0; end
 if ~isfield(opts,'beta'),         opts.beta = 2.0; end
@@ -70,7 +69,7 @@ histBest = zeros(0,1);
 % main ACO loop
 % ==========================
 itr = 0;
-while itr < opts.MaxIters && nEvals < opts.MaxEvals
+while nEvals < opts.MaxEvals
     itr = itr + 1;
 
     nThisBatch = min(opts.nAnts, opts.MaxEvals - nEvals);

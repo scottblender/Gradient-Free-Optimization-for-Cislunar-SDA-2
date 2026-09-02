@@ -10,7 +10,6 @@ function [xval, fval, nEvals, history] = abc_discrete(ObjFcn, LB, UB, opts)
 % ---------------- defaults ----------------
 if nargin < 4 || isempty(opts), opts = struct(); end
 if ~isfield(opts,'ColonySize'),      opts.ColonySize = 60; end
-if ~isfield(opts,'MaxIters'),        opts.MaxIters = inf; end
 if ~isfield(opts,'MaxEvals'),        opts.MaxEvals = inf; end
 if ~isfield(opts,'Limit'),           opts.Limit = 20; end
 if ~isfield(opts,'StallIters'),      opts.StallIters = inf; end
@@ -66,7 +65,7 @@ opts.Logger('ABC init     | FE = %5d/%5d | bestJ = %.6g\n', ...
 
 % ================= main ABC loop =================
 itr = 0;
-while itr < opts.MaxIters && nEvals < opts.MaxEvals
+while nEvals < opts.MaxEvals
     itr = itr + 1;
     fvalAtStart = fval;
 

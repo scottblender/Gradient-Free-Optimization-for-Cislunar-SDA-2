@@ -2,14 +2,17 @@ function [summary,inventory] = process_fe_convergence( ...
     root,studyID,seeds,budget,makePlots,optimizers)
 % Process schema-v2 results. Save DATA ONLY; optional display-only previews.
 % Example:
-% process_fe_convergence(pilotRoot,"reviewer2_pilot_v2",0:2,120,false)
+% Comparison:
+% process_fe_convergence(comparisonRoot,"reviewer2_comparison_v1",0:19,6000,false)
+% GA baseline:
+% process_fe_convergence(baselineRoot,"reviewer2_baseline_v1",0:19,6000,false,"GA")
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
 paths = setup_project();
 if nargin < 1 || isempty(root), root = fullfile(paths.runs,'COMPARISON'); end
-if nargin < 2 || isempty(studyID), studyID = "reviewer2_pilot_v2"; end
-if nargin < 3 || isempty(seeds), seeds = 0:2; end
-if nargin < 4 || isempty(budget), budget = 120; end
+if nargin < 2 || isempty(studyID), studyID = "reviewer2_comparison_v1"; end
+if nargin < 3 || isempty(seeds), seeds = 0:19; end
+if nargin < 4 || isempty(budget), budget = 6000; end
 if nargin < 5, makePlots = false; end
 if nargin < 6, optimizers = ["GA","PSO","BAYESIAN","ABC","ACO"]; end
 seeds = seeds(:)';

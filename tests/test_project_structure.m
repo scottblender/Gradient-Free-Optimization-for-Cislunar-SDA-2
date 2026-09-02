@@ -48,8 +48,10 @@ function test_project_structure()
         'plot_study_definition_figures', 'scripts/plot_study_definition_figures.m'
         'process_baseline_results', 'scripts/process_baseline_results.m'
         'process_comparison_results', 'scripts/process_comparison_results.m'
+        'process_fe_convergence', 'scripts/process_fe_convergence.m'
         'print_observer_ics_from_experiment_summary', 'scripts/print_observer_ics_from_experiment_summary.m'
         'test_observer_catalog', 'tests/test_observer_catalog.m'
+        'test_fe_study_configuration', 'tests/test_fe_study_configuration.m'
         'test_visibility_keepout_definition', 'tests/test_visibility_keepout_definition.m'
         'test_visibility_trajectories', 'tests/test_visibility_trajectories.m'
     };

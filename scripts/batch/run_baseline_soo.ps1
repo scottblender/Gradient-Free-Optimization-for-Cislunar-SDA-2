@@ -1,27 +1,39 @@
 # ---------------- run_baseline_soo.ps1 ----------------
+param(
+    [string]$MatlabExe = "",
+    [int]$EvalBudget = 6000,
+    [int[]]$Seeds = (0..19)
+)
+
 $ErrorActionPreference = "Stop"
-
-$MeasurementModels = @("ANGLES_ONLY", "ANGLES_RANGE")
-$MissionTypes = @("LOW_THRUST_TRANSFER", "LUNAR_GATEWAY")
-$ObserverCounts = @(3, 5, 7, 10)
-
-# Only use 1, 3, 5 periods for Lunar Gateway
-$GatewayPeriods = @(1, 3, 5)
 
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $RunOpt = Join-Path $ProjectRoot "run_opt.m"
 if (-not (Test-Path $RunOpt)) { throw "Cannot find run_opt.m at: $RunOpt" }
+
+if ([string]::IsNullOrWhiteSpace($MatlabExe)) {
+    $matlabCommand = Get-Command matlab.exe -ErrorAction SilentlyContinue
+    if ($matlabCommand) {
+        $MatlabExe = $matlabCommand.Source
+    }
+    else {
+        $MatlabExe = "C:\Program Files\MATLAB\R2026a\bin\matlab.exe"
+    }
+}
+if (-not (Test-Path $MatlabExe)) {
+    throw "Cannot find matlab.exe. Pass -MatlabExe or add MATLAB to PATH."
+}
+
+if ($EvalBudget -lt 60 -or ($EvalBudget % 60) -ne 0) {
+    throw "EvalBudget must be a positive multiple of 60 for GA and PSO."
+}
+if ($Seeds.Count -eq 0 -or ($Seeds | Where-Object { $_ -lt 0 }).Count -gt 0) {
+    throw "Seeds must contain nonnegative integers."
+}
+
 $ProjectRootMatlab = $ProjectRoot.Replace("'", "''")
 $RunOptMatlab = $RunOpt.Replace("'", "''")
-
-$MatlabExe = "C:\Program Files\MATLAB\R2025b\bin\matlab.exe"
-if (-not (Test-Path $MatlabExe)) { throw "Cannot find matlab.exe at: $MatlabExe" }
-
-$RunsRoot = Join-Path (Join-Path $ProjectRoot "results") "runs"
-$BaselineRoot = Join-Path $RunsRoot "BASELINE"
-
-New-Item -ItemType Directory -Force -Path $RunsRoot | Out-Null
-New-Item -ItemType Directory -Force -Path $BaselineRoot | Out-Null
+$MeasurementNoiseSeed = 1001
 
 function Get-MissionCode {
     param([string]$Mission)
@@ -29,10 +41,8 @@ function Get-MissionCode {
     switch ($Mission) {
         "LOW_THRUST_TRANSFER" { return "lt" }
         "LUNAR_GATEWAY"       { return "lg" }
+        "GATEWAY_IMPULSE"     { return "gi" }
         "PERIODIC_ORBIT"      { return "po" }
-        "BALLISTIC_TRANSFER"  { return "bt" }
-        "TIME_OPT_TRANSFER"   { return "tt" }
-        "FUEL_OPT_TRANSFER"   { return "ft" }
         default               { return $Mission.ToLower() }
     }
 }
@@ -51,32 +61,46 @@ function Invoke-MatlabRun {
     param(
         [string]$RunDir,
         [string]$Alg,
-        [int]$MaxEvals,
+        [string]$StudyId,
         [string]$MissionType,
         [string]$MeasModel,
         [int]$NumObservers,
         [int]$NPeriods,
-        [bool]$UseScreening,
-        [bool]$UseJ1,
-        [bool]$UseJ2,
-        [bool]$UseJ3,
-        [int]$Seed = 0
+        [int]$Seed
     )
+
+    $dataDir = Join-Path $RunDir "data"
+    $stateFile = Join-Path $dataDir "optimization_run.mat"
+    $trackingFile = Join-Path $dataDir "tracking_data.mat"
+
+    if (Test-Path $trackingFile) {
+        Write-Host "Skipping completed run -> $RunDir"
+        return
+    }
+    if (Test-Path $stateFile) {
+        throw "Incomplete run exists at $RunDir. Inspect or move it before resuming."
+    }
 
     New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 
+    $env:STUDY_ID = $StudyId
     $env:OPTIMIZER_MODE = $Alg
-    $env:MAX_EVALS = "$MaxEvals"
+    $env:MAX_EVALS = "$EvalBudget"
     $env:USE_PARALLEL_OPT = "1"
     $env:MISSION_TYPE = $MissionType
     $env:MEAS_MODEL = $MeasModel
     $env:NUM_OBSERVERS = "$NumObservers"
     $env:NPERIODS = "$NPeriods"
-    $env:USE_SCREENING = $(if ($UseScreening) { "1" } else { "0" })
-    $env:USE_J1 = $(if ($UseJ1) { "1" } else { "0" })
-    $env:USE_J2 = $(if ($UseJ2) { "1" } else { "0" })
-    $env:USE_J3 = $(if ($UseJ3) { "1" } else { "0" })
+    $env:USE_SCREENING = "1"
+    $env:USE_J1 = "1"
+    $env:USE_J2 = "1"
+    $env:USE_J3 = "1"
     $env:SEED = "$Seed"
+    $env:MEAS_NOISE_SEED = "$MeasurementNoiseSeed"
+    $env:MAKE_PLOTS = "0"
+    $env:IMPULSE_DV_MPS = "10"
+    $env:IMPULSE_DIRECTION = "PROGRADE"
+    $env:IMPULSE_DURATION_TU = "1.5"
     $env:RUN_DIR = $RunDir
 
     Push-Location $RunDir
@@ -95,6 +119,9 @@ exit(0);
 "@
 
         & "$MatlabExe" -batch $cmd *> "console.log"
+        if ($LASTEXITCODE -ne 0) {
+            throw "MATLAB failed with exit code $LASTEXITCODE. See $RunDir\console.log"
+        }
     }
     finally {
         Pop-Location
@@ -103,57 +130,49 @@ exit(0);
     Write-Host "Saved -> $RunDir"
 }
 
-# ---------------- Baseline GA ----------------
-$gaBaselineEvals = 6000
-$baselineSeed = 0
+# GA-only reproduction/sensitivity study from the original paper.
+$StudyId = "reviewer2_baseline_v1"
+$MeasurementModels = @("ANGLES_ONLY", "ANGLES_RANGE")
+$MissionTypes = @("LOW_THRUST_TRANSFER", "LUNAR_GATEWAY", "GATEWAY_IMPULSE")
+$ObserverCounts = @(3, 5, 7, 10)
+$GatewayPeriods = @(1, 3, 5)
+
+$BaselineRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") "BASELINE"
+New-Item -ItemType Directory -Force -Path $BaselineRoot | Out-Null
 
 foreach ($meas in $MeasurementModels) {
     $measCode = Get-MeasCode $meas
-
-    $AlgRoot = Join-Path $BaselineRoot "runs_GA"
-    $MeasRoot = Join-Path $AlgRoot $measCode
-    New-Item -ItemType Directory -Force -Path $AlgRoot | Out-Null
-    New-Item -ItemType Directory -Force -Path $MeasRoot | Out-Null
-
     foreach ($mission in $MissionTypes) {
-        $MissionCode = Get-MissionCode $mission
-        $MissionOutDir = Join-Path $MeasRoot $MissionCode
-        New-Item -ItemType Directory -Force -Path $MissionOutDir | Out-Null
+        $missionCode = Get-MissionCode $mission
+        $missionRoot = Join-Path (Join-Path (Join-Path $BaselineRoot "runs_GA") $measCode) $missionCode
+        New-Item -ItemType Directory -Force -Path $missionRoot | Out-Null
 
         foreach ($nObs in $ObserverCounts) {
-
-            if ($mission -eq "LUNAR_GATEWAY") {
-                $periodList = $GatewayPeriods
-            }
-            else {
-                $periodList = @(1)
-            }
+            $periodList = if ($mission -eq "LUNAR_GATEWAY") { $GatewayPeriods } else { @(1) }
 
             foreach ($nper in $periodList) {
+                foreach ($seed in $Seeds) {
+                    $seedCode = $seed.ToString("000")
+                    if ($mission -eq "LUNAR_GATEWAY") {
+                        $runName = "b_ga$($EvalBudget)_$($measCode)_o$($nObs)_p$($nper)_seed$($seedCode)"
+                    }
+                    else {
+                        $runName = "b_ga$($EvalBudget)_$($measCode)_o$($nObs)_seed$($seedCode)"
+                    }
+                    $runDir = Join-Path $missionRoot $runName
 
-                if ($mission -eq "LOW_THRUST_TRANSFER") {
-                    $caseName = "b_ga${gaBaselineEvals}_${measCode}_o${nObs}"
+                    Write-Host "`nBaseline GA: [$mission] [$meas] $runName"
+                    Write-Host "FE budget: $EvalBudget | optimizer seed: $seed | measurement seed: $MeasurementNoiseSeed"
+
+                    Invoke-MatlabRun -RunDir $runDir -Alg "GA" -StudyId $StudyId `
+                        -MissionType $mission -MeasModel $meas -NumObservers $nObs `
+                        -NPeriods $nper -Seed $seed
                 }
-                else {
-                    $caseName = "b_ga${gaBaselineEvals}_${measCode}_o${nObs}_p${nper}"
-                }
-
-                $RunDir = Join-Path $MissionOutDir $caseName
-
-                Write-Host "`n============================="
-                Write-Host "Baseline GA: [$mission] [$meas] $caseName"
-                Write-Host "FE budget: $gaBaselineEvals"
-                Write-Host "============================="
-
-                Invoke-MatlabRun -RunDir $RunDir -Alg "GA" -MaxEvals $gaBaselineEvals `
-                    -MissionType $mission -MeasModel $meas -NumObservers $nObs -NPeriods $nper `
-                    -UseScreening $true -UseJ1 $true -UseJ2 $true -UseJ3 $true `
-                    -Seed $baselineSeed
             }
         }
     }
 }
 
-Write-Host "`nBaseline runs complete."
+Write-Host "`nBaseline GA runs complete."
 Write-Host "Baseline -> $BaselineRoot"
-# -------------------------------------------------
+# -------------------------------------------------------

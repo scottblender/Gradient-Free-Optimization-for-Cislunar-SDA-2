@@ -1,8 +1,9 @@
 # Gradient-Free Optimization for Cislunar SDA
 
 MATLAB tools for designing cislunar observer constellations using estimation
-performance. The current target scenarios include Lunar Gateway tracking and a
-low-thrust transfer.
+performance. The fixed target scenarios are Lunar Gateway tracking, a
+low-thrust transfer, and a 10 m/s prograde impulse applied at Gateway perilune
+and propagated for 1.5 TU.
 
 ## Project layout
 
@@ -62,8 +63,8 @@ There is no need to regenerate an existing catalog just because files moved.
 
 The workflow uses MATLAB, Global Optimization Toolbox, Optimization Toolbox,
 Statistics and Machine Learning Toolbox, and Parallel Computing Toolbox.
-Required toolboxes depend on the entry point. The existing Windows batch
-launchers specify MATLAB R2025b; adjust `$MatlabExe` for your installation.
+The Windows batch launchers use MATLAB on `PATH` when available and otherwise
+try MATLAB R2026a. Pass `-MatlabExe` to select another installation.
 
 ## Entry points
 
@@ -78,10 +79,9 @@ launch_optimization_gui
 % This invokes the transfer solver, but no constellation optimizer.
 test_visibility_trajectories
 
-% Catalog figures and result-processing utilities.
-plot_jpl_orbit_catalog
-process_baseline_results
-process_comparison_results
+% Study-definition figures and FE result processing.
+plot_study_definition_figures
+process_fe_convergence
 print_observer_ics_from_experiment_summary
 ```
 
@@ -94,15 +94,49 @@ files. It reads `data/JPL_Data/`, with support for an existing root-level
 `JPL_Data/`, and writes the catalog into `data/`. Its filtering and orbit
 ordering are unchanged by this reorganization.
 
-Windows batch entry points are now:
+## Function-evaluation studies
+
+Every supported optimizer uses `MAX_EVALS` as its only search stopping
+criterion. The supported methods are GA, PSO, Bayesian optimization, ABC, and
+ACO. The GUI and batch launchers do not set or fall back to `MAX_ITERS`.
+
+The reviewer-facing comparison uses a common 6000-FE budget, angles-only
+measurements, three observers, all three cost terms, visibility screening, the
+three fixed target cases, and optimizer seeds 0--19. Measurement noise uses the
+fixed seed 1001 for every independent optimizer run. The default matrix contains
+300 runs: 5 methods x 3 target cases x 20 seeds.
+
+The GA baseline preserves the original sensitivity grid: both measurement
+models, 3/5/7/10 observers, and 1/3/5 periods for the Gateway case. It adds the
+low-thrust and Gateway-impulse cases and repeats every configuration for seeds
+0--19 so baseline tables can report means and standard deviations.
 
 ```powershell
 .\scripts\batch\run_baseline_soo.ps1
 .\scripts\batch\run_comparison_soo.ps1
 ```
 
-These scripts resolve the project root from their own locations. Their mission,
-optimizer, seed, and stopping settings have not changed.
+Both launchers accept `-MatlabExe`, `-EvalBudget`, and `-Seeds`. Completed
+runs are skipped safely; an incomplete run must be inspected or moved instead
+of being silently overwritten.
+
+After the studies finish, aggregate the data and convergence histories with:
+
+```matlab
+paths = setup_project();
+
+[comparisonSummary, comparisonInventory] = process_fe_convergence( ...
+    fullfile(paths.runs,'COMPARISON'), ...
+    "reviewer2_comparison_v1",0:19,6000,false);
+
+[baselineSummary, baselineInventory] = process_fe_convergence( ...
+    fullfile(paths.runs,'BASELINE'), ...
+    "reviewer2_baseline_v1",0:19,6000,false,"GA");
+```
+
+Convergence histories are aligned by cumulative function evaluations, not
+iterations. The processor retains missing early checkpoints as `NaN` rather
+than inventing values, and saves aggregate data without saving figures.
 
 ## Data, caches, and outputs
 
@@ -134,9 +168,10 @@ caches are built in `data/cache/`; old root-level caches are not loaded
 automatically. This avoids silently reusing a database built with the previous
 slot definition. Do not move pre-correction caches into the new cache folders.
 
-This commit reorganizes paths only. Measurement-noise handling, evaluation
-budgets, independent optimizer runs, and convergence logging are separate
-follow-up changes. Historical results should still be interpreted using the
-mission and model settings with which they were generated.
+Historical results should still be interpreted using the mission, visibility,
+noise, and stopping settings with which they were generated.
 
-Fixed Gateway, low-thrust, and Gateway-impulse target definitions are stored in `data/TargetCaseDatabase.mat`. The loader creates this compact database from `scripts/build_target_case_database.m` when it is missing. Fixed target cases never resolve observer catalog rows or observer slots.
+Fixed Gateway, low-thrust, and Gateway-impulse target definitions are stored in
+`data/TargetCaseDatabase.mat`. The loader creates this compact database from
+`scripts/build_target_case_database.m` when it is missing. Fixed target cases
+never resolve observer catalog rows or observer slots.

@@ -30,7 +30,7 @@ function launch_optimization_gui()
     lblMission = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Mission Type');
     ddMission = uidropdown(leftPanel, ...
         'Position',[fieldX y fieldW 22], ...
-        'Items',{'LOW_THRUST_TRANSFER','LUNAR_GATEWAY','PERIODIC_ORBIT'}, ...
+        'Items',{'LOW_THRUST_TRANSFER','LUNAR_GATEWAY','GATEWAY_IMPULSE','PERIODIC_ORBIT'}, ...
         'Value','LOW_THRUST_TRANSFER');
 
     y = y - dy;
@@ -39,7 +39,7 @@ function launch_optimization_gui()
     lblOpt = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Optimizer');
     ddOpt = uidropdown(leftPanel, ...
         'Position',[fieldX y fieldW 22], ...
-        'Items',{'GA','PSO','BAYESIAN','GAMULTIOBJ','DMOPSO','ABC','ACO'}, ...
+        'Items',{'GA','PSO','BAYESIAN','ABC','ACO'}, ...
         'Value','GA');
 
     y = y - dy;
@@ -52,19 +52,11 @@ function launch_optimization_gui()
 
     y = y - dy;
 
-    % ---------------- Max Iterations ----------------
-    lblMaxIters = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Max Iters');
-    efMaxIters = uieditfield(leftPanel, 'text', ...
-        'Position',[fieldX y fieldW 22], ...
-        'Value','5');
-
-    y = y - dy;
-
     % ---------------- Max Evaluations ----------------
     lblMaxEvals = uilabel(leftPanel, 'Position',[labelX y 160 22], 'Text','Max Evals');
     efMaxEvals = uieditfield(leftPanel, 'text', ...
         'Position',[fieldX y fieldW 22], ...
-        'Value','100');
+        'Value','6000');
 
     y = y - dy;
 
@@ -140,9 +132,9 @@ function launch_optimization_gui()
             'It uses -logfile to make detached runs more robust.', ...
             'Stop Batch Runs kills OTHER MATLAB processes started with -batch.', ...
             'Your current GUI session is left alone.', ...
-            'MAX_ITERS applies to most optimizers.', ...
-            'MAX_EVALS applies to BAYESIAN.', ...
-            'NPERIODS applies to LUNAR_GATEWAY and PERIODIC_ORBIT only.'});
+            'MAX_EVALS is the stopping criterion for every optimizer.', ...
+            'NPERIODS applies to LUNAR_GATEWAY and PERIODIC_ORBIT only.', ...
+            'GATEWAY_IMPULSE uses the fixed 10 m/s, 1.5 TU target case.'});
 
     y = y - 190;
 
@@ -219,7 +211,6 @@ function launch_optimization_gui()
 
     isManualLogSelection = false;
 
-    ddOpt.ValueChangedFcn = @(~,~) toggleFields();
     ddMission.ValueChangedFcn = @(~,~) toggleFields();
     toggleFields();
     resetMonitor();
@@ -257,22 +248,14 @@ function launch_optimization_gui()
     end
 
     function toggleFields()
-        % optimizer-specific toggles
-        if strcmp(ddOpt.Value, 'BAYESIAN')
-            efMaxIters.Enable = 'off';
-            efMaxEvals.Enable = 'on';
-        else
-            efMaxIters.Enable = 'on';
-            efMaxEvals.Enable = 'off';
-        end
-
-        % mission-specific toggles
-        if strcmp(ddMission.Value, 'LOW_THRUST_TRANSFER')
-            efNPeriods.Enable = 'off';
-            lblNPeriods.Enable = 'off';
-        else
+        usesPeriods = ismember(ddMission.Value, ...
+            {'LUNAR_GATEWAY','PERIODIC_ORBIT'});
+        if usesPeriods
             efNPeriods.Enable = 'on';
             lblNPeriods.Enable = 'on';
+        else
+            efNPeriods.Enable = 'off';
+            lblNPeriods.Enable = 'off';
         end
     end
 
@@ -358,12 +341,11 @@ function launch_optimization_gui()
         params.OPTIMIZER_MODE = char(ddOpt.Value);
 
         params.NUM_OBSERVERS = validatePositiveInteger(efNumObs.Value, 'NUM_OBSERVERS');
-        params.MAX_ITERS     = validatePositiveInteger(efMaxIters.Value, 'MAX_ITERS');
         params.MAX_EVALS     = validatePositiveInteger(efMaxEvals.Value, 'MAX_EVALS');
         params.EKF_DT        = validatePositiveScalar(efEkfDt.Value, 'EKF_DT');
         params.SEED          = validateInteger(efSeed.Value, 'SEED');
 
-        if strcmp(params.MISSION_TYPE, 'LOW_THRUST_TRANSFER')
+        if ~ismember(params.MISSION_TYPE, {'LUNAR_GATEWAY','PERIODIC_ORBIT'})
             params.NPERIODS = '1';
         else
             params.NPERIODS = validatePositiveInteger(efNPeriods.Value, 'NPERIODS');
@@ -510,7 +492,6 @@ function cmd = buildLaunchCommand(params)
         'setenv(''MISSION_TYPE'',''%s'');' ...
         'setenv(''OPTIMIZER_MODE'',''%s'');' ...
         'setenv(''NUM_OBSERVERS'',''%s'');' ...
-        'setenv(''MAX_ITERS'',''%s'');' ...
         'setenv(''MAX_EVALS'',''%s'');' ...
         'setenv(''EKF_DT'',''%s'');' ...
         'setenv(''NPERIODS'',''%s'');' ...
@@ -524,7 +505,6 @@ function cmd = buildLaunchCommand(params)
         escapeSingleQuotes(params.MISSION_TYPE), ...
         escapeSingleQuotes(params.OPTIMIZER_MODE), ...
         escapeSingleQuotes(params.NUM_OBSERVERS), ...
-        escapeSingleQuotes(params.MAX_ITERS), ...
         escapeSingleQuotes(params.MAX_EVALS), ...
         escapeSingleQuotes(params.EKF_DT), ...
         escapeSingleQuotes(params.NPERIODS), ...

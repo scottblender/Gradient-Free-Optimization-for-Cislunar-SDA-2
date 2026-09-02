@@ -1,28 +1,39 @@
 # ---------------- run_comparison_soo.ps1 ----------------
+param(
+    [string]$MatlabExe = "",
+    [int]$EvalBudget = 6000,
+    [int[]]$Seeds = (0..19)
+)
+
 $ErrorActionPreference = "Stop"
-
-$Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
-$MeasurementModels = @("ANGLES_ONLY", "ANGLES_RANGE")
-$MissionTypes = @("LOW_THRUST_TRANSFER", "LUNAR_GATEWAY")
-$ObserverCounts = @(3, 5, 7, 10)
-
-# Only use 1, 3, 5 periods for Lunar Gateway
-$GatewayPeriods = @(1, 3, 5)
 
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $RunOpt = Join-Path $ProjectRoot "run_opt.m"
 if (-not (Test-Path $RunOpt)) { throw "Cannot find run_opt.m at: $RunOpt" }
+
+if ([string]::IsNullOrWhiteSpace($MatlabExe)) {
+    $matlabCommand = Get-Command matlab.exe -ErrorAction SilentlyContinue
+    if ($matlabCommand) {
+        $MatlabExe = $matlabCommand.Source
+    }
+    else {
+        $MatlabExe = "C:\Program Files\MATLAB\R2026a\bin\matlab.exe"
+    }
+}
+if (-not (Test-Path $MatlabExe)) {
+    throw "Cannot find matlab.exe. Pass -MatlabExe or add MATLAB to PATH."
+}
+
+if ($EvalBudget -lt 60 -or ($EvalBudget % 60) -ne 0) {
+    throw "EvalBudget must be a positive multiple of 60 for GA and PSO."
+}
+if ($Seeds.Count -eq 0 -or ($Seeds | Where-Object { $_ -lt 0 }).Count -gt 0) {
+    throw "Seeds must contain nonnegative integers."
+}
+
 $ProjectRootMatlab = $ProjectRoot.Replace("'", "''")
 $RunOptMatlab = $RunOpt.Replace("'", "''")
-
-$MatlabExe = "C:\Program Files\MATLAB\R2025b\bin\matlab.exe"
-if (-not (Test-Path $MatlabExe)) { throw "Cannot find matlab.exe at: $MatlabExe" }
-
-$RunsRoot = Join-Path (Join-Path $ProjectRoot "results") "runs"
-$ComparisonRoot = Join-Path $RunsRoot "COMPARISON"
-
-New-Item -ItemType Directory -Force -Path $RunsRoot | Out-Null
-New-Item -ItemType Directory -Force -Path $ComparisonRoot | Out-Null
+$MeasurementNoiseSeed = 1001
 
 function Get-MissionCode {
     param([string]$Mission)
@@ -30,10 +41,8 @@ function Get-MissionCode {
     switch ($Mission) {
         "LOW_THRUST_TRANSFER" { return "lt" }
         "LUNAR_GATEWAY"       { return "lg" }
+        "GATEWAY_IMPULSE"     { return "gi" }
         "PERIODIC_ORBIT"      { return "po" }
-        "BALLISTIC_TRANSFER"  { return "bt" }
-        "TIME_OPT_TRANSFER"   { return "tt" }
-        "FUEL_OPT_TRANSFER"   { return "ft" }
         default               { return $Mission.ToLower() }
     }
 }
@@ -52,32 +61,46 @@ function Invoke-MatlabRun {
     param(
         [string]$RunDir,
         [string]$Alg,
-        [int]$MaxEvals,
+        [string]$StudyId,
         [string]$MissionType,
         [string]$MeasModel,
         [int]$NumObservers,
         [int]$NPeriods,
-        [bool]$UseScreening,
-        [bool]$UseJ1,
-        [bool]$UseJ2,
-        [bool]$UseJ3,
-        [int]$Seed = 0
+        [int]$Seed
     )
+
+    $dataDir = Join-Path $RunDir "data"
+    $stateFile = Join-Path $dataDir "optimization_run.mat"
+    $trackingFile = Join-Path $dataDir "tracking_data.mat"
+
+    if (Test-Path $trackingFile) {
+        Write-Host "Skipping completed run -> $RunDir"
+        return
+    }
+    if (Test-Path $stateFile) {
+        throw "Incomplete run exists at $RunDir. Inspect or move it before resuming."
+    }
 
     New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 
+    $env:STUDY_ID = $StudyId
     $env:OPTIMIZER_MODE = $Alg
-    $env:MAX_EVALS = "$MaxEvals"
+    $env:MAX_EVALS = "$EvalBudget"
     $env:USE_PARALLEL_OPT = "1"
     $env:MISSION_TYPE = $MissionType
     $env:MEAS_MODEL = $MeasModel
     $env:NUM_OBSERVERS = "$NumObservers"
     $env:NPERIODS = "$NPeriods"
-    $env:USE_SCREENING = $(if ($UseScreening) { "1" } else { "0" })
-    $env:USE_J1 = $(if ($UseJ1) { "1" } else { "0" })
-    $env:USE_J2 = $(if ($UseJ2) { "1" } else { "0" })
-    $env:USE_J3 = $(if ($UseJ3) { "1" } else { "0" })
+    $env:USE_SCREENING = "1"
+    $env:USE_J1 = "1"
+    $env:USE_J2 = "1"
+    $env:USE_J3 = "1"
     $env:SEED = "$Seed"
+    $env:MEAS_NOISE_SEED = "$MeasurementNoiseSeed"
+    $env:MAKE_PLOTS = "0"
+    $env:IMPULSE_DV_MPS = "10"
+    $env:IMPULSE_DIRECTION = "PROGRADE"
+    $env:IMPULSE_DURATION_TU = "1.5"
     $env:RUN_DIR = $RunDir
 
     Push-Location $RunDir
@@ -96,6 +119,9 @@ exit(0);
 "@
 
         & "$MatlabExe" -batch $cmd *> "console.log"
+        if ($LASTEXITCODE -ne 0) {
+            throw "MATLAB failed with exit code $LASTEXITCODE. See $RunDir\console.log"
+        }
     }
     finally {
         Pop-Location
@@ -104,73 +130,47 @@ exit(0);
     Write-Host "Saved -> $RunDir"
 }
 
-# ---------------- Comparison sweep ----------------
-# Universal search-effort budget used by every optimizer.
-$evalBudget = 6000
+# Reviewer-facing optimizer comparison:
+# 5 methods x 3 target cases x 20 seeds = 300 runs by default.
+$StudyId = "reviewer2_comparison_v1"
+$Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
+$MeasurementModels = @("ANGLES_ONLY")
+$MissionTypes = @("LUNAR_GATEWAY", "LOW_THRUST_TRANSFER", "GATEWAY_IMPULSE")
+$ObserverCounts = @(3)
+$GatewayPeriods = @(1)
 
-# Independent stochastic repeats for Reviewer 2 statistics.
-$Seeds = 0..19
-
-$Cases = @(
-    @{ screening=$true;  J1=$true;  J2=$true;  J3=$true  },
-    @{ screening=$false; J1=$true;  J2=$true;  J3=$true  },
-    @{ screening=$true;  J1=$true;  J2=$false; J3=$false },
-    @{ screening=$true;  J1=$false; J2=$true;  J3=$false },
-    @{ screening=$true;  J1=$false; J2=$false; J3=$true  }
-)
+$ComparisonRoot = Join-Path (Join-Path (Join-Path $ProjectRoot "results") "runs") "COMPARISON"
+New-Item -ItemType Directory -Force -Path $ComparisonRoot | Out-Null
 
 foreach ($alg in $Algs) {
     $algCode = $alg.ToLower()
-    $AlgRoot = Join-Path $ComparisonRoot "runs_$alg"
-    New-Item -ItemType Directory -Force -Path $AlgRoot | Out-Null
-
     foreach ($meas in $MeasurementModels) {
         $measCode = Get-MeasCode $meas
-        $MeasRoot = Join-Path $AlgRoot $measCode
-        New-Item -ItemType Directory -Force -Path $AlgRoot | Out-Null
-        New-Item -ItemType Directory -Force -Path $MeasRoot | Out-Null
-
         foreach ($mission in $MissionTypes) {
-            $MissionCode = Get-MissionCode $mission
-            $MissionOutDir = Join-Path $MeasRoot $MissionCode
-            New-Item -ItemType Directory -Force -Path $MissionOutDir | Out-Null
+            $missionCode = Get-MissionCode $mission
+            $missionRoot = Join-Path (Join-Path (Join-Path $ComparisonRoot "runs_$alg") $measCode) $missionCode
+            New-Item -ItemType Directory -Force -Path $missionRoot | Out-Null
 
             foreach ($nObs in $ObserverCounts) {
-
-                if ($mission -eq "LUNAR_GATEWAY") {
-                    $periodList = $GatewayPeriods
-                }
-                else {
-                    $periodList = @(1)
-                }
+                $periodList = if ($mission -eq "LUNAR_GATEWAY") { $GatewayPeriods } else { @(1) }
 
                 foreach ($nper in $periodList) {
-                    foreach ($cc in $Cases) {
-                        foreach ($seed in $Seeds) {
-
-                            $screenCode = if ($cc.screening) { "1" } else { "0" }
-                            $jCode = "$( [int]$cc.J1 )$( [int]$cc.J2 )$( [int]$cc.J3 )"
-                            $seedCode = $seed.ToString("000")
-
-                            if ($mission -eq "LOW_THRUST_TRANSFER") {
-                                $runName = "s_${algCode}${evalBudget}_${measCode}_o${nObs}_s${screenCode}_j${jCode}_seed${seedCode}"
-                            }
-                            else {
-                                $runName = "s_${algCode}${evalBudget}_${measCode}_o${nObs}_p${nper}_s${screenCode}_j${jCode}_seed${seedCode}"
-                            }
-
-                            $RunDir = Join-Path $MissionOutDir $runName
-
-                            Write-Host "`n============================="
-                            Write-Host "Running: [$mission] [$meas] $runName"
-                            Write-Host "FE budget: $evalBudget | seed: $seed"
-                            Write-Host "============================="
-
-                            Invoke-MatlabRun -RunDir $RunDir -Alg $alg -MaxEvals $evalBudget `
-                                -MissionType $mission -MeasModel $meas -NumObservers $nObs -NPeriods $nper `
-                                -UseScreening $cc.screening -UseJ1 $cc.J1 -UseJ2 $cc.J2 -UseJ3 $cc.J3 `
-                                -Seed $seed
+                    foreach ($seed in $Seeds) {
+                        $seedCode = $seed.ToString("000")
+                        if ($mission -eq "LUNAR_GATEWAY") {
+                            $runName = "c_$($algCode)$($EvalBudget)_$($measCode)_o$($nObs)_p$($nper)_seed$($seedCode)"
                         }
+                        else {
+                            $runName = "c_$($algCode)$($EvalBudget)_$($measCode)_o$($nObs)_seed$($seedCode)"
+                        }
+                        $runDir = Join-Path $missionRoot $runName
+
+                        Write-Host "`nComparison: [$alg] [$mission] [$meas] $runName"
+                        Write-Host "FE budget: $EvalBudget | optimizer seed: $seed | measurement seed: $MeasurementNoiseSeed"
+
+                        Invoke-MatlabRun -RunDir $runDir -Alg $alg -StudyId $StudyId `
+                            -MissionType $mission -MeasModel $meas -NumObservers $nObs `
+                            -NPeriods $nper -Seed $seed
                     }
                 }
             }
@@ -180,4 +180,4 @@ foreach ($alg in $Algs) {
 
 Write-Host "`nComparison runs complete."
 Write-Host "Comparison -> $ComparisonRoot"
-# -------------------------------------------------
+# ---------------------------------------------------------
