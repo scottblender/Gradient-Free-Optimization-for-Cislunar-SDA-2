@@ -164,11 +164,12 @@ function Invoke-MatlabRun {
     Write-Host "Saved -> $RunDir"
 }
 
-# Reviewer-facing optimizer comparison:
-# 5 methods x 3 target cases x 20 seeds = 300 runs by default.
+# Reviewer-facing extended optimizer comparison:
+# 4 scalable methods x 3 target cases x 20 seeds = 240 runs by default.
+# Bayesian optimization is handled separately by run_bayesian_1200_soo.ps1.
 $StudyId = "reviewer2_comparison_v1"
 $StudyFolder = "COMPARISON"
-$Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
+$Algs = @("GA", "PSO", "ABC", "ACO")
 $MeasurementModels = @("ANGLES_ONLY")
 $MissionTypes = @("LUNAR_GATEWAY", "LOW_THRUST_TRANSFER", "GATEWAY_IMPULSE")
 $ObserverCounts = @(3)
@@ -178,6 +179,9 @@ if ($Pilot) {
     if (-not $PSBoundParameters.ContainsKey("EvalBudget")) { $EvalBudget = 1200 }
     if (-not $PSBoundParameters.ContainsKey("Seeds")) { $Seeds = @(0) }
 
+    # Retain BO in the existing 1200-FE dress rehearsal so the five-method
+    # pilot remains compatible with run_reviewer2_pipeline_pilot.m.
+    $Algs = @("GA", "PSO", "BAYESIAN", "ABC", "ACO")
     $StudyId = "reviewer2_comparison_pilot_1200_v1"
     $StudyFolder = "COMPARISON_PILOT_1200"
 }
