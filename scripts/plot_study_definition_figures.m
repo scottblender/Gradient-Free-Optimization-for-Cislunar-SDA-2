@@ -186,15 +186,22 @@ maxPointsPerOrbit = 300;
 figureFiles = strings(numel(familyGroups),1);
 
 for groupIndex = 1:numel(familyGroups)
-    fig = publication_figure(6.5,5.4);
-    ax = axes(fig);
+    group = familyGroups{groupIndex};
+
+    if numel(group)==2
+        fig = publication_figure(7.6,7.0);
+        [ax,plotPosition] = create_centered_3d_axes(fig);
+    else
+        fig = publication_figure(6.5,5.4);
+        ax = axes(fig);
+        plotPosition = [];
+    end
+
     hold(ax,'on');
     box(ax,'on');
     grid(ax,'off');
     axis(ax,'equal');
     set(ax,'TickLabelInterpreter','tex','Layer','top');
-
-    group = familyGroups{groupIndex};
 
     if numel(group)==2
         ax.Projection = 'perspective';
@@ -283,8 +290,19 @@ for groupIndex = 1:numel(familyGroups)
 
         moonRadius = 1737.1/LU;
         angle = linspace(0,2*pi,200);
-        moonHandle = fill(ax,(1-mu)+moonRadius*cos(angle), ...
-            moonRadius*sin(angle),cMoon,'EdgeColor','none');
+
+        % Retain the physically scaled lunar disk, then add a fixed-size
+        % marker so the Moon remains visible across the full DRO extent.
+        % The marker is intentionally schematic; the disk preserves scale.
+        fill(ax,(1-mu)+moonRadius*cos(angle), ...
+            moonRadius*sin(angle),cMoon, ...
+            'EdgeColor','none','HandleVisibility','off');
+        moonHandle = plot(ax,1-mu,0,'o', ...
+            'MarkerSize',9, ...
+            'MarkerFaceColor',cMoon, ...
+            'MarkerEdgeColor','k', ...
+            'LineWidth',1.1);
+        uistack(moonHandle,'top');
 
         legendHandles = [droHandle;moonHandle];
         legendLabels = ["DRO";"Moon"];
@@ -302,18 +320,29 @@ for groupIndex = 1:numel(familyGroups)
     ylabel(ax,'y (LU)');
     format_publication_axes(ax,13);
 
-    legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
-        'Location','northeast','Orientation','vertical');
+    if numel(group)==2
+        legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
+            'Location','northoutside','Orientation','horizontal');
+        legendColumns = numel(legendLabels);
+    else
+        legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
+            'Location','northeast','Orientation','vertical');
+        legendColumns = 1;
+    end
     legendHandle.Box = 'on';
     legendHandle.FontName = 'Times New Roman';
     legendHandle.FontSize = 12;
     legendHandle.FontWeight = 'bold';
     legendHandle.ItemTokenSize = [14,8];
-    legendHandle.NumColumns = 1;
+    legendHandle.NumColumns = legendColumns;
 
-    ax.Units = 'normalized';
-    ax.Position = [0.12,0.13,0.80,0.80];
-    ax.LooseInset = max(ax.TightInset,0.015);
+    if numel(group)==2
+        finalize_centered_3d_axes(ax,legendHandle,plotPosition);
+    else
+        ax.Units = 'normalized';
+        ax.Position = [0.12,0.13,0.80,0.80];
+        ax.LooseInset = max(ax.TightInset,0.015);
+    end
 
     figureFiles(groupIndex) = fullfile( ...
         outputDir,figureNames(groupIndex)+".eps");
@@ -388,8 +417,8 @@ mu = 1.215058560962404E-2;
 LU = 384400;
 
 % Figure 1: the orbit and its 50 equal-time candidate states.
-figGeometry = publication_figure(6.5,6.5);
-ax = axes(figGeometry);
+figGeometry = publication_figure(7.6,7.0);
+[ax,plotPosition] = create_centered_3d_axes(figGeometry);
 prepare_axes(ax);
 
 plotStep = max(1,round(size(rawState,1)/500));
@@ -417,10 +446,7 @@ legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hMoon], ...
     'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
 legendHandle.NumColumns = 3;
 legendHandle.Box = 'on';
-place_legend_above(legendHandle,3,13);
-axis(ax,'tight');
-axis(ax,'vis3d');
-ax.Position = [0.13,0.14,0.74,0.66];
+finalize_centered_3d_axes(ax,legendHandle,plotPosition);
 
 geometryFile = fullfile(outputDir,'slot_geometry_equal_time.eps');
 inspect_before_export(figGeometry,inspectFigure, ...
@@ -936,8 +962,9 @@ cPostImpulse = postImpulseAlpha*cImpulse+ ...
 cReference = [0.48,0.48,0.48];
 cPoint = [0.80,0.80,0.80];
 
-figGateway = publication_figure(7.2,6.5);
-ax = axes(figGateway); prepare_axes(ax);
+figGateway = publication_figure(7.6,7.0);
+[ax,plotPosition] = create_centered_3d_axes(figGateway);
+prepare_axes(ax);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3),'-','Color',cGateway,'LineWidth',2.8);
 hMoon = draw_moon(ax,mu,LU);
 hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
@@ -948,13 +975,15 @@ format_case_axes(ax);
 legendHandle = legend(ax,[hGateway,hMoon,hL1,hL2], ...
     {'Nominal Gateway','Moon','L1','L2'}, ...
     'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,4); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
+format_case_legend(legendHandle,4);
+finalize_centered_3d_axes(ax,legendHandle,plotPosition);
 figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
 inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
 export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
 
-figTransfer = publication_figure(7.2,6.5);
-ax = axes(figTransfer); prepare_axes(ax);
+figTransfer = publication_figure(7.6,7.0);
+[ax,plotPosition] = create_centered_3d_axes(figTransfer);
+prepare_axes(ax);
 hDeparture = plot3(ax,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.3);
 plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3),'-','Color',cReference,'LineWidth',1.3,'HandleVisibility','off');
 hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3),'-','Color',cTransfer,'LineWidth',3.0);
@@ -965,13 +994,15 @@ hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','Marke
 hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
 format_case_axes(ax);
 legendHandle = legend(ax,[hDeparture,hTransfer,hStart,hEnd,hMoon,hL1,hL2],{'Endpoint orbits','Transfer','Start','End','Moon','L1','L2'},'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,4); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
+format_case_legend(legendHandle,4);
+finalize_centered_3d_axes(ax,legendHandle,plotPosition);
 figureFiles(2) = fullfile(outputDir,'case_low_thrust_transfer.eps');
 inspect_before_export(figTransfer,inspectFigure,'low-thrust transfer case');
 export_publication_eps(figTransfer,figureFiles(2)); close(figTransfer);
 
-figImpulse = publication_figure(7.2,6.5);
-ax = axes(figImpulse); prepare_axes(ax);
+figImpulse = publication_figure(7.6,7.0);
+[ax,plotPosition] = create_centered_3d_axes(figImpulse);
+prepare_axes(ax);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1),sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3),'--','Color',cNominal,'LineWidth',2.2);
 hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3), ...
     '-','Color',cPostImpulse,'LineWidth',3.0);
@@ -985,7 +1016,8 @@ format_case_axes(ax);
 legendHandle = legend(ax,[hNominal,hImpulse,hBurn,hMoon,hL1,hL2], ...
     {'Nominal Gateway','Post-impulse','10 m/s burn','Moon','L1','L2'}, ...
     'Location','northoutside','Orientation','horizontal');
-format_case_legend(legendHandle,3); axis(ax,'tight'); axis(ax,'vis3d'); format_case_axes(ax);
+format_case_legend(legendHandle,3);
+finalize_centered_3d_axes(ax,legendHandle,plotPosition);
 figureFiles(3) = fullfile(outputDir,'case_gateway_perilune_impulse.eps');
 inspect_before_export(figImpulse,inspectFigure,'Gateway impulse case');
 export_publication_eps(figImpulse,figureFiles(3)); close(figImpulse);
@@ -1080,6 +1112,51 @@ orbitState = bestOrbit(:,1:6);
 end
 
 
+function [ax,plotPosition] = create_centered_3d_axes(fig)
+%CENTERED_3D_AXES Use the manuscript-wide centered 3-D plot box.
+
+plotPosition = [0.17 0.26 0.66 0.50];
+ax = axes(fig,'Units','normalized','Position',plotPosition);
+ax.PositionConstraint = 'innerposition';
+end
+
+
+function finalize_centered_3d_axes(ax,legendHandle,plotPosition)
+%FINALIZE_CENTERED_3D_AXES Match the 1200-FE trajectory construction.
+
+axis(ax,'tight');
+xlim(ax,pad_axis_limits(ax.XLim,0.08));
+ylim(ax,pad_axis_limits(ax.YLim,0.10));
+zlim(ax,pad_axis_limits(ax.ZLim,0.10));
+axis(ax,'vis3d');
+
+legendHandle.Units = 'normalized';
+drawnow;
+legendPosition = legendHandle.Position;
+legendPosition(1) = 0.5-legendPosition(3)/2;
+legendPosition(2) = 0.875;
+legendHandle.Position = legendPosition;
+legendHandle.AutoUpdate = 'off';
+
+% Creating or moving a legend can shift a perspective axes. Restore the
+% same centered inner box after all legend layout operations.
+ax.PositionConstraint = 'innerposition';
+ax.Position = plotPosition;
+drawnow;
+end
+
+
+function limits = pad_axis_limits(limits,fraction)
+
+span = limits(2)-limits(1);
+if span <= 100*eps(max(1,max(abs(limits))))
+    span = max(0.02,0.05*max(1,abs(mean(limits))));
+end
+padding = fraction*span;
+limits = limits+[-padding,padding];
+end
+
+
 function prepare_axes(ax)
 
 hold(ax,'on');
@@ -1142,15 +1219,6 @@ end
 function format_case_axes(ax)
 
 format_publication_axes(ax,12);
-ax.Units = 'normalized';
-
-% Let MATLAB size the inner 3-D plot box from the rendered tick and axis
-% labels. OuterPosition reserves a consistent band above the axes for the
-% legend without forcing every viewing angle into one fixed Position.
-ax.PositionConstraint = 'outerposition';
-ax.OuterPosition = [0.02,0.04,0.96,0.80];
-drawnow;
-ax.LooseInset = max(ax.TightInset,0.035);
 end
 
 
@@ -1162,7 +1230,6 @@ legendHandle.FontSize = 12;
 legendHandle.FontWeight = 'bold';
 legendHandle.ItemTokenSize = [16,9];
 legendHandle.NumColumns = numColumns;
-place_legend_above(legendHandle,numColumns,12);
 end
 
 
