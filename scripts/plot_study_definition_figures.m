@@ -1112,7 +1112,7 @@ end
 function [ax,plotPosition] = create_centered_3d_axes(fig)
 %CENTERED_3D_AXES Use the manuscript-wide centered 3-D plot box.
 
-plotPosition = [0.14 0.22 0.72 0.60];
+plotPosition = [0.12 0.20 0.76 0.64];
 ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 end
@@ -1131,8 +1131,9 @@ legendHandle.Units = 'normalized';
 drawnow;
 legendPosition = legendHandle.Position;
 legendPosition(1) = 0.5-legendPosition(3)/2;
-legendTop = 0.965;
-legendPosition(2) = legendTop-legendPosition(4);
+legendGap = 0.012;
+legendBottom = plotPosition(2)+plotPosition(4)+legendGap;
+legendPosition(2) = min(legendBottom,0.98-legendPosition(4));
 legendHandle.Position = legendPosition;
 legendHandle.AutoUpdate = 'off';
 
@@ -1303,27 +1304,46 @@ else
     arrowStart = labelPosition;
 end
 
-draw_leader_arrow(ax,arrowStart,targetPosition,labelColor);
-
 text(ax,labelPosition(1),labelPosition(2),labelText, ...
     'Color',labelColor,'FontWeight','bold','FontSize',fontSize, ...
     'HorizontalAlignment','center','VerticalAlignment','middle', ...
     'BackgroundColor','w','Margin',0.8);
+
+% Draw after the white text box so the leader and arrowhead remain visible
+% all the way to the label in both MATLAB and the exported EPS.
+draw_leader_arrow(ax,arrowStart,targetPosition,labelColor);
 end
 
 
 function draw_leader_arrow(ax,startPosition,targetPosition,lineColor)
-%DRAW_LEADER_ARROW Draw an unscaled leader that ends at its data target.
+%DRAW_LEADER_ARROW Draw an EPS-stable leader with an explicit arrowhead.
 
 delta = targetPosition-startPosition;
-arrow = quiver(ax,startPosition(1),startPosition(2), ...
-    delta(1),delta(2),0, ...
-    'Color',lineColor, ...
-    'LineWidth',1.55, ...
-    'MaxHeadSize',0.38, ...
-    'HandleVisibility','off');
-arrow.AutoScale = 'off';
-arrow.Clipping = 'off';
+distance = norm(delta);
+if distance <= eps
+    return;
+end
+
+direction = delta/distance;
+normal = [-direction(2),direction(1)];
+headLength = min(0.13,0.20*distance);
+headHalfWidth = 0.48*headLength;
+headBase = targetPosition-headLength*direction;
+
+plot(ax,[startPosition(1),headBase(1)], ...
+    [startPosition(2),headBase(2)],'-', ...
+    'Color',lineColor,'LineWidth',1.55, ...
+    'Clipping','off','HandleVisibility','off');
+
+headX = [targetPosition(1), ...
+    headBase(1)+headHalfWidth*normal(1), ...
+    headBase(1)-headHalfWidth*normal(1)];
+headY = [targetPosition(2), ...
+    headBase(2)+headHalfWidth*normal(2), ...
+    headBase(2)-headHalfWidth*normal(2)];
+patch(ax,headX,headY,lineColor, ...
+    'EdgeColor',lineColor,'LineWidth',0.8, ...
+    'Clipping','off','HandleVisibility','off');
 end
 
 
