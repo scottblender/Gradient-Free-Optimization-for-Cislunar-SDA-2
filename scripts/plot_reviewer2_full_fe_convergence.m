@@ -3,8 +3,9 @@ function figureFiles = plot_reviewer2_full_fe_convergence(analysisDir,saveFigure
 %
 % Population-based optimizers retain their last legitimate incumbent between
 % recorded generation/batch checkpoints. Bayesian optimization retains its
-% native finer-resolution history. Values before an optimizer's first valid
-% checkpoint remain undefined and are not backfilled.
+% native finer-resolution history. For a fair visual comparison, manuscript
+% convergence plots begin at FE 60, the first FE at which every algorithm has
+% a legitimate incumbent.
 %
 % Usage:
 %   plot_reviewer2_full_fe_convergence
@@ -39,6 +40,7 @@ figureDir = fullfile(analysisDir,'paper_preview');
 if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
 figureFiles = strings(numel(missions),2);
 colors = lines(numel(optimizers));
+plotStartFE = 60;
 
 for m = 1:numel(missions)
     loaded = struct();
@@ -65,7 +67,6 @@ for m = 1:numel(missions)
 
     curveOptimizers = upper(string({loaded.curves.optimizer}));
     handles = gobjects(numel(optimizers),1);
-    firstFE = inf;
     finalFE = 0;
 
     for a = 1:numel(optimizers)
@@ -75,12 +76,13 @@ for m = 1:numel(missions)
 
         fe = double(curve.fe(:));
         meanBest = double(curve.mean(:));
-        valid = isfinite(meanBest);
-        assert(any(valid),'No finite convergence values for %s.',optimizers(a));
+        valid = isfinite(meanBest) & fe >= plotStartFE;
+        assert(any(valid), ...
+            'No finite convergence values at or after FE %d for %s.', ...
+            plotStartFE,optimizers(a));
 
         x = fe(valid);
         y = meanBest(valid);
-        firstFE = min(firstFE,x(1));
         finalFE = max(finalFE,x(end));
 
         handles(a) = stairs(ax,x,y, ...
@@ -96,7 +98,12 @@ for m = 1:numel(missions)
             'MarkerSize',4.0,'HandleVisibility','off');
     end
 
-    xlim(ax,[firstFE finalFE]);
+    xlim(ax,[plotStartFE finalFE]);
+    if finalFE <= 1200
+        xticks(ax,unique([plotStartFE,200:200:finalFE,finalFE]));
+    else
+        xticks(ax,unique([plotStartFE,1000:1000:finalFE,finalFE]));
+    end
     xlabel(ax,'Function evaluations','FontWeight','bold');
     ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
     set(ax,'FontName','Times New Roman','FontSize',12, ...
@@ -108,9 +115,9 @@ for m = 1:numel(missions)
         'Location','northoutside','Orientation','horizontal', ...
         'NumColumns',numel(optimizers),'Box','on');
     lgd.FontName = 'Times New Roman';
-    lgd.FontSize = 11;
+    lgd.FontSize = 12;
     lgd.FontWeight = 'bold';
-    lgd.ItemTokenSize = [16 9];
+    lgd.ItemTokenSize = [18 10];
 
     ax.Units = 'normalized';
     ax.PositionConstraint = 'outerposition';
