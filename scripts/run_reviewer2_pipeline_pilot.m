@@ -342,7 +342,7 @@ for mission = missions
     lgd = legend(ax,lineHandles,cellstr(optimizers), ...
         'Location','northoutside','Orientation','horizontal', ...
         'NumColumns',numel(optimizers),'Box','on');
-    format_legend(lgd,11);
+    format_legend(lgd,12);
     reserve_top_legend_space(ax);
     if saveFigures
         stem = fullfile(figureDir, ...
@@ -384,7 +384,7 @@ apply_figure_style(ax);
 lgd = legend(ax,bars,cellstr(optimizers), ...
     'Location','northoutside','Orientation','horizontal', ...
     'NumColumns',numel(optimizers),'Box','on');
-format_legend(lgd,11);
+format_legend(lgd,12);
 reserve_top_legend_space(ax);
 
 if saveFigures
@@ -462,7 +462,7 @@ end
 lgd = legend(legendBars,cellstr(optimizers), ...
     'Orientation','horizontal','NumColumns',numel(optimizers),'Box','on');
 lgd.Layout.Tile = 'north';
-format_legend(lgd,11);
+format_legend(lgd,12);
 
 if saveFigures
     export_pilot_figure(fig,fullfile(figureDir,fileStem));
@@ -629,11 +629,8 @@ lgd = legend(ax,[hEstimate hTruth hMoon hL1 hL2 hStart hEnd], ...
     {'EKF estimate','Truth trajectory','Moon','L1','L2','Start','End'}, ...
     'Location','northoutside','Orientation','horizontal', ...
     'NumColumns',4,'Box','on');
-format_legend(lgd,11);
-ax.PositionConstraint = 'outerposition';
-ax.OuterPosition = [0.02 0.04 0.96 0.84];
-drawnow;
-ax.LooseInset = max(ax.TightInset,0.035);
+format_legend(lgd,12);
+fit_3d_axes_labels(ax,0.80);
 end
 
 function fig = plot_best_ekf_errors(runState,tracking,bestRun)
@@ -730,13 +727,14 @@ colorbarHandle.Ticks = 0:nObservers;
 colorbarHandle.Label.String = 'Available observers';
 colorbarHandle.Label.FontWeight = 'bold';
 colorbarHandle.FontName = 'Times New Roman';
-colorbarHandle.FontSize = 11;
+colorbarHandle.FontSize = 12;
 colorbarHandle.FontWeight = 'bold';
+colorbarHandle.Label.FontSize = 14;
 
 lgd = legend([hErrorLegend hBoundLegend],{'EKF error','+/- 3 sigma'}, ...
     'Orientation','horizontal','NumColumns',2,'Box','on');
 lgd.Layout.Tile = 'north';
-format_legend(lgd,11);
+format_legend(lgd,12);
 end
 
 function [xL1,xL2] = collinear_lagrange_points(mu)
@@ -779,10 +777,35 @@ ax.ZLabel.FontSize = 14;
 end
 
 function format_legend(lgd,fontSize)
+fontSize = max(12,fontSize);
 lgd.FontName = 'Times New Roman';
 lgd.FontSize = fontSize;
 lgd.FontWeight = 'bold';
-lgd.ItemTokenSize = [16 9];
+lgd.ItemTokenSize = [18 10];
+end
+
+function fit_3d_axes_labels(ax,topLimit)
+% Reserve margins from the actual rendered tick/axis-label extents. This is
+% intentionally data dependent: low-thrust and impulsive cases use different
+% tick strings/ranges, so a fixed axes margin can clip y (LU) after rotation.
+if nargin < 2 || isempty(topLimit), topLimit = 0.82; end
+drawnow;
+oldUnits = ax.Units;
+ax.Units = 'normalized';
+ax.PositionConstraint = 'innerposition';
+for pass = 1:2
+    tight = max(ax.TightInset,0);
+    left = max(0.055,tight(1)+0.025);
+    bottom = max(0.055,tight(2)+0.025);
+    right = max(0.035,tight(3)+0.025);
+    topMargin = max(0.030,tight(4)+0.015);
+    upper = min(topLimit,1-topMargin);
+    width = max(0.30,1-left-right);
+    height = max(0.30,upper-bottom);
+    ax.Position = [left bottom width height];
+    drawnow;
+end
+ax.Units = oldUnits;
 end
 
 function reserve_top_legend_space(ax)
