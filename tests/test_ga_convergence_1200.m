@@ -121,6 +121,7 @@ plot(ax,double(H.fe),double(H.bestJ),'o', ...
     'MarkerSize',4.5,'HandleVisibility','off');
 
 xlim(ax,[H.fe(1) budget]);
+xticks(ax,unique([double(H.fe(1)):120:budget,budget]));
 xlabel(ax,'Function evaluations','FontWeight','bold');
 ylabel(ax,'Best-so-far objective','FontWeight','bold');
 set(ax,'FontName','Times New Roman','FontSize',12, ...
@@ -129,8 +130,10 @@ ax.XLabel.FontSize = 14;
 ax.YLabel.FontSize = 14;
 
 figureStem = fullfile(testRoot,'ga_convergence_1200');
-print(fig,[figureStem '.eps'],'-depsc','-painters');
-exportgraphics(fig,[figureStem '.png'],'Resolution',300);
+figureEPS = [figureStem '.eps'];
+figurePNG = [figureStem '.png'];
+print(fig,figureEPS,'-depsc','-painters');
+exportgraphics(fig,figurePNG,'Resolution',300);
 
 expandedHistory = table(feGrid,bestGrid, ...
     'VariableNames',{'fe','bestJ'});
@@ -141,8 +144,8 @@ writetable(H,fullfile(testRoot,'ga_convergence_1200_recorded.csv'));
 report = struct();
 report.testRoot = string(testRoot);
 report.runDirectory = string(runDir);
-report.figureEPS = string(figureStem+'.eps');
-report.figurePNG = string(figureStem+'.png');
+report.figureEPS = string(figureEPS);
+report.figurePNG = string(figurePNG);
 report.recordedHistory = H;
 report.expandedHistory = expandedHistory;
 report.bestJ = runState.bestJ;
