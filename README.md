@@ -150,9 +150,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\batch\run_base
 ```
 
 Without overrides, the baseline pilot performs three 120-FE GA runs (one per
-fixed target case), and the comparison pilot performs fifteen 120-FE runs
+fixed target case), and the comparison pilot performs fifteen 1200-FE runs
 (five optimizers by three target cases), all with optimizer seed 0. Pilot output
-is isolated under `BASELINE_PILOT` and `COMPARISON_PILOT`, so it cannot be
+is isolated under `BASELINE_PILOT` and `COMPARISON_PILOT_1200`, so it cannot be
 mistaken for the manuscript study.
 
 For one end-to-end check of the comparison pipeline, including all five
@@ -162,24 +162,31 @@ optimizers, all three fixed cases, and seeds 0--2, run:
 report = run_reviewer2_pipeline_pilot;
 ```
 
-This launches or resumes 45 parallel runs at 120 FE, processes and validates
+This launches or resumes 45 parallel runs at 1200 FE, processes and validates
 every saved result, prints mean +/- sample-standard-deviation tables, and
 creates EPS/PNG convergence, objective, runtime, and cost-component previews.
 For each target case, it also identifies the lowest-objective run across all
 optimizers and seeds and plots its truth/estimate trajectory and integrated EKF
 error, +/- 3-sigma, and available-observer diagnostics. The selected runs are
 recorded in `pilot_best_observed_runs.csv`; figures are saved under the newest
-`COMPARISON_PILOT/FE_DATA_*/paper_preview` folder. To reprocess completed runs without launching MATLAB workers again,
-use `run_reviewer2_pipeline_pilot(false,true)`. These are explicitly pilot
+`COMPARISON_PILOT_1200/FE_DATA_*/paper_preview` folder. To reprocess completed
+runs without launching MATLAB workers again, use `run_reviewer2_pipeline_pilot(false,true)`. These are explicitly pilot
 statistics; the full 20-seed study must replace them in the manuscript.
+
+To regenerate only the centered, label-safe best-run trajectory panels from the
+newest processed 1200-FE pilot, run:
+
+```matlab
+plot_reviewer2_best_trajectories;
+```
 
 Process the one-seed comparison pilot manually with:
 
 ```matlab
 paths = setup_project();
 process_fe_convergence( ...
-    fullfile(paths.runs,'COMPARISON_PILOT'), ...
-    "reviewer2_comparison_pilot_v1",0,120,false);
+    fullfile(paths.runs,'COMPARISON_PILOT_1200'), ...
+    "reviewer2_comparison_pilot_1200_v1",0,1200,false);
 ```
 
 After the studies finish, aggregate the data and convergence histories with:
@@ -211,7 +218,7 @@ than inventing values, and saves aggregate data without saving figures.
 | Transfer truth cache | `data/cache/transfers/` |
 | Individual optimization runs | `results/runs/<timestamp>/...` |
 | PowerShell baseline pilot | `results/runs/BASELINE_PILOT/runs_GA/...` |
-| PowerShell comparison pilot | `results/runs/COMPARISON_PILOT/runs_<algorithm>/...` |
+| PowerShell comparison pilot | `results/runs/COMPARISON_PILOT_1200/runs_<algorithm>/...` |
 | PowerShell baseline study | `results/runs/BASELINE/runs_GA/...` |
 | PowerShell comparison study | `results/runs/COMPARISON/runs_<algorithm>/...` |
 | Orbit catalog figures | `results/database_figs/` |
