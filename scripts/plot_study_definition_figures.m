@@ -298,10 +298,10 @@ for groupIndex = 1:numel(familyGroups)
             moonRadius*sin(angle),cMoon, ...
             'EdgeColor','none','HandleVisibility','off');
         moonHandle = plot(ax,1-mu,0,'o', ...
-            'MarkerSize',7, ...
+            'MarkerSize',5, ...
             'MarkerFaceColor',cMoon, ...
             'MarkerEdgeColor','k', ...
-            'LineWidth',1.0);
+            'LineWidth',0.9);
         uistack(moonHandle,'top');
 
         legendHandles = [droHandle;moonHandle];
@@ -447,6 +447,13 @@ legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hMoon], ...
 legendHandle.NumColumns = 3;
 legendHandle.Box = 'on';
 finalize_centered_3d_axes(ax,legendHandle,plotPosition);
+
+% The projected x axis is short for this representative NRHO. Retain the
+% endpoints of MATLAB's useful tick range and remove the crowded midpoint.
+xTicks = ax.XTick;
+if numel(xTicks)>2
+    ax.XTick = xTicks([1,end]);
+end
 
 geometryFile = fullfile(outputDir,'slot_geometry_equal_time.eps');
 inspect_before_export(figGeometry,inspectFigure, ...
@@ -636,16 +643,18 @@ text(ax,body(1),body(2)-1.16,'Body b', ...
 
 % Keep the angular labels outside the shaded geometry. Each leader points
 % to the middle of the arc represented by that label.
+% Point every angular leader at the geometric midpoint of its own arc.
+% Label offsets are then defined relative to those exact arc points.
 occArcPoint = observer + ...
-    0.95*[cos(0.55*thetaOcc),sin(0.55*thetaOcc)];
+    0.95*[cos(0.5*thetaOcc),sin(0.5*thetaOcc)];
 keepoutArcPoint = observer + ...
-    1.48*[cos(0.62*thetaKeepout),sin(0.62*thetaKeepout)];
+    1.48*[cos(0.5*thetaKeepout),sin(0.5*thetaKeepout)];
 targetArcPoint = observer + ...
-    2.10*[cos(0.72*thetaB),sin(0.72*thetaB)];
+    2.10*[cos(0.5*thetaB),sin(0.5*thetaB)];
 
-occLabel = observer + [1.05,-0.62];
-keepoutLabel = observer + [1.15,1.10];
-targetAngleLabel = observer + [2.35,1.18];
+occLabel = occArcPoint + [-0.08,-0.55];
+keepoutLabel = keepoutArcPoint + [-0.55,0.55];
+targetAngleLabel = targetArcPoint + [0.35,0.42];
 
 draw_text_callout(ax,occLabel,occArcPoint, ...
     '\theta_{occ,b}',cOcc,16);
@@ -1299,7 +1308,8 @@ direction = targetPosition-labelPosition;
 distance = norm(direction);
 
 if distance > 0
-    arrowStart = labelPosition + 0.46*direction/distance;
+    leaderOffset = min(0.22,0.30*distance);
+    arrowStart = labelPosition + leaderOffset*direction/distance;
 else
     arrowStart = labelPosition;
 end
