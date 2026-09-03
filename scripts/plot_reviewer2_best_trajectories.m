@@ -161,7 +161,7 @@ fig = figure('Color','w','Units','inches','Position',[1 1 7.6 7.0], ...
     'Renderer','painters','InvertHardcopy','off');
 movegui(fig,'center');
 
-plotPosition = [0.17 0.26 0.66 0.50];
+plotPosition = [0.14 0.22 0.72 0.60];
 ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 hold(ax,'on');
@@ -233,7 +233,8 @@ lgd.Units = 'normalized';
 drawnow;
 legendPosition = lgd.Position;
 legendPosition(1) = 0.5-legendPosition(3)/2;
-legendPosition(2) = 0.875;
+legendTop = 0.965;
+legendPosition(2) = legendTop-legendPosition(4);
 lgd.Position = legendPosition;
 lgd.AutoUpdate = 'off';
 
