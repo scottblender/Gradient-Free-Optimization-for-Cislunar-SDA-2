@@ -166,7 +166,8 @@ function Invoke-MatlabRun {
 
 # Reviewer-facing extended optimizer comparison:
 # 4 scalable methods x 3 target cases x 20 seeds = 240 runs by default.
-# Bayesian optimization is handled separately by run_bayesian_1200_soo.ps1.
+# The five-method 1200-FE runtime comparison is handled separately by
+# run_runtime_comparison_1200_soo.ps1.
 $StudyId = "reviewer2_comparison_v1"
 $StudyFolder = "COMPARISON"
 $Algs = @("GA", "PSO", "ABC", "ACO")
