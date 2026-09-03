@@ -1,4 +1,4 @@
-function figureFiles = plot_reviewer2_best_trajectories(analysisDir,saveFigures)
+function figureFiles = plot_reviewer2_best_trajectories(analysisDir,saveFigures,bestRuns)
 %PLOT_REVIEWER2_BEST_TRAJECTORIES Regenerate centered best-run trajectories.
 %
 % This plotting-only helper uses the processed Reviewer 2 pilot outputs and
@@ -11,6 +11,7 @@ function figureFiles = plot_reviewer2_best_trajectories(analysisDir,saveFigures)
 %   plot_reviewer2_best_trajectories
 %   plot_reviewer2_best_trajectories(analysisDir)
 %   plot_reviewer2_best_trajectories(analysisDir,false)
+%   plot_reviewer2_best_trajectories(analysisDir,true,bestRuns)
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
 validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
@@ -25,13 +26,13 @@ else
 end
 assert(isfolder(analysisDir),'Analysis directory does not exist: %s',analysisDir);
 
-bestRunFile = fullfile(analysisDir,'pilot_best_observed_runs.csv');
-assert(isfile(bestRunFile),'Missing best-run table: %s',bestRunFile);
-bestRuns = readtable(bestRunFile,'TextType','string', ...
-    'VariableNamingRule','preserve');
-required = ["Mission","Optimizer","Seed","OptimizationRunFile","TrackingDataFile"];
-assert(all(ismember(required,string(bestRuns.Properties.VariableNames))), ...
-    'Best-run table is missing required trajectory fields.');
+if nargin < 3 || isempty(bestRuns)
+    bestRunFile = fullfile(analysisDir,'pilot_best_observed_runs.csv');
+    assert(isfile(bestRunFile),'Missing best-run table: %s',bestRunFile);
+    bestRuns = readtable(bestRunFile,'TextType','string', ...
+        'VariableNamingRule','preserve');
+end
+bestRuns = standardize_best_run_table(bestRuns,analysisDir);
 
 figureDir = fullfile(analysisDir,'paper_preview');
 if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
@@ -55,6 +56,90 @@ fprintf('Centered Reviewer 2 trajectory plots complete.\n');
 if saveFigures
     fprintf('Figures saved under:\n%s\n',figureDir);
 end
+end
+
+function bestRuns = standardize_best_run_table(bestRuns,analysisDir)
+% Accept the in-memory pipeline table and recover paths from processed data
+% when an older CSV contains only the displayed best-run columns.
+assert(istable(bestRuns),'bestRuns must be a table.');
+baseColumns = ["Mission","Optimizer","Seed"];
+[bestRuns,baseFound] = rename_columns(bestRuns,baseColumns);
+assert(all(baseFound), ...
+    'Best-run table is missing Mission, Optimizer, or Seed.');
+
+pathColumns = ["OptimizationRunFile","TrackingDataFile"];
+[bestRuns,pathFound] = rename_columns(bestRuns,pathColumns);
+if ~all(pathFound)
+    summaryFile = fullfile(analysisDir,'FE_summary.csv');
+    metricsFile = fullfile(analysisDir,'final_run_metrics.csv');
+    assert(isfile(summaryFile) && isfile(metricsFile), ...
+        'Cannot recover trajectory paths from the processed pilot data.');
+
+    summary = readtable(summaryFile,'TextType','string', ...
+        'VariableNamingRule','preserve');
+    metrics = readtable(metricsFile,'TextType','string', ...
+        'VariableNamingRule','preserve');
+    [summary,summaryFound] = rename_columns( ...
+        summary,["comparison_key","optimizer","mission"]);
+    [metrics,metricsFound] = rename_columns( ...
+        metrics,["comparison_key","optimizer","seed","run_file"]);
+    assert(all(summaryFound) && all(metricsFound), ...
+        'Processed pilot tables are missing path-recovery fields.');
+
+    optimizationFiles = strings(height(bestRuns),1);
+    trackingFiles = strings(height(bestRuns),1);
+    for k = 1:height(bestRuns)
+        summaryRow = summary( ...
+            upper(string(summary.mission)) == upper(string(bestRuns.Mission(k))) & ...
+            upper(string(summary.optimizer)) == upper(string(bestRuns.Optimizer(k))),:);
+        assert(height(summaryRow) == 1, ...
+            'Cannot identify one comparison group for %s/%s.', ...
+            string(bestRuns.Mission(k)),string(bestRuns.Optimizer(k)));
+
+        metricSeeds = str2double(string(metrics.seed));
+        selectedSeed = str2double(string(bestRuns.Seed(k)));
+        metricRow = metrics( ...
+            string(metrics.comparison_key) == string(summaryRow.comparison_key) & ...
+            upper(string(metrics.optimizer)) == upper(string(bestRuns.Optimizer(k))) & ...
+            metricSeeds == selectedSeed,:);
+        assert(height(metricRow) == 1, ...
+            'Cannot identify one saved run for %s/%s/seed %d.', ...
+            string(bestRuns.Mission(k)),string(bestRuns.Optimizer(k)), ...
+            selectedSeed);
+
+        optimizationFiles(k) = string(metricRow.run_file);
+        trackingFiles(k) = string(fullfile( ...
+            fileparts(optimizationFiles(k)),'tracking_data.mat'));
+    end
+    bestRuns.OptimizationRunFile = optimizationFiles;
+    bestRuns.TrackingDataFile = trackingFiles;
+end
+
+required = [baseColumns pathColumns];
+assert(all(ismember(required,string(bestRuns.Properties.VariableNames))), ...
+    'Best-run table could not be standardized for trajectory plotting.');
+end
+
+function [T,found] = rename_columns(T,desiredNames)
+found = false(size(desiredNames));
+actualNames = string(T.Properties.VariableNames);
+actualKeys = canonical_names(actualNames);
+desiredKeys = canonical_names(desiredNames);
+for k = 1:numel(desiredNames)
+    matches = find(actualKeys == desiredKeys(k));
+    assert(numel(matches) <= 1, ...
+        'Table contains ambiguous columns matching %s.',desiredNames(k));
+    if numel(matches) == 1
+        T.Properties.VariableNames{matches} = char(desiredNames(k));
+        actualNames(matches) = desiredNames(k);
+        actualKeys(matches) = desiredKeys(k);
+        found(k) = true;
+    end
+end
+end
+
+function keys = canonical_names(names)
+keys = lower(regexprep(string(names),'[^A-Za-z0-9]',''));
 end
 
 function fig = make_trajectory_figure(runState,tracking)
