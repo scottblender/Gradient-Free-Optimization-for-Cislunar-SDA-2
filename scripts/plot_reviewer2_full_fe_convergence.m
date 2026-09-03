@@ -12,9 +12,9 @@ function figureFiles = plot_reviewer2_full_fe_convergence(analysisDir,saveFigure
 %   plot_reviewer2_full_fe_convergence(analysisDir,false)
 %
 % With no analysisDir, the newest FE_DATA_* directory under
-% results/COMPARISON_PILOT is used. Saved figures overwrite the corresponding
-% pilot_convergence_*.eps/png files in that analysis directory's paper_preview
-% folder so the result can be compared directly with the existing preview.
+% results/COMPARISON_PILOT_1200 is used. Saved figures overwrite the
+% corresponding pilot_convergence_*.eps/png files in that analysis
+% directory's paper_preview folder.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
 validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
@@ -22,7 +22,7 @@ saveFigures = logical(saveFigures);
 
 paths = setup_project();
 if nargin < 1 || isempty(analysisDir)
-    pilotRoot = fullfile(paths.results,'COMPARISON_PILOT');
+    pilotRoot = fullfile(paths.results,'COMPARISON_PILOT_1200');
     analysisDir = newest_analysis_directory(pilotRoot);
 else
     analysisDir = char(string(analysisDir));
