@@ -1,10 +1,11 @@
 function figureFiles = plot_reviewer2_best_trajectories(analysisDir,saveFigures)
-%PLOT_REVIEWER2_BEST_TRAJECTORIES Regenerate label-safe best-run trajectories.
+%PLOT_REVIEWER2_BEST_TRAJECTORIES Regenerate centered best-run trajectories.
 %
 % This plotting-only helper uses the processed Reviewer 2 pilot outputs and
 % does not rerun any optimization. It matches the study-definition CR3BP
 % camera (perspective, view(-37.5,30)), emphasizes the EKF estimate, and
-% keeps all rendered x/y/z labels inside the export canvas.
+% uses a centered 3-D plotting region with explicit margins so the projected
+% x/y/z axis labels remain inside the export canvas.
 %
 % Usage:
 %   plot_reviewer2_best_trajectories
@@ -50,7 +51,7 @@ for k = 1:height(bestRuns)
     end
 end
 
-fprintf('Label-safe Reviewer 2 trajectory plots complete.\n');
+fprintf('Centered Reviewer 2 trajectory plots complete.\n');
 if saveFigures
     fprintf('Figures saved under:\n%s\n',figureDir);
 end
@@ -65,16 +66,18 @@ moonCenter = [1-mu,0,0];
 moonRadius = 1737.1/LU;
 [xL1,xL2] = collinear_lagrange_points(mu);
 
-fig = figure('Color','w','Units','inches','Position',[1 1 7.6 6.8], ...
-    'PaperUnits','inches','PaperSize',[7.6 6.8], ...
-    'PaperPosition',[0 0 7.6 6.8],'PaperPositionMode','manual', ...
+% A slightly taller canvas and a deliberately centered inner plotting box
+% are more reliable for MATLAB perspective axes than TightInset-based
+% correction. The box is symmetric left/right and leaves a substantial
+% lower margin for projected x/y labels.
+fig = figure('Color','w','Units','inches','Position',[1 1 7.6 7.0], ...
+    'PaperUnits','inches','PaperSize',[7.6 7.0], ...
+    'PaperPosition',[0 0 7.6 7.0],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
 movegui(fig,'center');
 
-% Use an intentionally conservative inner box for 3-D perspective axes.
-% MATLAB TightInset is unreliable for rotated 3-D axis labels, so the
-% rendered label extents are checked separately below as a final guard.
-ax = axes(fig,'Units','normalized','Position',[0.14 0.17 0.79 0.62]);
+plotPosition = [0.17 0.22 0.66 0.55];
+ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 hold(ax,'on');
 box(ax,'on');
@@ -131,59 +134,28 @@ ax.XLabel.FontSize = 14;
 ax.YLabel.FontSize = 14;
 ax.ZLabel.FontSize = 14;
 
+% Create the legend, then explicitly restore the centered axes Position.
+% This prevents northoutside legend layout from shifting/shrinking the 3-D
+% axes differently for different trajectory geometries.
 lgd = legend(ax,[hEstimate hTruth hMoon hL1 hL2 hStart hEnd], ...
     {'EKF estimate','Truth trajectory','Moon','L1','L2','Start','End'}, ...
-    'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',4,'Box','on');
+    'Orientation','horizontal','NumColumns',4,'Box','on');
 lgd.FontName = 'Times New Roman';
 lgd.FontSize = 12;
 lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [18 10];
-
+lgd.Units = 'normalized';
 drawnow;
-keep_axis_labels_inside_canvas(ax,0.035,0.82);
-end
+legendPosition = lgd.Position;
+legendPosition(1) = 0.5-legendPosition(3)/2;
+legendPosition(2) = 0.875;
+lgd.Position = legendPosition;
+lgd.AutoUpdate = 'off';
 
-function keep_axis_labels_inside_canvas(ax,guard,topLimit)
-% Move rendered 3-D axis-label text only when it crosses the figure canvas.
-% Label extents are converted from axes-normalized units to figure-normalized
-% units, making the correction responsive to the actual tick labels/view.
-labels = [ax.XLabel ax.YLabel ax.ZLabel];
-ax.Units = 'normalized';
-for pass = 1:3
-    drawnow;
-    axPos = ax.Position;
-    for k = 1:numel(labels)
-        label = labels(k);
-        label.Units = 'normalized';
-        drawnow;
-        extent = label.Extent;
-        pos = label.Position;
-        figExtent = [ ...
-            axPos(1)+extent(1)*axPos(3), ...
-            axPos(2)+extent(2)*axPos(4), ...
-            extent(3)*axPos(3), ...
-            extent(4)*axPos(4)];
-
-        dx = 0;
-        dy = 0;
-        if figExtent(1) < guard
-            dx = dx + (guard-figExtent(1))/axPos(3);
-        end
-        if figExtent(1)+figExtent(3) > 1-guard
-            dx = dx - (figExtent(1)+figExtent(3)-(1-guard))/axPos(3);
-        end
-        if figExtent(2) < guard
-            dy = dy + (guard-figExtent(2))/axPos(4);
-        end
-        if figExtent(2)+figExtent(4) > topLimit
-            dy = dy - (figExtent(2)+figExtent(4)-topLimit)/axPos(4);
-        end
-        pos(1) = pos(1)+dx;
-        pos(2) = pos(2)+dy;
-        label.Position = pos;
-    end
-end
+% Force the same centered plotting box after legend creation. This is the
+% key step that keeps the projected axes centered on the page.
+ax.Position = plotPosition;
+drawnow;
 end
 
 function [xL1,xL2] = collinear_lagrange_points(mu)
