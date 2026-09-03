@@ -132,7 +132,8 @@ plot_grouped_result(paperResults,missions,optimizers, ...
     'pilot_runtime',figureDir,saveFigures);
 plot_cost_component_preview( ...
     paperResults,missions,optimizers,figureDir,saveFigures);
-plot_best_run_tracking(bestRuns,figureDir,saveFigures);
+plot_best_run_ekf_errors(bestRuns,figureDir,saveFigures);
+plot_reviewer2_best_trajectories(analysisDir,saveFigures);
 
 report = struct();
 report.studyID = studyID;
@@ -528,7 +529,7 @@ bestRuns = table( ...
     'OptimizationRunFile','TrackingDataFile'});
 end
 
-function plot_best_run_tracking(bestRuns,figureDir,saveFigures)
+function plot_best_run_ekf_errors(bestRuns,figureDir,saveFigures)
 for k = 1:height(bestRuns)
     stateData = load(bestRuns.OptimizationRunFile(k),'runState');
     trackingData = load(bestRuns.TrackingDataFile(k),'tracking');
@@ -541,96 +542,15 @@ for k = 1:height(bestRuns)
     assert(size(tracking.covariance,1) == numel(tracking.t_TU), ...
         'Tracking covariance length is inconsistent.');
 
-    trajectoryFig = plot_best_trajectory( ...
-        runState,tracking,bestRuns(k,:));
     errorFig = plot_best_ekf_errors( ...
         runState,tracking,bestRuns(k,:));
 
     if saveFigures
         code = mission_code(bestRuns.Mission(k));
-        export_pilot_figure(trajectoryFig, ...
-            fullfile(figureDir,"pilot_best_trajectory_"+code));
         export_pilot_figure(errorFig, ...
             fullfile(figureDir,"pilot_best_ekf_errors_"+code));
     end
 end
-end
-
-function fig = plot_best_trajectory(runState,tracking,bestRun)
-truth = tracking.truth(:,1:3);
-estimate = tracking.estimate(:,1:3);
-mu = runState.settings.mu;
-LU = runState.settings.LU;
-moonCenter = [1-mu,0,0];
-moonRadius = 1737.1/LU;
-[xL1,xL2] = collinear_lagrange_points(mu);
-
-% Match the manuscript study-definition target-case figures exactly:
-% perspective projection and view(-37.5,30).
-fig = create_paper_figure(7.2,6.2, ...
-    mission_label(bestRun.Mission)+" best-run trajectory");
-ax = axes(fig);
-hold(ax,'on');
-box(ax,'on');
-axis(ax,'equal');
-
-% Plot the truth first and de-emphasize it. The estimate is the result of
-% interest, so it is drawn second, solid, thicker, and visually dominant.
-hTruth = plot3(ax,truth(:,1),truth(:,2),truth(:,3), ...
-    '--','Color',[0.55 0.55 0.55],'LineWidth',1.25, ...
-    'DisplayName','Truth trajectory');
-hEstimate = plot3(ax,estimate(:,1),estimate(:,2),estimate(:,3), ...
-    '-','Color',[0.00 0.28 0.85],'LineWidth',2.9, ...
-    'DisplayName','EKF estimate');
-
-[sx,sy,sz] = sphere(30);
-hMoon = surf(ax,moonCenter(1)+moonRadius*sx, ...
-    moonCenter(2)+moonRadius*sy,moonCenter(3)+moonRadius*sz, ...
-    'FaceColor',[0.72 0.72 0.72], ...
-    'EdgeColor','none','FaceLighting','gouraud', ...
-    'DisplayName','Moon');
-camlight(ax,'headlight');
-material(ax,'dull');
-
-hL1 = plot3(ax,xL1,0,0,'^','MarkerSize',9, ...
-    'MarkerFaceColor',[0.80 0.80 0.80], ...
-    'MarkerEdgeColor','k','LineWidth',1.1, ...
-    'DisplayName','L1');
-hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',9, ...
-    'MarkerFaceColor',[0.80 0.80 0.80], ...
-    'MarkerEdgeColor','k','LineWidth',1.1, ...
-    'DisplayName','L2');
-hStart = plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
-    'MarkerSize',8,'MarkerFaceColor',[0.20 0.70 0.25], ...
-    'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','Start');
-hEnd = plot3(ax,truth(end,1),truth(end,2),truth(end,3),'s', ...
-    'MarkerSize',8,'MarkerFaceColor',[0.20 0.35 0.90], ...
-    'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','End');
-
-allPoints = [truth;estimate;moonCenter; ...
-    moonCenter+[moonRadius 0 0];moonCenter-[moonRadius 0 0]; ...
-    moonCenter+[0 moonRadius 0];moonCenter-[0 moonRadius 0]; ...
-    moonCenter+[0 0 moonRadius];moonCenter-[0 0 moonRadius]; ...
-    xL1 0 0;xL2 0 0];
-xlim(ax,padded_limits(allPoints(:,1),0.08));
-ylim(ax,padded_limits(allPoints(:,2),0.10));
-zlim(ax,padded_limits(allPoints(:,3),0.10));
-axis(ax,'vis3d');
-ax.Projection = 'perspective';
-view(ax,-37.5,30);
-grid(ax,'off');
-
-xlabel(ax,'x (LU)','FontWeight','bold');
-ylabel(ax,'y (LU)','FontWeight','bold');
-zlabel(ax,'z (LU)','FontWeight','bold');
-apply_figure_style(ax);
-
-lgd = legend(ax,[hEstimate hTruth hMoon hL1 hL2 hStart hEnd], ...
-    {'EKF estimate','Truth trajectory','Moon','L1','L2','Start','End'}, ...
-    'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',4,'Box','on');
-format_legend(lgd,12);
-fit_3d_axes_labels(ax,0.80);
 end
 
 function fig = plot_best_ekf_errors(runState,tracking,bestRun)
@@ -737,14 +657,6 @@ lgd.Layout.Tile = 'north';
 format_legend(lgd,12);
 end
 
-function [xL1,xL2] = collinear_lagrange_points(mu)
-equilibrium = @(x) x ...
-    -(1-mu)*(x+mu)./abs(x+mu).^3 ...
-    -mu*(x-1+mu)./abs(x-1+mu).^3;
-xL1 = fzero(equilibrium,1-mu-0.15);
-xL2 = fzero(equilibrium,1-mu+0.15);
-end
-
 function limits = padded_limits(values,fraction)
 values = values(isfinite(values));
 assert(~isempty(values),'Cannot size axes from empty data.');
@@ -782,30 +694,6 @@ lgd.FontName = 'Times New Roman';
 lgd.FontSize = fontSize;
 lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [18 10];
-end
-
-function fit_3d_axes_labels(ax,topLimit)
-% Reserve margins from the actual rendered tick/axis-label extents. This is
-% intentionally data dependent: low-thrust and impulsive cases use different
-% tick strings/ranges, so a fixed axes margin can clip y (LU) after rotation.
-if nargin < 2 || isempty(topLimit), topLimit = 0.82; end
-drawnow;
-oldUnits = ax.Units;
-ax.Units = 'normalized';
-ax.PositionConstraint = 'innerposition';
-for pass = 1:2
-    tight = max(ax.TightInset,0);
-    left = max(0.055,tight(1)+0.025);
-    bottom = max(0.055,tight(2)+0.025);
-    right = max(0.035,tight(3)+0.025);
-    topMargin = max(0.030,tight(4)+0.015);
-    upper = min(topLimit,1-topMargin);
-    width = max(0.30,1-left-right);
-    height = max(0.30,upper-bottom);
-    ax.Position = [left bottom width height];
-    drawnow;
-end
-ax.Units = oldUnits;
 end
 
 function reserve_top_legend_space(ax)
