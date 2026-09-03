@@ -133,7 +133,7 @@ plot_grouped_result(paperResults,missions,optimizers, ...
 plot_cost_component_preview( ...
     paperResults,missions,optimizers,figureDir,saveFigures);
 plot_best_run_ekf_errors(bestRuns,figureDir,saveFigures);
-plot_reviewer2_best_trajectories(analysisDir,saveFigures);
+plot_reviewer2_best_trajectories(analysisDir,saveFigures,bestRuns);
 
 report = struct();
 report.studyID = studyID;
