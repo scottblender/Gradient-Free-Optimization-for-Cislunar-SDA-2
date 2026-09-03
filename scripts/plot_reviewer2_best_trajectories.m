@@ -69,14 +69,14 @@ moonRadius = 1737.1/LU;
 % A slightly taller canvas and a deliberately centered inner plotting box
 % are more reliable for MATLAB perspective axes than TightInset-based
 % correction. The box is symmetric left/right and leaves a substantial
-% lower margin for projected x/y labels.
+% lower margin for projected x/y labels, including long negative tick labels.
 fig = figure('Color','w','Units','inches','Position',[1 1 7.6 7.0], ...
     'PaperUnits','inches','PaperSize',[7.6 7.0], ...
     'PaperPosition',[0 0 7.6 7.0],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
 movegui(fig,'center');
 
-plotPosition = [0.17 0.22 0.66 0.55];
+plotPosition = [0.17 0.26 0.66 0.50];
 ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 hold(ax,'on');
