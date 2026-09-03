@@ -175,11 +175,11 @@ $ObserverCounts = @(3)
 $GatewayPeriods = @(1)
 
 if ($Pilot) {
-    if (-not $PSBoundParameters.ContainsKey("EvalBudget")) { $EvalBudget = 120 }
+    if (-not $PSBoundParameters.ContainsKey("EvalBudget")) { $EvalBudget = 1200 }
     if (-not $PSBoundParameters.ContainsKey("Seeds")) { $Seeds = @(0) }
 
-    $StudyId = "reviewer2_comparison_pilot_v1"
-    $StudyFolder = "COMPARISON_PILOT"
+    $StudyId = "reviewer2_comparison_pilot_1200_v1"
+    $StudyFolder = "COMPARISON_PILOT_1200"
 }
 
 $ComparisonRoot = Join-Path (Join-Path $ProjectRoot "results") $StudyFolder
