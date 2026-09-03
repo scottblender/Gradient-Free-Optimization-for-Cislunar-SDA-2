@@ -1,0 +1,246 @@
+function figureFiles = plot_reviewer2_best_trajectories(analysisDir,saveFigures)
+%PLOT_REVIEWER2_BEST_TRAJECTORIES Regenerate label-safe best-run trajectories.
+%
+% This plotting-only helper uses the processed Reviewer 2 pilot outputs and
+% does not rerun any optimization. It matches the study-definition CR3BP
+% camera (perspective, view(-37.5,30)), emphasizes the EKF estimate, and
+% keeps all rendered x/y/z labels inside the export canvas.
+%
+% Usage:
+%   plot_reviewer2_best_trajectories
+%   plot_reviewer2_best_trajectories(analysisDir)
+%   plot_reviewer2_best_trajectories(analysisDir,false)
+
+if nargin < 2 || isempty(saveFigures), saveFigures = true; end
+validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
+saveFigures = logical(saveFigures);
+
+paths = setup_project();
+if nargin < 1 || isempty(analysisDir)
+    pilotRoot = fullfile(paths.results,'COMPARISON_PILOT_1200');
+    analysisDir = newest_analysis_directory(pilotRoot);
+else
+    analysisDir = char(string(analysisDir));
+end
+assert(isfolder(analysisDir),'Analysis directory does not exist: %s',analysisDir);
+
+bestRunFile = fullfile(analysisDir,'pilot_best_observed_runs.csv');
+assert(isfile(bestRunFile),'Missing best-run table: %s',bestRunFile);
+bestRuns = readtable(bestRunFile,'TextType','string', ...
+    'VariableNamingRule','preserve');
+required = ["Mission","Optimizer","Seed","OptimizationRunFile","TrackingDataFile"];
+assert(all(ismember(required,string(bestRuns.Properties.VariableNames))), ...
+    'Best-run table is missing required trajectory fields.');
+
+figureDir = fullfile(analysisDir,'paper_preview');
+if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
+figureFiles = strings(height(bestRuns),2);
+
+for k = 1:height(bestRuns)
+    stateData = load(bestRuns.OptimizationRunFile(k),'runState');
+    trackingData = load(bestRuns.TrackingDataFile(k),'tracking');
+    fig = make_trajectory_figure(stateData.runState,trackingData.tracking);
+
+    if saveFigures
+        code = mission_code(bestRuns.Mission(k));
+        stem = fullfile(figureDir,"pilot_best_trajectory_"+code);
+        export_trajectory_figure(fig,stem);
+        figureFiles(k,1) = stem+".eps";
+        figureFiles(k,2) = stem+".png";
+    end
+end
+
+fprintf('Label-safe Reviewer 2 trajectory plots complete.\n');
+if saveFigures
+    fprintf('Figures saved under:\n%s\n',figureDir);
+end
+end
+
+function fig = make_trajectory_figure(runState,tracking)
+truth = tracking.truth(:,1:3);
+estimate = tracking.estimate(:,1:3);
+mu = runState.settings.mu;
+LU = runState.settings.LU;
+moonCenter = [1-mu,0,0];
+moonRadius = 1737.1/LU;
+[xL1,xL2] = collinear_lagrange_points(mu);
+
+fig = figure('Color','w','Units','inches','Position',[1 1 7.6 6.8], ...
+    'PaperUnits','inches','PaperSize',[7.6 6.8], ...
+    'PaperPosition',[0 0 7.6 6.8],'PaperPositionMode','manual', ...
+    'Renderer','painters','InvertHardcopy','off');
+movegui(fig,'center');
+
+% Use an intentionally conservative inner box for 3-D perspective axes.
+% MATLAB TightInset is unreliable for rotated 3-D axis labels, so the
+% rendered label extents are checked separately below as a final guard.
+ax = axes(fig,'Units','normalized','Position',[0.14 0.17 0.79 0.62]);
+ax.PositionConstraint = 'innerposition';
+hold(ax,'on');
+box(ax,'on');
+axis(ax,'equal');
+
+hTruth = plot3(ax,truth(:,1),truth(:,2),truth(:,3), ...
+    '--','Color',[0.55 0.55 0.55],'LineWidth',1.25, ...
+    'DisplayName','Truth trajectory');
+hEstimate = plot3(ax,estimate(:,1),estimate(:,2),estimate(:,3), ...
+    '-','Color',[0.00 0.28 0.85],'LineWidth',2.9, ...
+    'DisplayName','EKF estimate');
+
+[sx,sy,sz] = sphere(30);
+hMoon = surf(ax,moonCenter(1)+moonRadius*sx, ...
+    moonCenter(2)+moonRadius*sy,moonCenter(3)+moonRadius*sz, ...
+    'FaceColor',[0.72 0.72 0.72], ...
+    'EdgeColor','none','FaceLighting','gouraud', ...
+    'DisplayName','Moon');
+camlight(ax,'headlight');
+material(ax,'dull');
+
+hL1 = plot3(ax,xL1,0,0,'^','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80 0.80 0.80], ...
+    'MarkerEdgeColor','k','LineWidth',1.1,'DisplayName','L1');
+hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80 0.80 0.80], ...
+    'MarkerEdgeColor','k','LineWidth',1.1,'DisplayName','L2');
+hStart = plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
+    'MarkerSize',8,'MarkerFaceColor',[0.20 0.70 0.25], ...
+    'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','Start');
+hEnd = plot3(ax,truth(end,1),truth(end,2),truth(end,3),'s', ...
+    'MarkerSize',8,'MarkerFaceColor',[0.20 0.35 0.90], ...
+    'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','End');
+
+allPoints = [truth;estimate;moonCenter; ...
+    moonCenter+[moonRadius 0 0];moonCenter-[moonRadius 0 0]; ...
+    moonCenter+[0 moonRadius 0];moonCenter-[0 moonRadius 0]; ...
+    moonCenter+[0 0 moonRadius];moonCenter-[0 0 moonRadius]; ...
+    xL1 0 0;xL2 0 0];
+xlim(ax,padded_limits(allPoints(:,1),0.08));
+ylim(ax,padded_limits(allPoints(:,2),0.10));
+zlim(ax,padded_limits(allPoints(:,3),0.10));
+axis(ax,'vis3d');
+ax.Projection = 'perspective';
+view(ax,-37.5,30);
+grid(ax,'off');
+
+xlabel(ax,'x (LU)','FontWeight','bold');
+ylabel(ax,'y (LU)','FontWeight','bold');
+zlabel(ax,'z (LU)','FontWeight','bold');
+set(ax,'FontName','Times New Roman','FontSize',12, ...
+    'FontWeight','bold','LineWidth',1.2,'Layer','top');
+ax.XLabel.FontSize = 14;
+ax.YLabel.FontSize = 14;
+ax.ZLabel.FontSize = 14;
+
+lgd = legend(ax,[hEstimate hTruth hMoon hL1 hL2 hStart hEnd], ...
+    {'EKF estimate','Truth trajectory','Moon','L1','L2','Start','End'}, ...
+    'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',4,'Box','on');
+lgd.FontName = 'Times New Roman';
+lgd.FontSize = 12;
+lgd.FontWeight = 'bold';
+lgd.ItemTokenSize = [18 10];
+
+drawnow;
+keep_axis_labels_inside_canvas(ax,0.035,0.82);
+end
+
+function keep_axis_labels_inside_canvas(ax,guard,topLimit)
+% Move rendered 3-D axis-label text only when it crosses the figure canvas.
+% Label extents are converted from axes-normalized units to figure-normalized
+% units, making the correction responsive to the actual tick labels/view.
+labels = [ax.XLabel ax.YLabel ax.ZLabel];
+ax.Units = 'normalized';
+for pass = 1:3
+    drawnow;
+    axPos = ax.Position;
+    for k = 1:numel(labels)
+        label = labels(k);
+        label.Units = 'normalized';
+        drawnow;
+        extent = label.Extent;
+        pos = label.Position;
+        figExtent = [ ...
+            axPos(1)+extent(1)*axPos(3), ...
+            axPos(2)+extent(2)*axPos(4), ...
+            extent(3)*axPos(3), ...
+            extent(4)*axPos(4)];
+
+        dx = 0;
+        dy = 0;
+        if figExtent(1) < guard
+            dx = dx + (guard-figExtent(1))/axPos(3);
+        end
+        if figExtent(1)+figExtent(3) > 1-guard
+            dx = dx - (figExtent(1)+figExtent(3)-(1-guard))/axPos(3);
+        end
+        if figExtent(2) < guard
+            dy = dy + (guard-figExtent(2))/axPos(4);
+        end
+        if figExtent(2)+figExtent(4) > topLimit
+            dy = dy - (figExtent(2)+figExtent(4)-topLimit)/axPos(4);
+        end
+        pos(1) = pos(1)+dx;
+        pos(2) = pos(2)+dy;
+        label.Position = pos;
+    end
+end
+end
+
+function [xL1,xL2] = collinear_lagrange_points(mu)
+equilibrium = @(x) x ...
+    -(1-mu)*(x+mu)./abs(x+mu).^3 ...
+    -mu*(x-1+mu)./abs(x-1+mu).^3;
+xL1 = fzero(equilibrium,1-mu-0.15);
+xL2 = fzero(equilibrium,1-mu+0.15);
+end
+
+function limits = padded_limits(values,fraction)
+values = values(isfinite(values));
+assert(~isempty(values),'Cannot size axes from empty data.');
+lowerValue = min(values);
+upperValue = max(values);
+span = upperValue-lowerValue;
+if span <= 100*eps(max(1,max(abs(values))))
+    span = max(0.02,0.05*max(1,abs(mean(values))));
+end
+padding = fraction*span;
+limits = [lowerValue-padding,upperValue+padding];
+end
+
+function analysisDir = newest_analysis_directory(root)
+assert(isfolder(root),'Comparison pilot root does not exist: %s',root);
+directories = dir(fullfile(root,'FE_DATA_*'));
+directories = directories([directories.isdir]);
+assert(~isempty(directories), ...
+    'No FE_DATA analysis directory was found under %s.',root);
+[~,idx] = max([directories.datenum]);
+analysisDir = fullfile(directories(idx).folder,directories(idx).name);
+end
+
+function export_trajectory_figure(fig,stem)
+drawnow;
+stem = string(stem);
+oldUnits = fig.Units;
+fig.Units = 'inches';
+position = fig.Position;
+fig.PaperUnits = 'inches';
+fig.PaperSize = position(3:4);
+fig.PaperPosition = [0 0 position(3:4)];
+fig.PaperPositionMode = 'manual';
+fig.Units = oldUnits;
+print(fig,char(stem+".eps"),'-depsc','-painters');
+exportgraphics(fig,char(stem+".png"),'Resolution',300);
+end
+
+function code = mission_code(mission)
+switch string(mission)
+    case "LUNAR_GATEWAY"
+        code = "lg";
+    case "LOW_THRUST_TRANSFER"
+        code = "lt";
+    case "GATEWAY_IMPULSE"
+        code = "gi";
+    otherwise
+        code = lower(string(mission));
+end
+end
