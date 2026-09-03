@@ -3,13 +3,13 @@ function report = run_reviewer2_pipeline_pilot(runOptimizations,saveFigures)
 %
 % This is an integration pilot, not a quick unit test. By default it runs:
 %   5 optimizers x 3 fixed target cases x 3 seeds = 45 optimization runs
-%   120 search function evaluations per run
+%   1200 search function evaluations per run
 %
 % The script then validates the saved schema, aligns convergence by function
 % evaluations, prints mean +/- sample-standard-deviation tables, and creates
 % paper-style preview figures. For each case, the lowest-objective run across
 % every optimizer and seed supplies the trajectory and EKF diagnostic plots.
-% Pilot output is isolated from the full study.
+% Pilot output is isolated from both the earlier 120-FE pilot and full study.
 %
 % Usage:
 %   report = run_reviewer2_pipeline_pilot;
@@ -27,12 +27,12 @@ runOptimizations = logical(runOptimizations);
 saveFigures = logical(saveFigures);
 
 paths = setup_project();
-budget = 120;
+budget = 1200;
 seeds = 0:2;
 optimizers = ["GA","PSO","BAYESIAN","ABC","ACO"];
 missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
-studyID = "reviewer2_comparison_pilot_v1";
-pilotRoot = fullfile(paths.runs,'COMPARISON_PILOT');
+studyID = "reviewer2_comparison_pilot_1200_v1";
+pilotRoot = fullfile(paths.runs,'COMPARISON_PILOT_1200');
 
 fprintf('\n--- Reviewer 2 full-pipeline pilot ---\n');
 fprintf('Target cases:             %d\n',numel(missions));
@@ -85,7 +85,7 @@ assert(height(summary) == numel(missions)*numel(optimizers), ...
     numel(missions)*numel(optimizers),height(summary));
 assert(all(summary.n_runs == numel(seeds)) && ...
     all(summary.fe_budget == budget), ...
-    'The processed pilot does not contain three 120-FE runs per group.');
+    'The processed pilot does not contain three 1200-FE runs per group.');
 
 analysisDir = newest_analysis_directory(pilotRoot);
 metricsFile = fullfile(analysisDir,'final_run_metrics.csv');
@@ -120,8 +120,10 @@ if saveFigures
     if ~isfolder(figureDir), mkdir(figureDir); end
 end
 
-plot_convergence_previews( ...
-    analysisDir,figureDir,missions,optimizers,budget,saveFigures);
+% Use the processed 1:budget traces for the convergence preview. Population
+% methods hold their last legitimate incumbent between batch checkpoints,
+% while Bayesian optimization retains its finer FE-by-FE history.
+plot_reviewer2_full_fe_convergence(analysisDir,saveFigures);
 plot_grouped_result(paperResults,missions,optimizers, ...
     'BestJMean','BestJStd','Final best objective', ...
     'pilot_final_objective',figureDir,saveFigures);
@@ -283,21 +285,17 @@ end
 
 function plot_convergence_previews( ...
     analysisDir,figureDir,missions,optimizers,budget,saveFigures)
-
+% Retained for compatibility with older processed pilot data. The current
+% pilot uses plot_reviewer2_full_fe_convergence above.
 files = dir(fullfile(analysisDir,'convergence_*.mat'));
 assert(numel(files) == numel(missions), ...
     'Expected one convergence data file per target case.');
 colors = lines(numel(optimizers));
-
-% All methods are displayed at the same FE checkpoints. Population methods
-% do not have a meaningful incumbent before their first batch completes, and
-% BO should not receive a visual advantage merely because it records every FE.
 checkpointStep = 60;
 commonFE = (checkpointStep:checkpointStep:budget)';
 if isempty(commonFE) || commonFE(end) ~= budget
     commonFE = unique([commonFE;budget]);
 end
-
 for mission = missions
     match = "";
     loaded = struct();
@@ -313,28 +311,22 @@ for mission = missions
     end
     assert(strlength(match) > 0, ...
         'No convergence data found for %s.',mission);
-
     fig = create_paper_figure(7.2,4.4, ...
         mission_label(mission)+" convergence");
     ax = axes(fig);
     hold(ax,'on');
     box(ax,'on');
     grid(ax,'on');
-
     curveOptimizers = upper(string({loaded.curves.optimizer}));
     lineHandles = gobjects(numel(optimizers),1);
     for a = 1:numel(optimizers)
         idx = find(curveOptimizers == optimizers(a),1);
         assert(~isempty(idx),'Missing %s convergence curve.',optimizers(a));
         curve = loaded.curves(idx);
-
         meanCommon = curve.mean(commonFE);
         validLine = isfinite(meanCommon);
         xLine = commonFE(validLine);
         yLine = meanCommon(validLine);
-
-        % Best-so-far is an incumbent process, so a stair-step trace is more
-        % faithful than linear interpolation between common FE checkpoints.
         lineHandles(a) = stairs(ax,xLine,yLine, ...
             'Color',colors(a,:),'LineWidth',2.15, ...
             'DisplayName',optimizers(a));
@@ -342,21 +334,16 @@ for mission = missions
             'Color',colors(a,:),'MarkerFaceColor',colors(a,:), ...
             'MarkerSize',4.3,'HandleVisibility','off');
     end
-
     xlim(ax,[commonFE(1) commonFE(end)]);
-    if budget <= 600
-        xticks(ax,commonFE);
-    end
+    if budget <= 600, xticks(ax,commonFE); end
     xlabel(ax,'Function evaluations','FontWeight','bold');
     ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
     apply_figure_style(ax);
-
     lgd = legend(ax,lineHandles,cellstr(optimizers), ...
         'Location','northoutside','Orientation','horizontal', ...
         'NumColumns',numel(optimizers),'Box','on');
     format_legend(lgd,11);
     reserve_top_legend_space(ax);
-
     if saveFigures
         stem = fullfile(figureDir, ...
             "pilot_convergence_"+mission_code(mission));
