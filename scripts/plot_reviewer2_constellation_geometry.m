@@ -1,14 +1,16 @@
 function details = plot_reviewer2_constellation_geometry(selection,figureDir,stemPrefix,saveFigures)
 %PLOT_REVIEWER2_CONSTELLATION_GEOMETRY Plot selected observer constellations.
 %
-% Each row in selection is one manuscript panel. The selected observer
-% trajectories are propagated for one period of each observer orbit and are
-% shown with the saved target truth trajectory. This exposes constellation
-% geometry directly, rather than plotting only target/EKF estimation error.
+% Each row in selection is one manuscript panel. Each unique selected
+% periodic observer orbit is propagated for one period and drawn once as a
+% solid line; individual observer phase locations are retained as markers.
+% This avoids renderer z-fighting when multiple observers occupy different
+% slots on the same periodic orbit.
 %
 % Target trajectories use the same mission colors as the tracking-case
 % introduction figures. Earth is intentionally omitted so the result panels
-% stay focused on the lunar-region constellation geometry.
+% stay focused on the lunar-region constellation geometry. Low-thrust panels
+% also show the departure/arrival periodic orbits and transfer endpoints.
 %
 % Required selection columns:
 %   Mission, PanelKey, PanelLabel, RunFile, BestObjective
@@ -82,7 +84,11 @@ fig = figure('Color','w','Units','inches','Position',[1 1 7.6 7.0], ...
     'PaperPosition',[0 0 7.6 7.0],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
 movegui(fig,'center');
-plotPosition = [0.12 0.20 0.76 0.64];
+
+% Use a deliberately smaller, centered inner box than the first draft.
+% Perspective axes can project labels/corners outside their nominal Position;
+% these margins keep the complete axes and labels inside the export canvas.
+plotPosition = [0.15 0.23 0.70 0.56];
 ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 hold(ax,'on'); box(ax,'on'); axis(ax,'equal');
@@ -90,26 +96,69 @@ hold(ax,'on'); box(ax,'on'); axis(ax,'equal');
 hTarget = plot3(ax,truth(:,1),truth(:,2),truth(:,3),'-', ...
     'Color',targetColor,'LineWidth',2.8,'DisplayName','Target trajectory');
 
-observerColors = lines(max(nObs,1));
+% Draw each distinct periodic observer orbit once. Multiple observers on the
+% same family/orbit index differ only by slot/phase, so overdrawing the same
+% 3-D curve can create a dashed-looking z-buffer artifact. Their individual
+% phase markers are still all shown below.
+family = string(observers.orbit_family);
+orbitIndex = string(observers.orbit_index);
+orbitKeys = family + "_" + orbitIndex;
+uniqueOrbitKeys = unique(orbitKeys,'stable');
+observerColors = lines(max(numel(uniqueOrbitKeys),1));
 allObserverPoints = zeros(0,3);
 hObserver = gobjects(1,1);
 opts = odeset('RelTol',1e-11,'AbsTol',1e-12);
-for j = 1:nObs
-    period = double(observers.period_TU(j));
+
+for u = 1:numel(uniqueOrbitKeys)
+    member = find(orbitKeys == uniqueOrbitKeys(u),1,'first');
+    period = double(observers.period_TU(member));
     validateattributes(period,{'numeric'},{'scalar','real','finite','positive'});
     tPlot = linspace(0,period,300);
-    initialState = observers.initial_state(j,:)';
+    initialState = observers.initial_state(member,:)';
     [~,state] = ode45(@(t,s) cr3bp_dynamics(t,s,mu),tPlot,initialState,opts);
     allObserverPoints = [allObserverPoints;state(:,1:3)]; %#ok<AGROW>
-    h = plot3(ax,state(:,1),state(:,2),state(:,3),'-', ...
-        'Color',observerColors(j,:),'LineWidth',1.65, ...
+    h = plot3(ax,state(:,1),state(:,2),state(:,3), ...
+        'LineStyle','-','Color',observerColors(u,:),'LineWidth',1.65, ...
         'HandleVisibility','off');
-    plot3(ax,state(1,1),state(1,2),state(1,3),'o', ...
-        'MarkerSize',5.5,'MarkerFaceColor',observerColors(j,:), ...
-        'MarkerEdgeColor','k','LineWidth',0.7,'HandleVisibility','off');
-    if j == 1, hObserver = h; end
+    if u == 1, hObserver = h; end
 end
 set(hObserver,'HandleVisibility','on','DisplayName','Observer orbits');
+
+for j = 1:nObs
+    u = find(uniqueOrbitKeys == orbitKeys(j),1,'first');
+    phaseState = observers.initial_state(j,:);
+    plot3(ax,phaseState(1),phaseState(2),phaseState(3),'o', ...
+        'MarkerSize',5.5,'MarkerFaceColor',observerColors(u,:), ...
+        'MarkerEdgeColor','k','LineWidth',0.7,'HandleVisibility','off');
+end
+
+% Low-thrust panels retain the same endpoint-orbit context as the
+% introductory target-case figure, while the optimized observer orbits
+% remain the main comparison quantity.
+endpointPoints = zeros(0,3);
+hEndpoint = gobjects(0);
+hStart = gobjects(0);
+hEnd = gobjects(0);
+if mission == "LOW_THRUST_TRANSFER"
+    assert(size(tracking.truth,2) >= 6, ...
+        'Low-thrust geometry requires six-component saved truth states.');
+    [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits( ...
+        tracking.truth(1,1:6),tracking.truth(end,1:6));
+    cReference = [0.48 0.48 0.48];
+    hEndpoint = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
+        departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.25, ...
+        'DisplayName','Endpoint orbits');
+    plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3),'-', ...
+        'Color',cReference,'LineWidth',1.25,'HandleVisibility','off');
+    endpointPoints = [departureOrbit(:,1:3);arrivalOrbit(:,1:3)];
+
+    hStart = plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
+        'MarkerSize',8,'MarkerFaceColor',reviewer2_target_color("LUNAR_GATEWAY"), ...
+        'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','Start');
+    hEnd = plot3(ax,truth(end,1),truth(end,2),truth(end,3),'s', ...
+        'MarkerSize',8,'MarkerFaceColor',targetColor, ...
+        'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','End');
+end
 
 moonCenter = [1-mu,0,0];
 moonRadius = 1737.1/LU;
@@ -128,13 +177,16 @@ hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',8, ...
     'MarkerFaceColor',[0.82 0.82 0.82],'MarkerEdgeColor','k', ...
     'LineWidth',1.0,'DisplayName','L2');
 
-% Size the result panel from the target/observer lunar-region geometry only.
-% Earth is intentionally excluded from both the drawing and axis limits.
-allPoints = [truth;allObserverPoints;moonCenter;xL1 0 0;xL2 0 0];
-xlim(ax,padded_limits(allPoints(:,1),0.06));
-ylim(ax,padded_limits(allPoints(:,2),0.08));
-zlim(ax,padded_limits(allPoints(:,3),0.08));
-axis(ax,'vis3d'); ax.Projection = 'perspective'; view(ax,-37.5,30); grid(ax,'off');
+% Size the result panel from lunar-region geometry only. Earth remains
+% intentionally absent from both the drawing and limits.
+allPoints = [truth;allObserverPoints;endpointPoints;moonCenter;xL1 0 0;xL2 0 0];
+xlim(ax,padded_limits(allPoints(:,1),0.08));
+ylim(ax,padded_limits(allPoints(:,2),0.10));
+zlim(ax,padded_limits(allPoints(:,3),0.10));
+axis(ax,'vis3d');
+ax.Projection = 'perspective';
+view(ax,-37.5,30);
+grid(ax,'off');
 
 xlabel(ax,'x (LU)','FontWeight','bold');
 ylabel(ax,'y (LU)','FontWeight','bold');
@@ -143,19 +195,100 @@ set(ax,'FontName','Times New Roman','FontSize',12,'FontWeight','bold', ...
     'LineWidth',1.2,'Layer','top');
 ax.XLabel.FontSize = 14; ax.YLabel.FontSize = 14; ax.ZLabel.FontSize = 14;
 
-lgd = legend(ax,[hTarget hObserver hMoon hL1 hL2], ...
-    {'Target trajectory','Observer orbits','Moon','L1','L2'}, ...
-    'Orientation','horizontal','NumColumns',3,'Box','on');
-lgd.FontName = 'Times New Roman'; lgd.FontSize = 12; lgd.FontWeight = 'bold';
-lgd.ItemTokenSize = [18 10]; lgd.Units = 'normalized';
+if mission == "LOW_THRUST_TRANSFER"
+    legendHandles = [hEndpoint hTarget hObserver hStart hEnd hMoon hL1 hL2];
+    legendLabels = {'Endpoint orbits','Target trajectory','Observer orbits', ...
+        'Start','End','Moon','L1','L2'};
+    numColumns = 4;
+else
+    legendHandles = [hTarget hObserver hMoon hL1 hL2];
+    legendLabels = {'Target trajectory','Observer orbits','Moon','L1','L2'};
+    numColumns = 3;
+end
+lgd = legend(ax,legendHandles,legendLabels, ...
+    'Orientation','horizontal','NumColumns',numColumns,'Box','on');
+lgd.FontName = 'Times New Roman';
+lgd.FontSize = 12;
+lgd.FontWeight = 'bold';
+lgd.ItemTokenSize = [18 10];
+lgd.Units = 'normalized';
+finalize_centered_geometry_axes(ax,lgd,plotPosition);
+end
+
+
+function finalize_centered_geometry_axes(ax,lgd,plotPosition)
+% Keep the complete perspective axes and legend centered inside the canvas.
+axis(ax,'vis3d');
+lgd.Units = 'normalized';
 drawnow;
 legendPosition = lgd.Position;
 legendPosition(1) = 0.5-legendPosition(3)/2;
-legendBottom = plotPosition(2)+plotPosition(4)+0.012;
+legendGap = 0.012;
+legendBottom = plotPosition(2)+plotPosition(4)+legendGap;
 legendPosition(2) = min(legendBottom,0.98-legendPosition(4));
-lgd.Position = legendPosition; lgd.AutoUpdate = 'off';
+lgd.Position = legendPosition;
+lgd.AutoUpdate = 'off';
+
+% Legend layout can move perspective axes. Restore the centered inner box
+% after all layout work, matching the introductory figure construction.
+ax.PositionConstraint = 'innerposition';
 ax.Position = plotPosition;
 drawnow;
+end
+
+
+function [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits(startState,endState)
+% Recover the full periodic orbits containing the fixed LT endpoint states.
+persistent cachedStart cachedEnd cachedDeparture cachedArrival
+startState = double(startState(:).');
+endState = double(endState(:).');
+if ~isempty(cachedStart) && isequal(size(cachedStart),size(startState)) && ...
+        max(abs(cachedStart-startState)) < 1e-12 && ...
+        max(abs(cachedEnd-endState)) < 1e-12
+    departureOrbit = cachedDeparture;
+    arrivalOrbit = cachedArrival;
+    return;
+end
+
+paths = setup_project();
+catalog = load(paths.catalog,'T');
+departureOrbit = find_reference_orbit_for_state(catalog.T,startState);
+arrivalOrbit = find_reference_orbit_for_state(catalog.T,endState);
+cachedStart = startState;
+cachedEnd = endState;
+cachedDeparture = departureOrbit;
+cachedArrival = arrivalOrbit;
+end
+
+
+function orbitState = find_reference_orbit_for_state(T,targetState)
+% Phase-independent catalog lookup used only for LT endpoint visualization.
+assert(istable(T) && ismember('state',T.Properties.VariableNames), ...
+    'Observer catalog must contain the state trajectory column.');
+targetState = targetState(:).';
+assert(numel(targetState)==6 && all(isfinite(targetState)), ...
+    'Reference state must contain six finite CR3BP components.');
+
+bestError = inf;
+bestOrbit = [];
+for k = 1:height(T)
+    state = T.state{k};
+    if isempty(state) || size(state,2)<6, continue; end
+    state6 = state(:,1:6);
+    state6 = state6(all(isfinite(state6),2),:);
+    if isempty(state6), continue; end
+    thisError = min(vecnorm(state6-targetState,2,2));
+    if thisError < bestError
+        bestError = thisError;
+        bestOrbit = state(:,1:6);
+    end
+end
+assert(~isempty(bestOrbit) && isfinite(bestError), ...
+    'Could not identify an LT endpoint reference orbit.');
+assert(bestError < 2.5e-2, ...
+    ['LT endpoint does not match the observer catalog closely enough for ' ...
+     'reference-orbit plotting (minimum state error %.6e).'],bestError);
+orbitState = bestOrbit;
 end
 
 
