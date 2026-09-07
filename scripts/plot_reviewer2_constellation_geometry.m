@@ -79,16 +79,15 @@ observers = runState.observers;
 nObs = height(observers);
 targetColor = reviewer2_target_color(mission);
 
-fig = figure('Color','w','Units','inches','Position',[1 1 7.6 7.0], ...
-    'PaperUnits','inches','PaperSize',[7.6 7.0], ...
-    'PaperPosition',[0 0 7.6 7.0],'PaperPositionMode','manual', ...
+% Use a slightly larger canvas than the introductory plots while retaining
+% their centered 3-D presentation. The extra physical margin is deliberate:
+% projected x/y/z labels can extend beyond a perspective axes Position.
+fig = figure('Color','w','Units','inches','Position',[1 1 8.2 7.6], ...
+    'PaperUnits','inches','PaperSize',[8.2 7.6], ...
+    'PaperPosition',[0 0 8.2 7.6],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
 movegui(fig,'center');
-
-% Use a deliberately smaller, centered inner box than the first draft.
-% Perspective axes can project labels/corners outside their nominal Position;
-% these margins keep the complete axes and labels inside the export canvas.
-plotPosition = [0.15 0.23 0.70 0.56];
+plotPosition = [0.18 0.19 0.64 0.60];
 ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 hold(ax,'on'); box(ax,'on'); axis(ax,'equal');
@@ -108,6 +107,8 @@ observerColors = lines(max(numel(uniqueOrbitKeys),1));
 allObserverPoints = zeros(0,3);
 hObserver = gobjects(1,1);
 opts = odeset('RelTol',1e-11,'AbsTol',1e-12);
+observerLineWidth = 1.65;
+if mission == "LOW_THRUST_TRANSFER", observerLineWidth = 1.45; end
 
 for u = 1:numel(uniqueOrbitKeys)
     member = find(orbitKeys == uniqueOrbitKeys(u),1,'first');
@@ -118,8 +119,8 @@ for u = 1:numel(uniqueOrbitKeys)
     [~,state] = ode45(@(t,s) cr3bp_dynamics(t,s,mu),tPlot,initialState,opts);
     allObserverPoints = [allObserverPoints;state(:,1:3)]; %#ok<AGROW>
     h = plot3(ax,state(:,1),state(:,2),state(:,3), ...
-        'LineStyle','-','Color',observerColors(u,:),'LineWidth',1.65, ...
-        'HandleVisibility','off');
+        'LineStyle','-','Color',observerColors(u,:), ...
+        'LineWidth',observerLineWidth,'HandleVisibility','off');
     if u == 1, hObserver = h; end
 end
 set(hObserver,'HandleVisibility','on','DisplayName','Observer orbits');
@@ -144,12 +145,12 @@ if mission == "LOW_THRUST_TRANSFER"
         'Low-thrust geometry requires six-component saved truth states.');
     [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits( ...
         tracking.truth(1,1:6),tracking.truth(end,1:6));
-    cReference = [0.48 0.48 0.48];
+    cReference = [0.65 0.65 0.65];
     hEndpoint = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
-        departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.25, ...
+        departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.0, ...
         'DisplayName','Endpoint orbits');
     plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3),'-', ...
-        'Color',cReference,'LineWidth',1.25,'HandleVisibility','off');
+        'Color',cReference,'LineWidth',1.0,'HandleVisibility','off');
     endpointPoints = [departureOrbit(:,1:3);arrivalOrbit(:,1:3)];
 
     hStart = plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
@@ -180,9 +181,9 @@ hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',8, ...
 % Size the result panel from lunar-region geometry only. Earth remains
 % intentionally absent from both the drawing and limits.
 allPoints = [truth;allObserverPoints;endpointPoints;moonCenter;xL1 0 0;xL2 0 0];
-xlim(ax,padded_limits(allPoints(:,1),0.08));
-ylim(ax,padded_limits(allPoints(:,2),0.10));
-zlim(ax,padded_limits(allPoints(:,3),0.10));
+xlim(ax,padded_limits(allPoints(:,1),0.10));
+ylim(ax,padded_limits(allPoints(:,2),0.12));
+zlim(ax,padded_limits(allPoints(:,3),0.12));
 axis(ax,'vis3d');
 ax.Projection = 'perspective';
 view(ax,-37.5,30);
@@ -218,20 +219,30 @@ end
 
 function finalize_centered_geometry_axes(ax,lgd,plotPosition)
 % Keep the complete perspective axes and legend centered inside the canvas.
+%
+% The legend is given a fixed centered strip instead of allowing MATLAB to
+% resize the perspective axes. The axes Position is then restored explicitly,
+% matching the construction used by the introductory tracking-case figures.
 axis(ax,'vis3d');
+ax.PositionConstraint = 'innerposition';
 lgd.Units = 'normalized';
 drawnow;
+
 legendPosition = lgd.Position;
 legendPosition(1) = 0.5-legendPosition(3)/2;
-legendGap = 0.012;
-legendBottom = plotPosition(2)+plotPosition(4)+legendGap;
-legendPosition(2) = min(legendBottom,0.98-legendPosition(4));
+legendPosition(2) = 0.835;
 lgd.Position = legendPosition;
 lgd.AutoUpdate = 'off';
 
-% Legend layout can move perspective axes. Restore the centered inner box
-% after all layout work, matching the introductory figure construction.
-ax.PositionConstraint = 'innerposition';
+ax.Position = plotPosition;
+drawnow;
+
+% Preserve generous export padding around projected labels. LooseInset is
+% applied after the final camera/legend layout so MATLAB cannot shrink the
+% 3-D box to make room for the legend.
+tightInset = ax.TightInset;
+minInset = [0.035 0.045 0.025 0.025];
+ax.LooseInset = max(tightInset,minInset);
 ax.Position = plotPosition;
 drawnow;
 end
