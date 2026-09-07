@@ -1,34 +1,29 @@
-function report = run_reviewer2_comparison_pipeline(saveFigures,runScreeningSensitivity)
+function report = run_reviewer2_comparison_pipeline(saveFigures)
 %RUN_REVIEWER2_COMPARISON_PIPELINE Process the completed 6000-FE comparison.
 %
 % This pipeline does not launch or rerun any optimization. It processes:
 %   4 optimizers x 3 target cases x 20 seeds = 240 optimization runs
 %   GA, PSO, ABC, ACO
 %   angles only, 3 observers, 1 Gateway period
+%   screening ON, J1+J2+J3
 %   6000 admitted search function evaluations per run
 %
-% In addition to the optimizer comparison, the pipeline can perform a
-% post-optimization screening sensitivity study. The 20 GA designs from each
-% target case are held fixed and their diagnostic EKF is re-evaluated with
-% screening OFF. The saved screening-ON result is the paired control. Thus
-% this isolates the measurement-availability gate; it is NOT a second
-% optimization with screening disabled.
+% The earlier fixed-design post-processing screening ON/OFF diagnostic has
+% been removed. Screening/objective sensitivity is now handled only by the
+% separate GA_OBJECTIVE_SCREENING optimization study.
+%
+% In addition to statistical results, this pipeline selects the lowest-cost
+% observed run for each optimizer/mission pair and exports observer-orbit
+% geometry panels. Those panels show how the optimizers select genuinely
+% different cislunar constellations for the same target case.
 %
 % Usage:
 %   report = run_reviewer2_comparison_pipeline;
-%   report = run_reviewer2_comparison_pipeline(false);       % display only
-%   report = run_reviewer2_comparison_pipeline(true,false);  % skip sensitivity
-%
-% Inputs:
-%   saveFigures            - save EPS/PNG previews (default true)
-%   runScreeningSensitivity- build/reuse GA ON/OFF sensitivity (default true)
+%   report = run_reviewer2_comparison_pipeline(false); % display only
 
 if nargin < 1 || isempty(saveFigures), saveFigures = true; end
-if nargin < 2 || isempty(runScreeningSensitivity), runScreeningSensitivity = true; end
 validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
-validateattributes(runScreeningSensitivity,{'logical','numeric'},{'scalar'});
 saveFigures = logical(saveFigures);
-runScreeningSensitivity = logical(runScreeningSensitivity);
 
 paths = setup_project();
 budget = 6000;
@@ -46,10 +41,11 @@ fprintf('Independent seeds:          %s\n',mat2str(seeds));
 fprintf('Measurement model:          ANGLES_ONLY\n');
 fprintf('Observers:                  3\n');
 fprintf('Gateway periods:            1\n');
+fprintf('Screening:                  ON\n');
+fprintf('Objective:                  J1 + J2 + J3\n');
 fprintf('Search FE per run:          %d\n',budget);
 fprintf('Expected optimization runs: %d\n\n',expectedRuns);
 
-% Static study-definition checks fail before result processing.
 test_project_structure();
 test_fe_study_configuration();
 
@@ -105,6 +101,8 @@ results = build_comparison_results( ...
     summary,runMetrics,missions,optimizers,seeds,budget);
 [objectiveTable,trackingTable] = format_comparison_tables(results);
 rankings = build_rankings(results,missions,optimizers);
+bestGeometryRuns = select_best_geometry_runs( ...
+    summary,runMetrics,missions,optimizers,seeds);
 
 fprintf('\n--- 6000-FE objective/runtime results (mean +/- sample std) ---\n');
 disp(objectiveTable);
@@ -112,6 +110,8 @@ fprintf('\n--- 6000-FE tracking/design results (mean +/- sample std) ---\n');
 disp(trackingTable);
 fprintf('\n--- Mission-wise objective/runtime rankings ---\n');
 disp(rankings);
+fprintf('\n--- Best observed runs used for optimizer geometry panels ---\n');
+disp(bestGeometryRuns(:,{'Mission','PanelLabel','Seed','BestObjective'}));
 
 writetable(results,fullfile(analysisDir,'comparison_6000_results.csv'));
 writetable(objectiveTable, ...
@@ -119,6 +119,8 @@ writetable(objectiveTable, ...
 writetable(trackingTable, ...
     fullfile(analysisDir,'comparison_6000_tracking_formatted.csv'));
 writetable(rankings,fullfile(analysisDir,'comparison_6000_rankings.csv'));
+writetable(bestGeometryRuns, ...
+    fullfile(analysisDir,'comparison_6000_geometry_selected_runs.csv'));
 
 figureDir = "";
 if saveFigures
@@ -126,7 +128,6 @@ if saveFigures
     if ~isfolder(figureDir), mkdir(figureDir); end
 end
 
-% Core extended-comparison figures.
 plot_comparison_convergence( ...
     analysisDir,missions,optimizers,budget,figureDir,saveFigures);
 plot_grouped_metric(results,missions,optimizers, ...
@@ -146,36 +147,16 @@ plot_grouped_metric(results,missions,optimizers, ...
     'CoverageMean','CoverageStd','Coverage fraction', ...
     'comparison_6000_coverage',figureDir,saveFigures);
 plot_grouped_metric(results,missions,optimizers, ...
-    'ScreeningMean','ScreeningStd','Screened observer-epoch pairs', ...
+    'ScreeningMean','ScreeningStd','Rejected measurement opportunities', ...
     'comparison_6000_screening_count',figureDir,saveFigures);
 plot_grouped_metric(results,missions,optimizers, ...
     'MeanStabilityMean','MeanStabilityStd','Mean observer stability index', ...
     'comparison_6000_stability',figureDir,saveFigures);
 
-% Post-optimization screening ON/OFF sensitivity using GA reference designs.
-screeningRuns = table();
-screeningSummary = table();
-if runScreeningSensitivity
-    [screeningRuns,screeningSummary] = build_screening_sensitivity( ...
-        comparisonRoot,summary,runMetrics,missions,seeds);
-    fprintf('\n--- GA fixed-design screening ON/OFF sensitivity ---\n');
-    disp(screeningSummary);
-    writetable(screeningRuns, ...
-        fullfile(analysisDir,'comparison_6000_screening_on_off_runs.csv'));
-    writetable(screeningSummary, ...
-        fullfile(analysisDir,'comparison_6000_screening_on_off_summary.csv'));
-
-    plot_screening_metric(screeningSummary,missions, ...
-        'ObjectiveMean','ObjectiveStd','Objective value', ...
-        'comparison_6000_screening_on_off_objective',figureDir,saveFigures);
-    plot_screening_metric(screeningSummary,missions, ...
-        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)', ...
-        'comparison_6000_screening_on_off_position_rmse',figureDir,saveFigures);
-    plot_screening_metric(screeningSummary,missions, ...
-        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km', ...
-        'Effective position sigma (km)', ...
-        'comparison_6000_screening_on_off_effective_sigma',figureDir,saveFigures);
-end
+geometryDetails = plot_reviewer2_constellation_geometry( ...
+    bestGeometryRuns,figureDir,"comparison_geometry",saveFigures);
+writetable(geometryDetails, ...
+    fullfile(analysisDir,'comparison_6000_geometry_details.csv'));
 
 report = struct();
 report.studyID = studyID;
@@ -193,16 +174,12 @@ report.results = results;
 report.objectiveTable = objectiveTable;
 report.trackingTable = trackingTable;
 report.rankings = rankings;
-report.screeningRuns = screeningRuns;
-report.screeningSummary = screeningSummary;
+report.bestGeometryRuns = bestGeometryRuns;
+report.geometryDetails = geometryDetails;
 
 fprintf('\nReviewer 2 comparison pipeline passed.\n');
 fprintf('Validated runs: %d/%d\n',sum(inventory.valid),expectedRuns);
 fprintf('Processed data: %s\n',analysisDir);
-if runScreeningSensitivity
-    fprintf(['Screening sensitivity: GA designs held fixed; ' ...
-        'diagnostic EKF re-evaluated with screening OFF.\n']);
-end
 if saveFigures
     fprintf('Paper-style previews: %s\n',figureDir);
 else
@@ -331,7 +308,7 @@ trackingTable = table( ...
     compose('%.5g +/- %.3g',results.ScreeningMean,results.ScreeningStd), ...
     'VariableNames',{ ...
     'Case','Optimizer','RMSEPosition_km','EffectiveSigmaPosition_km', ...
-    'MeanStability','CoverageFraction','ScreeningCount'});
+    'MeanStability','CoverageFraction','RejectedMeasurementOpportunities'});
 end
 
 
@@ -343,8 +320,6 @@ bestJMean = nan(rows,1); runtimeMean = nan(rows,1);
 row = 0;
 for mission = missions
     missionRows = results(results.Mission == mission,:);
-    assert(height(missionRows) == numel(optimizers), ...
-        'Incomplete ranking group for %s.',mission);
     [~,objectiveOrder] = sort(missionRows.BestJMean,'ascend');
     [~,runtimeOrder] = sort(missionRows.RuntimeMean_s,'ascend');
     objectiveRankLocal = nan(numel(optimizers),1);
@@ -368,189 +343,34 @@ rankings = table(missionColumn,optimizerColumn,objectiveRank,runtimeRank, ...
 end
 
 
-function [runs,summaryTable] = build_screening_sensitivity( ...
-    comparisonRoot,summary,runMetrics,missions,seeds)
-% Re-evaluate the 60 GA final designs with screening disabled. Screening-ON
-% metrics are the saved validated results. Cache the expensive OFF EKF passes
-% outside FE_DATA_* so reprocessing figures does not repeat them.
-
-cacheDir = fullfile(comparisonRoot,'SCREENING_SENSITIVITY_GA_6000');
-if ~isfolder(cacheDir), mkdir(cacheDir); end
-cacheFile = fullfile(cacheDir,'screening_on_off_runs.csv');
-
-source = select_ga_source_rows(summary,runMetrics,missions,seeds);
-if isfile(cacheFile)
-    candidate = readtable(cacheFile,'TextType','string', ...
-        'VariableNamingRule','preserve');
-    if valid_screening_cache(candidate,source)
-        runs = candidate;
-        summaryTable = summarize_screening_runs(runs,missions);
-        fprintf('Reused screening sensitivity cache:\n%s\n',cacheFile);
-        return;
-    end
-end
-
-fprintf('\nBuilding fixed-design screening sensitivity (%d GA designs)...\n',height(source));
-runs = table();
-for k = 1:height(source)
-    fprintf('  [%d/%d] %s seed %d\n', ...
-        k,height(source),source.Mission(k),source.Seed(k));
-    off = evaluate_screening_off(source.RunFile(k));
-
-    onRow = table(source.Mission(k),"GA",source.Seed(k),true, ...
-        source.RunFile(k),source.BestJ(k),source.RMSEPos_km(k), ...
-        source.EffectiveSigmaPos_km(k),source.ScreeningCount(k), ...
-        'VariableNames',{'Mission','Optimizer','Seed','UseScreening', ...
-        'SourceRunFile','Objective','RMSEPos_km','EffectiveSigmaPos_km', ...
-        'ScreeningCount'});
-    offRow = table(source.Mission(k),"GA",source.Seed(k),false, ...
-        source.RunFile(k),off.Objective,off.RMSEPos_km, ...
-        off.EffectiveSigmaPos_km,off.ScreeningCount, ...
-        'VariableNames',onRow.Properties.VariableNames);
-    runs = [runs; onRow; offRow]; %#ok<AGROW>
-end
-
-writetable(runs,cacheFile);
-summaryTable = summarize_screening_runs(runs,missions);
-fprintf('Saved screening sensitivity cache:\n%s\n',cacheFile);
-end
-
-
-function source = select_ga_source_rows(summary,runMetrics,missions,seeds)
-rowsExpected = numel(missions)*numel(seeds);
-missionColumn = strings(rowsExpected,1); seedColumn = nan(rowsExpected,1);
-runFile = strings(rowsExpected,1); bestJ = nan(rowsExpected,1);
-rmse = nan(rowsExpected,1); sigma = nan(rowsExpected,1); screen = nan(rowsExpected,1);
+function selected = select_best_geometry_runs( ...
+    summary,runMetrics,missions,optimizers,seeds)
+rows = numel(missions)*numel(optimizers);
+missionColumn = strings(rows,1); panelKey = strings(rows,1); panelLabel = strings(rows,1);
+runFile = strings(rows,1); bestObjective = nan(rows,1); seedColumn = nan(rows,1);
 row = 0;
 for mission = missions
-    summaryRow = summary(summary.mission == mission & summary.optimizer == "GA",:);
-    assert(height(summaryRow) == 1,'Missing GA summary row for %s.',mission);
-    key = summaryRow.comparison_key;
-    metricRows = runMetrics(runMetrics.comparison_key == key & ...
-        runMetrics.optimizer == "GA",:);
-    metricRows = sortrows(metricRows,'seed');
-    assert(height(metricRows) == numel(seeds) && ...
-        isequal(metricRows.seed(:)',seeds), ...
-        'Missing GA screening-sensitivity source runs for %s.',mission);
-    for k = 1:height(metricRows)
+    for optimizer = optimizers
         row = row + 1;
+        summaryRow = summary(summary.mission == mission & ...
+            summary.optimizer == optimizer,:);
+        assert(height(summaryRow) == 1,'Missing summary row for geometry selection.');
+        metricRows = runMetrics( ...
+            runMetrics.comparison_key == summaryRow.comparison_key & ...
+            runMetrics.optimizer == optimizer,:);
+        assert(height(metricRows) == numel(seeds), ...
+            'Incomplete geometry-selection group for %s/%s.',mission,optimizer);
+        [value,idx] = min(metricRows.bestJ);
         missionColumn(row) = mission;
-        seedColumn(row) = metricRows.seed(k);
-        runFile(row) = metricRows.run_file(k);
-        bestJ(row) = metricRows.bestJ(k);
-        rmse(row) = metricRows.rmse_pos_km(k);
-        sigma(row) = metricRows.mean_effective_sigma_pos_km(k);
-        screen(row) = metricRows.screening_count(k);
+        panelKey(row) = lower(optimizer);
+        panelLabel(row) = optimizer;
+        runFile(row) = metricRows.run_file(idx);
+        bestObjective(row) = value;
+        seedColumn(row) = metricRows.seed(idx);
     end
 end
-source = table(missionColumn,seedColumn,runFile,bestJ,rmse,sigma,screen, ...
-    'VariableNames',{'Mission','Seed','RunFile','BestJ','RMSEPos_km', ...
-    'EffectiveSigmaPos_km','ScreeningCount'});
-end
-
-
-function tf = valid_screening_cache(candidate,source)
-tf = false;
-required = ["Mission","Optimizer","Seed","UseScreening","SourceRunFile", ...
-    "Objective","RMSEPos_km","EffectiveSigmaPos_km","ScreeningCount"];
-if ~all(ismember(required,string(candidate.Properties.VariableNames)))
-    return;
-end
-if height(candidate) ~= 2*height(source), return; end
-for k = 1:height(source)
-    rows = candidate(candidate.Mission == source.Mission(k) & ...
-        candidate.Seed == source.Seed(k) & candidate.Optimizer == "GA",:);
-    if height(rows) ~= 2 || numel(unique(rows.UseScreening)) ~= 2 || ...
-            ~all(rows.SourceRunFile == source.RunFile(k))
-        return;
-    end
-    on = rows(logical(rows.UseScreening),:);
-    if height(on) ~= 1 || abs(on.Objective-source.BestJ(k)) > ...
-            1e-9*max(1,abs(source.BestJ(k)))
-        return;
-    end
-end
-tf = true;
-end
-
-
-function out = evaluate_screening_off(runFile)
-dataDir = fileparts(char(runFile));
-trackingFile = fullfile(dataDir,'tracking_data.mat');
-assert(isfile(runFile) && isfile(trackingFile), ...
-    'Missing saved run or tracking file for screening sensitivity.');
-S = load(runFile,'runState');
-T = load(trackingFile,'tracking');
-r = S.runState;
-tracking = T.tracking;
-s = r.settings;
-assert(s.useScreening, ...
-    'Screening sensitivity source run must be a screening-ON result.');
-assert(isfield(r,'observers') && istable(r.observers), ...
-    'Saved run is missing final observer data.');
-observerICs = r.observers.initial_state;
-stabilities = r.observers.stability_index;
-measCfg = s.measurements;
-sunFcn = @(t) sun_pos_bc4bp(t,s.LU,s.TU,s.theta0,s.i_sun);
-
-[estimate,cov,screeningCount] = cr3bp_ekf( ...
-    observerICs,tracking.truth,tracking.t_TU,s.P0,s.Q,s.R,s.mu,s.LU, ...
-    sunFcn,s.sun_exclusion,s.moon_exclusion,s.earth_exclusion,false,measCfg);
-[J,~,~,~] = compute_cost( ...
-    tracking.truth,estimate,cov,stabilities,'SOO',s.costFlags,s.cost);
-metrics = diagnostic_metrics(tracking.truth,estimate,cov,s.LU,s.TU);
-out = struct('Objective',J,'RMSEPos_km',metrics.RMSEPos_km, ...
-    'EffectiveSigmaPos_km',metrics.EffectiveSigmaPos_km, ...
-    'ScreeningCount',screeningCount);
-end
-
-
-function m = diagnostic_metrics(truth,estimate,cov,LU,TU)
-VU = LU/TU;
-err = estimate-truth;
-m.RMSEPos_km = sqrt(mean(sum(err(:,1:3).^2,2)))*LU;
-m.RMSEVel_kms = sqrt(mean(sum(err(:,4:6).^2,2)))*VU;
-N = size(cov,1);
-effPos = zeros(N,1);
-for k = 1:N
-    P = squeeze(cov(k,:,:));
-    P = 0.5*(P+P');
-    effPos(k) = max(det(P(1:3,1:3)),realmin)^(1/6);
-end
-m.EffectiveSigmaPos_km = mean(effPos)*LU;
-end
-
-
-function summaryTable = summarize_screening_runs(runs,missions)
-conditions = [true false];
-rows = numel(missions)*numel(conditions);
-missionColumn = strings(rows,1); useScreening = false(rows,1); nRuns = nan(rows,1);
-objectiveMean = nan(rows,1); objectiveStd = nan(rows,1);
-rmseMean = nan(rows,1); rmseStd = nan(rows,1);
-sigmaMean = nan(rows,1); sigmaStd = nan(rows,1);
-screenMean = nan(rows,1); screenStd = nan(rows,1);
-row = 0;
-for mission = missions
-    for condition = conditions
-        row = row + 1;
-        x = runs(runs.Mission == mission & runs.UseScreening == condition,:);
-        assert(height(x) == 20, ...
-            'Expected 20 GA sensitivity runs for %s/screening=%d.',mission,condition);
-        missionColumn(row) = mission;
-        useScreening(row) = condition;
-        nRuns(row) = height(x);
-        [objectiveMean(row),objectiveStd(row)] = sample_statistics(x.Objective);
-        [rmseMean(row),rmseStd(row)] = sample_statistics(x.RMSEPos_km);
-        [sigmaMean(row),sigmaStd(row)] = sample_statistics(x.EffectiveSigmaPos_km);
-        [screenMean(row),screenStd(row)] = sample_statistics(x.ScreeningCount);
-    end
-end
-summaryTable = table(missionColumn,useScreening,nRuns, ...
-    objectiveMean,objectiveStd,rmseMean,rmseStd,sigmaMean,sigmaStd, ...
-    screenMean,screenStd,'VariableNames',{ ...
-    'Mission','UseScreening','NRuns','ObjectiveMean','ObjectiveStd', ...
-    'RMSEPosMean_km','RMSEPosStd_km','EffectiveSigmaPosMean_km', ...
-    'EffectiveSigmaPosStd_km','ScreeningCountMean','ScreeningCountStd'});
+selected = table(missionColumn,panelKey,panelLabel,runFile,bestObjective,seedColumn, ...
+    'VariableNames',{'Mission','PanelKey','PanelLabel','RunFile','BestObjective','Seed'});
 end
 
 
@@ -632,38 +452,6 @@ xlabel(ax,'Target case','FontWeight','bold'); ylabel(ax,yLabel,'FontWeight','bol
 apply_figure_style(ax);
 lgd = legend(ax,b,cellstr(optimizers),'Location','northoutside', ...
     'Orientation','horizontal','NumColumns',numel(optimizers));
-format_legend(lgd);
-export_preview(fig,figureDir,stem,saveFigures);
-end
-
-
-function plot_screening_metric(summaryTable,missions,valueField,errorField, ...
-    yLabel,stem,figureDir,saveFigures)
-conditions = [true false];
-values = nan(numel(missions),2); errors = values;
-for m = 1:numel(missions)
-    for c = 1:2
-        row = summaryTable(summaryTable.Mission == missions(m) & ...
-            summaryTable.UseScreening == conditions(c),:);
-        assert(height(row) == 1,'Missing screening sensitivity row.');
-        values(m,c) = row.(valueField); errors(m,c) = row.(errorField);
-    end
-end
-fig = create_paper_figure(7.4,4.8); ax = axes(fig);
-hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
-for c = 1:2
-    x = b(c).XEndPoints;
-    lowerErrors = min(max(errors(:,c),0),max(values(:,c),0));
-    errorbar(ax,x,values(:,c),lowerErrors,max(errors(:,c),0), ...
-        'k.','LineWidth',1.25,'CapSize',8,'HandleVisibility','off');
-end
-b(1).DisplayName = 'Screening ON'; b(2).DisplayName = 'Screening OFF';
-ax.XTick = 1:numel(missions); ax.XTickLabel = cellstr(mission_labels(missions));
-xlabel(ax,'Target case','FontWeight','bold'); ylabel(ax,yLabel,'FontWeight','bold');
-apply_figure_style(ax);
-lgd = legend(ax,b,{'Screening ON','Screening OFF'}, ...
-    'Location','northoutside','Orientation','horizontal','NumColumns',2);
 format_legend(lgd);
 export_preview(fig,figureDir,stem,saveFigures);
 end
