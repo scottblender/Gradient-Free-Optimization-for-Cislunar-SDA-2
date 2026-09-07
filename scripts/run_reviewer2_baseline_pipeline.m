@@ -11,7 +11,7 @@ function report = run_reviewer2_baseline_pipeline(saveFigures)
 %
 % This is 40 unique configurations x 20 seeds = 800 optimization runs.
 % The script validates every saved run, aggregates mean +/- sample standard
-% deviation metrics, generates measurement/observer-count/period sensitivity
+% deviation metrics, generates FE convergence and baseline-sensitivity
 % figures, and exports best-run observer-geometry panels for 3/5/7/10 sensors.
 %
 % Usage:
@@ -24,6 +24,7 @@ saveFigures = logical(saveFigures);
 
 paths = setup_project();
 budget = 6000;
+plotStartFE = 60;
 seeds = 0:19;
 optimizer = "GA";
 measurements = ["ANGLES_ONLY","ANGLES_RANGE"];
@@ -34,6 +35,7 @@ studyID = "reviewer2_baseline_v1";
 baselineRoot = fullfile(paths.runs,'BASELINE');
 expectedGroups = 2*(4*3 + 4 + 4);
 expectedRuns = expectedGroups*numel(seeds);
+expectedConvergenceFigures = numel(missions)*numel(measurements) + numel(measurements);
 
 fprintf('\n--- Reviewer 2 baseline pipeline ---\n');
 fprintf('Optimizer:                   GA\n');
@@ -94,6 +96,26 @@ if saveFigures
     if ~isfolder(figureDir), mkdir(figureDir); end
 end
 
+% FE convergence for the observer-count comparison. Hold mission,
+% measurement model, and duration fixed so only 3/5/7/10 observers vary.
+for mission = missions
+    for meas = measurements
+        plot_observer_count_convergence(results,analysisDir,mission,meas, ...
+            observerCounts,budget,plotStartFE, ...
+            "baseline_convergence_vs_observers_"+mission_code(mission)+ ...
+            "_"+measurement_code(meas),figureDir,saveFigures);
+    end
+end
+
+% FE convergence for Gateway-duration sensitivity. Use the common 3-observer
+% design so the only varying baseline factor is 1/3/5 target periods.
+for meas = measurements
+    plot_gateway_period_convergence(results,analysisDir,meas,3,gatewayPeriods, ...
+        budget,plotStartFE, ...
+        "baseline_convergence_vs_periods_"+measurement_code(meas), ...
+        figureDir,saveFigures);
+end
+
 % Observer-count sensitivity at the nominal one-period Gateway duration.
 metricSpecs = { ...
     'BestJMean','BestJStd','Final best objective','objective'; ...
@@ -138,6 +160,7 @@ report.budget = budget;
 report.seeds = seeds;
 report.expectedGroups = expectedGroups;
 report.expectedRuns = expectedRuns;
+report.expectedConvergenceFigures = expectedConvergenceFigures;
 report.analysisDirectory = string(analysisDir);
 report.figureDirectory = figureDir;
 report.summary = summary;
@@ -151,6 +174,7 @@ report.geometryDetails = geometryDetails;
 fprintf('\nReviewer 2 baseline pipeline passed.\n');
 fprintf('Validated runs: %d/%d\n',sum(inventory.valid),expectedRuns);
 fprintf('Validated configurations: %d/%d\n',height(results),expectedGroups);
+fprintf('Baseline convergence figures: %d\n',expectedConvergenceFigures);
 fprintf('Processed data: %s\n',analysisDir);
 if saveFigures
     fprintf('Paper-style previews: %s\n',figureDir);
@@ -288,6 +312,88 @@ formatted = table(mission_labels(results.Mission),measurement_labels(results.Mea
     compose('%.5g +/- %.3g',results.RuntimeMean_s,results.RuntimeStd_s), ...
     'VariableNames',{'Case','Measurement','Observers','Periods','Runs', ...
     'BestObjective','RMSEPosition_km','EffectiveSigmaPosition_km','Runtime_s'});
+end
+
+
+function plot_observer_count_convergence(results,analysisDir,mission,measurement, ...
+    observerCounts,budget,plotStartFE,stem,figureDir,saveFigures)
+fig = create_paper_figure(7.2,4.6); ax = axes(fig);
+hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+colors = lines(numel(observerCounts)); handles = gobjects(numel(observerCounts),1);
+for q = 1:numel(observerCounts)
+    row = results(results.Mission == mission & ...
+        results.Measurement == measurement & ...
+        results.NumObservers == observerCounts(q) & results.NPeriods == 1,:);
+    assert(height(row) == 1,'Missing observer-count convergence configuration.');
+    curve = load_ga_curve(analysisDir,row.ComparisonKey,budget);
+    valid = isfinite(curve.mean) & curve.fe >= plotStartFE;
+    assert(any(valid),'No baseline convergence data for observer count %d.',observerCounts(q));
+    x = double(curve.fe(valid)); y = double(curve.mean(valid));
+    handles(q) = stairs(ax,x,y,'Color',colors(q,:), ...
+        'LineWidth',2.0,'DisplayName',string(observerCounts(q))+" observers");
+    markerStride = max(1,round(numel(x)/12));
+    markerIdx = unique([1:markerStride:numel(x),numel(x)]);
+    plot(ax,x(markerIdx),y(markerIdx),'o','Color',colors(q,:), ...
+        'MarkerFaceColor',colors(q,:),'MarkerSize',4,'HandleVisibility','off');
+end
+xlim(ax,[plotStartFE budget]);
+xticks(ax,unique([plotStartFE 1000:1000:budget budget]));
+xlabel(ax,'Function evaluations','FontWeight','bold');
+ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
+apply_figure_style(ax);
+lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',2);
+format_legend(lgd);
+export_preview(fig,figureDir,stem,saveFigures);
+end
+
+
+function plot_gateway_period_convergence(results,analysisDir,measurement,nObs, ...
+    gatewayPeriods,budget,plotStartFE,stem,figureDir,saveFigures)
+fig = create_paper_figure(7.2,4.6); ax = axes(fig);
+hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+colors = lines(numel(gatewayPeriods)); handles = gobjects(numel(gatewayPeriods),1);
+for q = 1:numel(gatewayPeriods)
+    row = results(results.Mission == "LUNAR_GATEWAY" & ...
+        results.Measurement == measurement & results.NumObservers == nObs & ...
+        results.NPeriods == gatewayPeriods(q),:);
+    assert(height(row) == 1,'Missing Gateway-period convergence configuration.');
+    curve = load_ga_curve(analysisDir,row.ComparisonKey,budget);
+    valid = isfinite(curve.mean) & curve.fe >= plotStartFE;
+    assert(any(valid),'No Gateway convergence data for %d periods.',gatewayPeriods(q));
+    x = double(curve.fe(valid)); y = double(curve.mean(valid));
+    label = string(gatewayPeriods(q))+" period";
+    if gatewayPeriods(q) ~= 1, label = label+"s"; end
+    handles(q) = stairs(ax,x,y,'Color',colors(q,:), ...
+        'LineWidth',2.0,'DisplayName',label);
+    markerStride = max(1,round(numel(x)/12));
+    markerIdx = unique([1:markerStride:numel(x),numel(x)]);
+    plot(ax,x(markerIdx),y(markerIdx),'o','Color',colors(q,:), ...
+        'MarkerFaceColor',colors(q,:),'MarkerSize',4,'HandleVisibility','off');
+end
+xlim(ax,[plotStartFE budget]);
+xticks(ax,unique([plotStartFE 1000:1000:budget budget]));
+xlabel(ax,'Function evaluations','FontWeight','bold');
+ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
+apply_figure_style(ax);
+lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',numel(gatewayPeriods));
+format_legend(lgd);
+export_preview(fig,figureDir,stem,saveFigures);
+end
+
+
+function curve = load_ga_curve(analysisDir,comparisonKey,budget)
+file = fullfile(analysisDir,"convergence_"+string(comparisonKey)+".mat");
+assert(isfile(file),'Missing baseline convergence file: %s',file);
+S = load(file,'curves');
+assert(isfield(S,'curves') && numel(S.curves) == 1 && ...
+    upper(string(S.curves(1).optimizer)) == "GA", ...
+    'Baseline convergence file must contain exactly one GA curve.');
+curve = S.curves(1);
+assert(numel(curve.fe) == budget && curve.fe(end) == budget && ...
+    numel(curve.mean) == budget, ...
+    'Baseline convergence curve does not span the prescribed FE budget.');
 end
 
 
