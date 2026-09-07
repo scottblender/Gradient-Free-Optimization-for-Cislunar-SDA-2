@@ -3,9 +3,8 @@ function figureFiles = plot_reviewer2_best_trajectories(analysisDir,saveFigures,
 %
 % This plotting-only helper uses the processed Reviewer 2 pilot outputs and
 % does not rerun any optimization. It matches the study-definition CR3BP
-% camera (perspective, view(-37.5,30)), emphasizes the EKF estimate, and
-% uses a centered 3-D plotting region with explicit margins so the projected
-% x/y/z axis labels remain inside the export canvas.
+% camera (perspective, view(-37.5,30)), uses the same target-case colors as
+% the manuscript introduction figures, and keeps Earth out of result plots.
 %
 % Usage:
 %   plot_reviewer2_best_trajectories
@@ -147,6 +146,8 @@ truth = tracking.truth(:,1:3);
 estimate = tracking.estimate(:,1:3);
 mu = runState.settings.mu;
 LU = runState.settings.LU;
+mission = string(runState.settings.mission.type);
+targetColor = reviewer2_target_color(mission);
 moonCenter = [1-mu,0,0];
 moonRadius = 1737.1/LU;
 [xL1,xL2] = collinear_lagrange_points(mu);
@@ -168,11 +169,14 @@ hold(ax,'on');
 box(ax,'on');
 axis(ax,'equal');
 
+% Keep the target visually identical to its introduction-case trajectory.
+% The EKF estimate is neutral so it remains distinguishable in the blue
+% low-thrust case as well as in the red/purple target cases.
 hTruth = plot3(ax,truth(:,1),truth(:,2),truth(:,3), ...
-    '--','Color',[0.55 0.55 0.55],'LineWidth',1.25, ...
+    '-','Color',targetColor,'LineWidth',2.8, ...
     'DisplayName','Truth trajectory');
 hEstimate = plot3(ax,estimate(:,1),estimate(:,2),estimate(:,3), ...
-    '-','Color',[0.00 0.28 0.85],'LineWidth',2.9, ...
+    '--','Color',[0.22 0.22 0.22],'LineWidth',1.7, ...
     'DisplayName','EKF estimate');
 
 [sx,sy,sz] = sphere(30);
@@ -222,8 +226,8 @@ ax.ZLabel.FontSize = 14;
 % Create the legend, then explicitly restore the centered axes Position.
 % This prevents northoutside legend layout from shifting/shrinking the 3-D
 % axes differently for different trajectory geometries.
-lgd = legend(ax,[hEstimate hTruth hMoon hL1 hL2 hStart hEnd], ...
-    {'EKF estimate','Truth trajectory','Moon','L1','L2','Start','End'}, ...
+lgd = legend(ax,[hTruth hEstimate hMoon hL1 hL2 hStart hEnd], ...
+    {'Truth trajectory','EKF estimate','Moon','L1','L2','Start','End'}, ...
     'Orientation','horizontal','NumColumns',4,'Box','on');
 lgd.FontName = 'Times New Roman';
 lgd.FontSize = 12;
