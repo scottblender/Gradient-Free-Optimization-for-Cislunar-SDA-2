@@ -6,6 +6,10 @@ function details = plot_reviewer2_constellation_geometry(selection,figureDir,ste
 % shown with the saved target truth trajectory. This exposes constellation
 % geometry directly, rather than plotting only target/EKF estimation error.
 %
+% Target trajectories use the same mission colors as the tracking-case
+% introduction figures. Earth is intentionally omitted so the result panels
+% stay focused on the lunar-region constellation geometry.
+%
 % Required selection columns:
 %   Mission, PanelKey, PanelLabel, RunFile, BestObjective
 %
@@ -67,9 +71,11 @@ end
 function fig = make_geometry_figure(runState,tracking)
 mu = runState.settings.mu;
 LU = runState.settings.LU;
+mission = string(runState.settings.mission.type);
 truth = tracking.truth(:,1:3);
 observers = runState.observers;
 nObs = height(observers);
+targetColor = reviewer2_target_color(mission);
 
 fig = figure('Color','w','Units','inches','Position',[1 1 7.6 7.0], ...
     'PaperUnits','inches','PaperSize',[7.6 7.0], ...
@@ -81,8 +87,8 @@ ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 hold(ax,'on'); box(ax,'on'); axis(ax,'equal');
 
-hTarget = plot3(ax,truth(:,1),truth(:,2),truth(:,3),'k--', ...
-    'LineWidth',2.5,'DisplayName','Target trajectory');
+hTarget = plot3(ax,truth(:,1),truth(:,2),truth(:,3),'-', ...
+    'Color',targetColor,'LineWidth',2.8,'DisplayName','Target trajectory');
 
 observerColors = lines(max(nObs,1));
 allObserverPoints = zeros(0,3);
@@ -105,15 +111,9 @@ for j = 1:nObs
 end
 set(hObserver,'HandleVisibility','on','DisplayName','Observer orbits');
 
-earthCenter = [-mu,0,0];
 moonCenter = [1-mu,0,0];
-earthRadius = 6378.1366/LU;
 moonRadius = 1737.1/LU;
 [sx,sy,sz] = sphere(30);
-hEarth = surf(ax,earthCenter(1)+earthRadius*sx, ...
-    earthCenter(2)+earthRadius*sy,earthCenter(3)+earthRadius*sz, ...
-    'FaceColor',[0.62 0.68 0.74],'EdgeColor','none', ...
-    'FaceLighting','gouraud','DisplayName','Earth');
 hMoon = surf(ax,moonCenter(1)+moonRadius*sx, ...
     moonCenter(2)+moonRadius*sy,moonCenter(3)+moonRadius*sz, ...
     'FaceColor',[0.72 0.72 0.72],'EdgeColor','none', ...
@@ -128,7 +128,9 @@ hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',8, ...
     'MarkerFaceColor',[0.82 0.82 0.82],'MarkerEdgeColor','k', ...
     'LineWidth',1.0,'DisplayName','L2');
 
-allPoints = [truth;allObserverPoints;earthCenter;moonCenter;xL1 0 0;xL2 0 0];
+% Size the result panel from the target/observer lunar-region geometry only.
+% Earth is intentionally excluded from both the drawing and axis limits.
+allPoints = [truth;allObserverPoints;moonCenter;xL1 0 0;xL2 0 0];
 xlim(ax,padded_limits(allPoints(:,1),0.06));
 ylim(ax,padded_limits(allPoints(:,2),0.08));
 zlim(ax,padded_limits(allPoints(:,3),0.08));
@@ -141,8 +143,8 @@ set(ax,'FontName','Times New Roman','FontSize',12,'FontWeight','bold', ...
     'LineWidth',1.2,'Layer','top');
 ax.XLabel.FontSize = 14; ax.YLabel.FontSize = 14; ax.ZLabel.FontSize = 14;
 
-lgd = legend(ax,[hTarget hObserver hEarth hMoon hL1 hL2], ...
-    {'Target trajectory','Observer orbits','Earth','Moon','L1','L2'}, ...
+lgd = legend(ax,[hTarget hObserver hMoon hL1 hL2], ...
+    {'Target trajectory','Observer orbits','Moon','L1','L2'}, ...
     'Orientation','horizontal','NumColumns',3,'Box','on');
 lgd.FontName = 'Times New Roman'; lgd.FontSize = 12; lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [18 10]; lgd.Units = 'normalized';
