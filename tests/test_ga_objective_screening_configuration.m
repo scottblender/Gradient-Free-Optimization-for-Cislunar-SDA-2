@@ -45,8 +45,8 @@ expected = [ ...
 
 starts = zeros(size(caseCodes));
 for k = 1:numel(caseCodes)
-    marker = 'Code = "' + caseCodes(k) + '"';
-    idx = strfind(studyRaw,char(marker));
+    marker = sprintf('Code = "%s"',char(caseCodes(k)));
+    idx = strfind(studyRaw,marker);
     assert(numel(idx) == 1, ...
         'Expected exactly one GA sensitivity case block for %s.',caseCodes(k));
     starts(k) = idx;
@@ -62,16 +62,17 @@ for k = 1:numel(caseCodes)
     end
     block = string(blockRaw);
 
-    assert(contains(block,'Label = "' + caseLabels(k) + '"'), ...
+    labelToken = string(sprintf('Label = "%s"',char(caseLabels(k))));
+    assert(contains(block,labelToken), ...
         'GA sensitivity case %s has the wrong label.',caseCodes(k));
-    assert(contains(block,"Screening = " + expected(k,1)), ...
-        'GA sensitivity case %s has the wrong screening switch.',caseCodes(k));
-    assert(contains(block,"J1 = " + expected(k,2)), ...
-        'GA sensitivity case %s has the wrong J1 switch.',caseCodes(k));
-    assert(contains(block,"J2 = " + expected(k,3)), ...
-        'GA sensitivity case %s has the wrong J2 switch.',caseCodes(k));
-    assert(contains(block,"J3 = " + expected(k,4)), ...
-        'GA sensitivity case %s has the wrong J3 switch.',caseCodes(k));
+
+    names = ["Screening","J1","J2","J3"];
+    for j = 1:numel(names)
+        switchToken = string(sprintf('%s = %d',char(names(j)),expected(k,j)));
+        assert(contains(block,switchToken), ...
+            'GA sensitivity case %s has the wrong %s switch.', ...
+            caseCodes(k),names(j));
+    end
 end
 
 % Only the combined-objective OFF case should disable screening.
