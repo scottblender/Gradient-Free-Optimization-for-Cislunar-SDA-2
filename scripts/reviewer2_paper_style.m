@@ -1,11 +1,9 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% The 3-D result figures intentionally match the tracking-case figures in
-% plot_study_definition_figures.m: 7.6 x 7.0 inch canvas, centered inner
-% axes box, manuscript camera, and Times New Roman with 12-point minimum
-% text. Two-dimensional result figures are standalone 6.5-inch-wide paper
-% figures so LaTeX can assemble them with subfigure/subcaption as needed.
+% All manuscript camera settings live here so perspective changes do not
+% require editing individual plotters. The legacy geometryAzimuth/
+% geometryElevation fields remain the default/fallback camera.
 
 style.fontName = 'Times New Roman';
 style.fontSize = 12;
@@ -24,18 +22,48 @@ style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = 6.5;
 style.convergenceFigureHeight = 4.6;
 
-% Shared 3-D layout used by the manuscript trajectory/result figures.
-% The low-thrust study-definition panel has a small local camera override
-% in plot_study_definition_figures.m; all other 3-D figures use this view.
+% Shared 3-D layout and fallback camera.
 style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
 style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
+style.geometryProjection = 'perspective';
 style.geometryXPadding = 0.08;
 style.geometryYPadding = 0.10;
 style.geometryZPadding = 0.10;
+
+% -------------------------------------------------------------------------
+% Camera controls: orbit-family study-definition figures.
+% Each view is [azimuth elevation] in degrees. Edit these values here only.
+% DRO preserves the current top-down orthographic presentation by default.
+% -------------------------------------------------------------------------
+style.orbitFamilyViews.northern_halo = [-37.5 30];
+style.orbitFamilyViews.southern_halo = [-37.5 30];
+style.orbitFamilyViews.northern_rectilinear = [-37.5 30];
+style.orbitFamilyViews.southern_rectilinear = [-37.5 30];
+style.orbitFamilyViews.dro_family = [0 90];
+
+style.orbitFamilyProjections.northern_halo = 'perspective';
+style.orbitFamilyProjections.southern_halo = 'perspective';
+style.orbitFamilyProjections.northern_rectilinear = 'perspective';
+style.orbitFamilyProjections.southern_rectilinear = 'perspective';
+style.orbitFamilyProjections.dro_family = 'orthographic';
+
+% -------------------------------------------------------------------------
+% Camera controls: target/maneuver trajectory figures.
+% These settings are used by both the study-definition tracking cases and
+% the baseline/comparison trajectory results. Low thrust is intentionally
+% offset slightly so its projected path does not appear to cross the Moon.
+% -------------------------------------------------------------------------
+style.maneuverViews.LUNAR_GATEWAY = [-37.5 30];
+style.maneuverViews.LOW_THRUST_TRANSFER = [-47.5 35];
+style.maneuverViews.GATEWAY_IMPULSE = [-37.5 30];
+
+style.maneuverProjections.LUNAR_GATEWAY = 'perspective';
+style.maneuverProjections.LOW_THRUST_TRANSFER = 'perspective';
+style.maneuverProjections.GATEWAY_IMPULSE = 'perspective';
 
 % Fixed qualitative palette so optimizer identity never changes by figure.
 style.optimizerOrder = ["GA","PSO","BAYESIAN","ABC","ACO"];
