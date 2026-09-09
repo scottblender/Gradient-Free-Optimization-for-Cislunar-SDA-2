@@ -4,7 +4,8 @@ function style = reviewer2_paper_style()
 % The 3-D result figures intentionally match the tracking-case figures in
 % plot_study_definition_figures.m: 7.6 x 7.0 inch canvas, centered inner
 % axes box, manuscript camera, and Times New Roman with 12-point minimum
-% text. This keeps the introduction and results visually identical.
+% text. Two-dimensional result figures are standalone 6.5-inch-wide paper
+% figures so LaTeX can assemble them with subfigure/subcaption as needed.
 
 style.fontName = 'Times New Roman';
 style.fontSize = 12;
@@ -16,12 +17,12 @@ style.capSize = 7;
 style.alphaBand = 0.16;
 style.exportDpi = 300;
 
-% Journal-sized 2-D figures.
+% Standalone journal-sized 2-D figures.
 style.figureWidth = 6.5;
 style.figureHeight = 4.6;
-style.panelFigureHeight = 6.2;
+style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = 6.5;
-style.convergenceFigureHeight = 6.2;
+style.convergenceFigureHeight = 4.6;
 
 % Exact 3-D layout used by the introductory tracking-case figures.
 style.geometryFigureWidth = 7.6;
