@@ -12,7 +12,8 @@ function manifest = make_reviewer2_curated_figures(reports,saveFigures)
 %   * orbit-family summaries use NHO, SHO, NNRHO, SNRHO, and DRO;
 %   * 3-D trajectory figures are produced only for comparison and baseline;
 %   * result trajectories use the established introduction-figure renderer;
-%   * all 2-D figures are standalone for LaTeX subfigure/subcaption assembly.
+%   * all 2-D figures are standalone for LaTeX subfigure/subcaption assembly;
+%   * all final axes have grid lines off and the surrounding axes box off.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -271,7 +272,7 @@ order = style.optimizerOrder(ismember(style.optimizerOrder,R.Optimizer));
 R = sort_to_order(R,'Optimizer',order);
 colors = colors_for_optimizers(R.Optimizer,style);
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
 b = bar(ax,1:height(R),values,0.72,'FaceColor','flat'); b.CData = colors;
 errorbar(ax,1:height(R),values,errors,'k.','LineWidth',1.0, ...
@@ -317,7 +318,7 @@ function plot_comparison_metric(r,valueField,stdField,yLabel,stem,out,saveFigure
 R = r.results; missions = string(r.missions); optimizers = string(r.optimizers);
 [values,errors] = grouped_values(R,missions,optimizers,valueField,stdField);
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
 for k = 1:numel(optimizers)
     b(k).FaceColor = optimizer_color(optimizers(k),style);
@@ -377,7 +378,7 @@ end
 function plot_baseline_observer_metric(r,mission,valueField,stdField,yLabel,out,stem,saveFigures,style)
 R = r.results; measurements = ["ANGLES_ONLY","ANGLES_RANGE"]; counts = [3 5 7 10];
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on'); handles = gobjects(2,1);
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off'); handles = gobjects(2,1);
 for m = 1:2
     values = nan(size(counts)); errors = values;
     for k = 1:numel(counts)
@@ -399,7 +400,7 @@ end
 function plot_baseline_duration_metric(r,measurement,valueField,stdField,yLabel,out,stem,saveFigures,style)
 R = r.results; counts = [3 5 7 10]; periods = [1 3 5]; colors = lines(numel(counts));
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on'); handles = gobjects(numel(counts),1);
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off'); handles = gobjects(numel(counts),1);
 for k = 1:numel(counts)
     values = nan(size(periods)); errors = values;
     for p = 1:numel(periods)
@@ -453,7 +454,7 @@ for m = 1:3
     end
 end
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:3,values,'grouped'); drawnow;
 for c = 1:2
     b(c).FaceColor = style.configurationColors(c,:);
@@ -589,7 +590,7 @@ for m = 1:3
     end
 end
 fig = paper_figure(style.figureWidth,style.figureHeight+0.35,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,x,V,'stacked','BarWidth',0.82); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = x; ax.XTickLabel = cellstr(tickLabels); ylim(ax,[0 108]);
@@ -614,7 +615,7 @@ for g = 1:4
     for f = 1:5, V(g,f) = 100*rows.Fraction(rows.Family == families(f)); end
 end
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:4,V,'stacked','BarWidth',0.78); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = 1:4; ax.XTickLabel = cellstr(labels); ylim(ax,[0 100]);
@@ -628,7 +629,7 @@ end
 %% Shared convergence/data helpers
 function plot_curve_overlay(curves,labels,colors,budget,out,stem,saveFigures,style)
 fig = paper_figure(style.convergenceFigureWidth,style.convergenceFigureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 handles = gobjects(numel(curves),1); allY = zeros(0,1);
 for k = 1:numel(curves)
     c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean); assert(any(valid),'No convergence FE >= 60.');
@@ -695,7 +696,8 @@ end
 
 function style_axes(ax,style)
 set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
-    'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top');
+    'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top', ...
+    'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontSize = style.labelFontSize; ax.YLabel.FontSize = style.labelFontSize;
 end
 
