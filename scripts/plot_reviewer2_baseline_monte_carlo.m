@@ -2,9 +2,10 @@ function details = plot_reviewer2_baseline_monte_carlo(samples,summary,outDir,sa
 %PLOT_REVIEWER2_BASELINE_MONTE_CARLO Export separate local-MC boxplots.
 %
 % Each baseline configuration is written as its own EPS/PNG so the paper can
-% assemble 3/5/7/10-observer panels with subfigure/subcaption. The boxplot
-% contains all local design samples, including sample 1 (the optimized GA
-% reference), and the optimized objective is shown as a red horizontal line.
+% assemble panels with subfigure/subcaption. The boxplot contains all local
+% design samples, including sample 1 (the optimized GA reference), and the
+% optimized objective is shown as a red horizontal line. Final axes use no
+% grid lines and no surrounding axes box.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -35,7 +36,7 @@ for k = 1:height(summary)
         'Renderer','painters','InvertHardcopy','off');
     movegui(fig,'center');
     ax = axes(fig,'Units','normalized','Position',[0.18 0.18 0.76 0.74]);
-    hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+    hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 
     hBox = boxchart(ax,ones(height(rows),1),rows.TotalCost, ...
         'BoxFaceColor',style.optimizerColors(1,:), ...
@@ -49,7 +50,8 @@ for k = 1:height(summary)
     ylabel(ax,'Total cost','FontWeight','bold');
     set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
         'FontWeight','bold','LineWidth',style.axisLineWidth, ...
-        'TickDir','out','Layer','top');
+        'TickDir','out','Layer','top','Box','off', ...
+        'XGrid','off','YGrid','off','ZGrid','off');
     ax.XLabel.FontSize = style.labelFontSize;
     ax.YLabel.FontSize = style.labelFontSize;
 
