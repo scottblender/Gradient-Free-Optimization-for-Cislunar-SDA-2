@@ -67,6 +67,7 @@ function test_project_structure()
         'test_visibility_keepout_definition', 'tests/test_visibility_keepout_definition.m'
         'test_visibility_trajectories', 'tests/test_visibility_trajectories.m'
         'test_reviewer2_paper_figures_configuration', 'tests/test_reviewer2_paper_figures_configuration.m'
+        'test_reviewer2_legend_configuration', 'tests/test_reviewer2_legend_configuration.m'
         'test_baseline_monte_carlo_configuration', 'tests/test_baseline_monte_carlo_configuration.m'
     };
 
