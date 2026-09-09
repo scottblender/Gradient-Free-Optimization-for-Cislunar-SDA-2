@@ -13,6 +13,8 @@ function manifest = make_reviewer2_curated_figures(reports,saveFigures)
 %   * 3-D trajectory figures are produced only for comparison and baseline;
 %   * result trajectories use the established introduction-figure renderer;
 %   * all 2-D figures are standalone for LaTeX subfigure/subcaption assembly;
+%   * convergence figures show only the 20-run mean best-so-far curves;
+%     run-to-run variability remains in metric summaries/tables;
 %   * all final axes have grid lines off and the surrounding axes box off.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -45,7 +47,7 @@ if isfield(reports,'runtime')
 
     plot_runtime_convergence(r,out,saveFigures,style);
     manifest = add_manifest(manifest,"runtime","runtime_1200_convergence", ...
-        "Five-method equal-FE convergence comparison.");
+        "Five-method equal-FE mean convergence comparison.");
 end
 
 %% Full 6000-FE optimizer comparison
@@ -635,14 +637,7 @@ for k = 1:numel(curves)
     c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean); assert(any(valid),'No convergence FE >= 60.');
     x = double(c.fe(valid)); y = double(c.mean(valid));
     handles(k) = stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth,'DisplayName',string(labels(k)));
-    dEnd = double(c.std(find(valid,1,'last')));
-    if isfinite(dEnd)
-        errorbar(ax,x(end),y(end),dEnd,'o','Color',colors(k,:),'MarkerFaceColor',colors(k,:), ...
-            'MarkerSize',5,'LineWidth',1,'CapSize',style.capSize,'HandleVisibility','off');
-        allY = [allY;y;y(end)-dEnd;y(end)+dEnd]; %#ok<AGROW>
-    else
-        allY = [allY;y]; %#ok<AGROW>
-    end
+    allY = [allY;y]; %#ok<AGROW>
 end
 allY = allY(isfinite(allY)); lo = min(allY); hi = max(allY); span = max(hi-lo,0.05*max(1,abs(hi)));
 ylim(ax,[lo-0.06*span hi+0.08*span]); xlim(ax,[60 budget]);
