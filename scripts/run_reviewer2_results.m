@@ -85,6 +85,18 @@ if saveFigures
         plot_reviewer2_screening_summary(reports.objective_screening,true);
     end
 
+    if isfield(reports,'baseline')
+        durationStem = plot_reviewer2_baseline_duration_matrix(reports.baseline,true);
+        durationRow = table("baseline",string(durationStem), ...
+            "Gateway duration and observer-count interaction for AO and AR.", ...
+            'VariableNames',reports.paperFigureManifest.Properties.VariableNames);
+        reports.paperFigureManifest = [reports.paperFigureManifest;durationRow];
+        baselineRows = reports.paperFigureManifest( ...
+            reports.paperFigureManifest.Study == "baseline",:);
+        writetable(baselineRows,fullfile( ...
+            char(reports.baseline.analysisDirectory),'paper_figure_manifest.csv'));
+    end
+
     if isfield(reports,'comparison')
         rankingStem = plot_reviewer2_optimizer_ranking(reports.comparison,true);
         rankingRow = table("comparison",string(rankingStem), ...
