@@ -951,6 +951,8 @@ gatewayCfg = target_case_config("LUNAR_GATEWAY");
 transferCfg = target_case_config("LOW_THRUST_TRANSFER");
 [tTransfer,sTransfer,transferInfo] = build_target_truth( ...
     transferCfg,table(),{}, {}, {},mu,odeOptions);
+[departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits( ...
+    sTransfer(1,1:6),sTransfer(end,1:6),projectPaths.catalog);
 
 impulseCfg = target_case_config("GATEWAY_IMPULSE");
 [tImpulse,sImpulse,impulseInfo] = build_target_truth( ...
@@ -1000,6 +1002,11 @@ export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
 figTransfer = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figTransfer);
 prepare_axes(ax);
+endpointColor = [0.70,0.70,0.70];
+hEndpoint = plot3(ax,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3), ...
+    '-','Color',endpointColor,'LineWidth',1.0);
+plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3), ...
+    '-','Color',endpointColor,'LineWidth',1.0,'HandleVisibility','off');
 hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3),'-','Color',cTransfer,'LineWidth',3.0);
 hStart = plot3(ax,sTransfer(1,1),sTransfer(1,2),sTransfer(1,3),'o','MarkerSize',9,'MarkerFaceColor',cGateway,'MarkerEdgeColor','k','LineWidth',1.2);
 hEnd = plot3(ax,sTransfer(end,1),sTransfer(end,2),sTransfer(end,3),'s','MarkerSize',9,'MarkerFaceColor',cTransfer,'MarkerEdgeColor','k','LineWidth',1.2);
@@ -1007,8 +1014,8 @@ hMoon = draw_moon(ax,mu,LU);
 hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
 hL2 = plot3(ax,xL2,0,0,'v','MarkerFaceColor',cPoint,'MarkerEdgeColor','k','MarkerSize',7,'LineWidth',1.0);
 format_case_axes(ax);
-legendHandle = legend(ax,[hTransfer,hStart,hEnd,hMoon,hL1,hL2], ...
-    {'Transfer','Start','End','Moon','L1','L2'}, ...
+legendHandle = legend(ax,[hEndpoint,hTransfer,hStart,hEnd,hMoon,hL1,hL2], ...
+    {'Endpoint orbits','Transfer','Start','End','Moon','L1','L2'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_case_legend(legendHandle,4);
 finalize_centered_3d_axes(ax,legendHandle,plotPosition);
@@ -1047,7 +1054,6 @@ nominalPeriluneEpoch_TU = [NaN;NaN;impulseInfo.periluneEpochNominal_TU];
 transferFinalResidualNorm = [NaN;transferInfo.finalResidualNorm;NaN];
 caseMetadata = table(caseName,targetDefinition,duration_TU,deltaV_m_s,impulseDirection,nominalPeriluneEpoch_TU,transferFinalResidualNorm);
 metadataFile = fullfile(outputDir,'tracking_case_metadata.csv'); writetable(caseMetadata,metadataFile);
-
 conditionCase = ["Lunar Gateway";"Lunar Gateway";"Low-thrust transfer";"Low-thrust transfer";"Perilune impulse";"Perilune impulse";"Perilune impulse"];
 condition = ["Initial";"Final";"Departure";"Arrival";"Pre-impulse";"Post-impulse";"Final"];
 caseEpoch_TU = [tGateway(1);tGateway(end);tTransfer(1);tTransfer(end);0;0;tImpulse(end)];
@@ -1150,6 +1156,39 @@ h = surf(ax,radius*x+1-mu,radius*y,radius*z, ...
     'EdgeColor','none','FaceLighting','gouraud');
 camlight(ax,'headlight');
 material(ax,'dull');
+end
+
+
+function [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits(startState,endState,catalogFile)
+catalog = load(catalogFile,'T');
+departureOrbit = find_reference_orbit_for_state(catalog.T,startState);
+arrivalOrbit = find_reference_orbit_for_state(catalog.T,endState);
+end
+
+
+function orbitState = find_reference_orbit_for_state(T,targetState)
+assert(istable(T) && ismember('state',T.Properties.VariableNames), ...
+    'Observer catalog must contain the state trajectory column.');
+targetState = double(targetState(:).');
+bestError = inf;
+bestOrbit = [];
+for k = 1:height(T)
+    state = T.state{k};
+    if isempty(state) || size(state,2) < 6, continue; end
+    state6 = double(state(:,1:6));
+    state6 = state6(all(isfinite(state6),2),:);
+    if isempty(state6), continue; end
+    thisError = min(vecnorm(state6-targetState,2,2));
+    if thisError < bestError
+        bestError = thisError;
+        bestOrbit = state6;
+    end
+end
+assert(~isempty(bestOrbit) && isfinite(bestError), ...
+    'Could not identify a low-thrust endpoint reference orbit.');
+assert(bestError < 2.5e-2, ...
+    'Low-thrust endpoint reference-orbit mismatch: %.6e.',bestError);
+orbitState = bestOrbit;
 end
 
 
