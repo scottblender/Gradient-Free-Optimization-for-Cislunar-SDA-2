@@ -82,7 +82,6 @@ test_visibility_trajectories
 % Study-definition figures and FE result processing.
 plot_study_definition_figures
 process_fe_convergence
-print_observer_ics_from_experiment_summary
 ```
 
 Run `setup_project` first when calling functions or scripts directly. The main
@@ -100,11 +99,14 @@ Every supported optimizer uses `MAX_EVALS` as its only search stopping
 criterion. The supported methods are GA, PSO, Bayesian optimization, ABC, and
 ACO. The GUI and batch launchers do not set or fall back to `MAX_ITERS`.
 
-The reviewer-facing comparison uses a common 6000-FE budget, angles-only
+The reviewer-facing full comparison uses a common 6000-FE budget, angles-only
 measurements, three observers, all three cost terms, visibility screening, the
 three fixed target cases, and optimizer seeds 0--19. Measurement noise uses the
-fixed seed 1001 for every independent optimizer run. The default matrix contains
-300 runs: 5 methods x 3 target cases x 20 seeds.
+fixed seed 1001 for every independent optimizer run. The scalable-method matrix
+contains 240 runs: 4 methods x 3 target cases x 20 seeds. Bayesian optimization
+is evaluated separately in the focused 1200-FE runtime study (5 methods x 20
+seeds for Lunar Gateway), where its equal-FE runtime and objective benefit can
+be assessed without committing to an impractically long 6000-FE campaign.
 
 The GA baseline preserves the original sensitivity grid: both measurement
 models, 3/5/7/10 observers, and 1/3/5 periods for the Gateway case. It adds the
@@ -114,9 +116,11 @@ low-thrust and Gateway-impulse cases and repeats every configuration for seeds
 ```powershell
 .\scripts\batch\run_baseline_soo.ps1
 .\scripts\batch\run_comparison_soo.ps1
+.\scripts\batch\run_runtime_comparison_1200_soo.ps1
+.\scripts\batch\run_ga_objective_screening_soo.ps1
 ```
 
-Both launchers accept `-MatlabExe`, `-EvalBudget`, `-Seeds`, and `-Pilot`.
+All four launchers accept `-MatlabExe`, `-EvalBudget`, `-Seeds`, and `-Pilot`.
 Pilot and full runs use the same parallel-optimization path. They show
 completed-run progress in PowerShell. Completed runs are skipped
 safely; an incomplete run must be inspected or moved instead of being silently
@@ -189,23 +193,25 @@ process_fe_convergence( ...
     "reviewer2_comparison_pilot_1200_v1",0,1200,false);
 ```
 
-After the studies finish, aggregate the data and convergence histories with:
+After the studies finish, run the manuscript processors. Each validates the
+complete factorial, writes numeric and formatted CSV tables, prints the key
+contrasts, and exports Times New Roman EPS/PNG figures with 12-point minimum
+text:
 
 ```matlab
-paths = setup_project();
+reports = run_reviewer2_results; % process all four completed studies
 
-[comparisonSummary, comparisonInventory] = process_fe_convergence( ...
-    fullfile(paths.runs,'COMPARISON'), ...
-    "reviewer2_comparison_v1",0:19,6000,false);
-
-[baselineSummary, baselineInventory] = process_fe_convergence( ...
-    fullfile(paths.runs,'BASELINE'), ...
-    "reviewer2_baseline_v1",0:19,6000,false,"GA");
+% Or inspect selected studies independently:
+comparisonReport = run_reviewer2_results("comparison");
+selectedReports = run_reviewer2_results(["runtime","objective_screening"]);
 ```
 
 Convergence histories are aligned by cumulative function evaluations, not
-iterations. The processor retains missing early checkpoints as `NaN` rather
-than inventing values, and saves aggregate data without saving figures.
+iterations, and the manuscript curves show the across-seed mean with sample
+standard-deviation bands. The objective/screening processor compares total
+objective only for the matched combined-objective ON/OFF pair; J1/J2/J3-only
+cases are compared using physical tracking, uncertainty, stability, coverage,
+and orbit-family outcomes.
 
 ## Data, caches, and outputs
 
@@ -216,22 +222,22 @@ than inventing values, and saves aggregate data without saving figures.
 | Raw JPL CSV files | `data/JPL_Data/` |
 | Interpolated orbit cache | `data/cache/orbits/` |
 | Transfer truth cache | `data/cache/transfers/` |
-| Individual optimization runs | `results/runs/<timestamp>/...` |
-| PowerShell baseline pilot | `results/runs/BASELINE_PILOT/runs_GA/...` |
-| PowerShell comparison pilot | `results/runs/COMPARISON_PILOT_1200/runs_<algorithm>/...` |
-| PowerShell baseline study | `results/runs/BASELINE/runs_GA/...` |
-| PowerShell comparison study | `results/runs/COMPARISON/runs_<algorithm>/...` |
+| Individual optimization runs | `results/<study>/...` |
+| PowerShell baseline pilot | `results/BASELINE_PILOT/runs_GA/...` |
+| PowerShell comparison pilot | `results/COMPARISON_PILOT_1200/runs_<algorithm>/...` |
+| PowerShell baseline study | `results/BASELINE/runs_GA/...` |
+| PowerShell comparison study | `results/COMPARISON/runs_<algorithm>/...` |
+| GA objective/screening study | `results/GA_OBJECTIVE_SCREENING/...` |
+| Focused Bayesian runtime study | `results/RUNTIME_COMPARISON_1200/...` |
 | Orbit catalog figures | `results/database_figs/` |
 
 An explicit `RUN_DIR` environment variable or GUI output-folder selection still
 takes precedence over the default run location. Each run retains its existing
 `data/`, `figs/`, and `logs/` subfolders.
 
-Post-processing scripts search the new results locations and retain support for
-legacy root-level results folders. To select a specific existing study, make
-its `runs_GA` or `runs` folder the MATLAB current folder and call the corresponding
-post-processing script by name after `setup_project`. The observer-IC utility's
-`RUN_ROOT` is relative to `results/`, with a project-root fallback.
+The schema-v2 processors read the named study roots above. Legacy Excel/FIG
+post-processors were removed so older result formats cannot be mistaken for the
+equal-FE reviewer study.
 
 The data and results contents are ignored by Git. Updating the repository does
 not move or delete your local catalog, old caches, or previous results. New

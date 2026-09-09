@@ -89,7 +89,9 @@ requiredMetrics = [ ...
     "solver_calls","parallel_overflow_evals","optimization_runtime_s", ...
     "budget_runtime_s","solver_wall_runtime_s","rmse_pos_km", ...
     "mean_effective_sigma_pos_km","mean_stability", ...
-    "coverage_epoch_fraction","screening_count","run_file"];
+    "coverage_epoch_fraction","mean_available_observers", ...
+    "J1_weighted","J2_weighted","J3_weighted", ...
+    "screening_count","run_file"];
 assert(all(ismember(requiredMetrics,string(runMetrics.Properties.VariableNames))), ...
     'Processed comparison metrics are missing required fields.');
 assert(all(runMetrics.search_fe == budget), ...
@@ -100,7 +102,8 @@ assert(all(runMetrics.parallel_overflow_evals == 0), ...
 results = build_comparison_results( ...
     summary,runMetrics,missions,optimizers,seeds,budget);
 [objectiveTable,trackingTable] = format_comparison_tables(results);
-rankings = build_rankings(results,missions,optimizers);
+[rankings,overallRanking,bestByMission] = ...
+    build_rankings(results,missions,optimizers);
 bestGeometryRuns = select_best_geometry_runs( ...
     summary,runMetrics,missions,optimizers,seeds);
 
@@ -110,6 +113,10 @@ fprintf('\n--- 6000-FE tracking/design results (mean +/- sample std) ---\n');
 disp(trackingTable);
 fprintf('\n--- Mission-wise objective/runtime rankings ---\n');
 disp(rankings);
+fprintf('\n--- Overall optimizer ranking (mean mission rank) ---\n');
+disp(overallRanking);
+fprintf('\n--- Best optimizer for each target case ---\n');
+disp(bestByMission);
 fprintf('\n--- Best observed runs used for optimizer geometry panels ---\n');
 disp(bestGeometryRuns(:,{'Mission','PanelLabel','Seed','BestObjective'}));
 
@@ -119,6 +126,10 @@ writetable(objectiveTable, ...
 writetable(trackingTable, ...
     fullfile(analysisDir,'comparison_6000_tracking_formatted.csv'));
 writetable(rankings,fullfile(analysisDir,'comparison_6000_rankings.csv'));
+writetable(overallRanking, ...
+    fullfile(analysisDir,'comparison_6000_overall_ranking.csv'));
+writetable(bestByMission, ...
+    fullfile(analysisDir,'comparison_6000_best_by_mission.csv'));
 writetable(bestGeometryRuns, ...
     fullfile(analysisDir,'comparison_6000_geometry_selected_runs.csv'));
 
@@ -152,6 +163,9 @@ plot_grouped_metric(results,missions,optimizers, ...
 plot_grouped_metric(results,missions,optimizers, ...
     'MeanStabilityMean','MeanStabilityStd','Mean observer stability index', ...
     'comparison_6000_stability',figureDir,saveFigures);
+plot_comparison_metric_panel(results,missions,optimizers,figureDir,saveFigures);
+plot_comparison_component_panel(results,missions,optimizers,figureDir,saveFigures);
+plot_overall_ranking(overallRanking,optimizers,figureDir,saveFigures);
 
 geometryDetails = plot_reviewer2_constellation_geometry( ...
     bestGeometryRuns,figureDir,"comparison_geometry",saveFigures);
@@ -174,6 +188,8 @@ report.results = results;
 report.objectiveTable = objectiveTable;
 report.trackingTable = trackingTable;
 report.rankings = rankings;
+report.overallRanking = overallRanking;
+report.bestByMission = bestByMission;
 report.bestGeometryRuns = bestGeometryRuns;
 report.geometryDetails = geometryDetails;
 
@@ -214,7 +230,11 @@ rmseMean = nan(nRows,1); rmseStd = nan(nRows,1);
 sigmaMean = nan(nRows,1); sigmaStd = nan(nRows,1);
 stabilityMean = nan(nRows,1); stabilityStd = nan(nRows,1);
 coverageMean = nan(nRows,1); coverageStd = nan(nRows,1);
+availableMean = nan(nRows,1); availableStd = nan(nRows,1);
 screeningMean = nan(nRows,1); screeningStd = nan(nRows,1);
+j1Mean = nan(nRows,1); j1Std = nan(nRows,1);
+j2Mean = nan(nRows,1); j2Std = nan(nRows,1);
+j3Mean = nan(nRows,1); j3Std = nan(nRows,1);
 
 row = 0;
 for mission = missions
@@ -264,8 +284,13 @@ for mission = missions
             sample_statistics(metricRows.mean_stability);
         [coverageMean(row),coverageStd(row)] = ...
             sample_statistics(metricRows.coverage_epoch_fraction);
+        [availableMean(row),availableStd(row)] = ...
+            sample_statistics(metricRows.mean_available_observers);
         [screeningMean(row),screeningStd(row)] = ...
             sample_statistics(metricRows.screening_count);
+        [j1Mean(row),j1Std(row)] = sample_statistics(metricRows.J1_weighted);
+        [j2Mean(row),j2Std(row)] = sample_statistics(metricRows.J2_weighted);
+        [j3Mean(row),j3Std(row)] = sample_statistics(metricRows.J3_weighted);
     end
 end
 
@@ -274,7 +299,8 @@ results = table( ...
     solverCallsMean,solverCallsStd,bestJMean,bestJStd, ...
     runtimeMean,runtimeStd,solverWallMean,solverWallStd, ...
     rmseMean,rmseStd,sigmaMean,sigmaStd,stabilityMean,stabilityStd, ...
-    coverageMean,coverageStd,screeningMean,screeningStd, ...
+    coverageMean,coverageStd,availableMean,availableStd, ...
+    screeningMean,screeningStd,j1Mean,j1Std,j2Mean,j2Std,j3Mean,j3Std, ...
     'VariableNames',{ ...
     'Mission','Optimizer','NRuns','SearchFE', ...
     'SolverCallsMean','SolverCallsStd','BestJMean','BestJStd', ...
@@ -282,7 +308,9 @@ results = table( ...
     'SolverWallRuntimeStd_s','RMSEPosMean_km','RMSEPosStd_km', ...
     'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km', ...
     'MeanStabilityMean','MeanStabilityStd','CoverageMean','CoverageStd', ...
-    'ScreeningMean','ScreeningStd'});
+    'AvailableObserversMean','AvailableObserversStd', ...
+    'ScreeningMean','ScreeningStd','J1Mean','J1Std','J2Mean','J2Std', ...
+    'J3Mean','J3Std'});
 end
 
 
@@ -305,14 +333,17 @@ trackingTable = table( ...
     compose('%.5g +/- %.3g', ...
         results.MeanStabilityMean,results.MeanStabilityStd), ...
     compose('%.4f +/- %.3f',results.CoverageMean,results.CoverageStd), ...
+    compose('%.4f +/- %.3f', ...
+        results.AvailableObserversMean,results.AvailableObserversStd), ...
     compose('%.5g +/- %.3g',results.ScreeningMean,results.ScreeningStd), ...
     'VariableNames',{ ...
     'Case','Optimizer','RMSEPosition_km','EffectiveSigmaPosition_km', ...
-    'MeanStability','CoverageFraction','RejectedMeasurementOpportunities'});
+    'MeanStability','CoverageFraction','MeanAvailableObservers', ...
+    'RejectedMeasurementOpportunities'});
 end
 
 
-function rankings = build_rankings(results,missions,optimizers)
+function [rankings,overall,bestByMission] = build_rankings(results,missions,optimizers)
 rows = numel(missions)*numel(optimizers);
 missionColumn = strings(rows,1); optimizerColumn = strings(rows,1);
 objectiveRank = nan(rows,1); runtimeRank = nan(rows,1);
@@ -340,6 +371,50 @@ end
 rankings = table(missionColumn,optimizerColumn,objectiveRank,runtimeRank, ...
     bestJMean,runtimeMean,'VariableNames',{ ...
     'Mission','Optimizer','ObjectiveRank','RuntimeRank','BestJMean','RuntimeMean_s'});
+
+averageObjectiveRank = nan(numel(optimizers),1);
+averageRuntimeRank = nan(numel(optimizers),1);
+objectiveWins = zeros(numel(optimizers),1);
+normalizedObjective = nan(numel(optimizers),1);
+for k = 1:numel(optimizers)
+    rows = rankings(rankings.Optimizer == optimizers(k),:);
+    averageObjectiveRank(k) = mean(rows.ObjectiveRank);
+    averageRuntimeRank(k) = mean(rows.RuntimeRank);
+    objectiveWins(k) = sum(rows.ObjectiveRank == 1);
+
+    normalized = nan(numel(missions),1);
+    for m = 1:numel(missions)
+        missionRows = results(results.Mission == missions(m),:);
+        lo = min(missionRows.BestJMean); hi = max(missionRows.BestJMean);
+        value = missionRows.BestJMean(missionRows.Optimizer == optimizers(k));
+        if hi > lo
+            normalized(m) = (value-lo)/(hi-lo);
+        else
+            normalized(m) = 0;
+        end
+    end
+    normalizedObjective(k) = mean(normalized);
+end
+overall = table(optimizers(:),averageObjectiveRank,normalizedObjective, ...
+    objectiveWins,averageRuntimeRank,'VariableNames',{ ...
+    'Optimizer','MeanObjectiveRank','MeanNormalizedObjective', ...
+    'MissionWins','MeanRuntimeRank'});
+overall = sortrows(overall, ...
+    {'MeanObjectiveRank','MeanNormalizedObjective','MeanRuntimeRank'}, ...
+    {'ascend','ascend','ascend'});
+overall.OverallRank = (1:height(overall))';
+
+missionColumn = missions(:); bestOptimizer = strings(numel(missions),1);
+bestObjectiveMean = nan(numel(missions),1); bestObjectiveStd = nan(numel(missions),1);
+for m = 1:numel(missions)
+    missionRows = results(results.Mission == missions(m),:);
+    [bestObjectiveMean(m),idx] = min(missionRows.BestJMean);
+    bestOptimizer(m) = missionRows.Optimizer(idx);
+    bestObjectiveStd(m) = missionRows.BestJStd(idx);
+end
+bestByMission = table(missionColumn,bestOptimizer,bestObjectiveMean, ...
+    bestObjectiveStd,'VariableNames',{ ...
+    'Mission','BestOptimizer','BestObjectiveMean','BestObjectiveStd'});
 end
 
 
@@ -403,8 +478,16 @@ for mission = missions
         valid = isfinite(meanBest) & fe >= plotStartFE;
         assert(any(valid),'No convergence data for %s/%s.',mission,optimizers(a));
         x = fe(valid); y = meanBest(valid);
+        deviation = double(curve.std(valid));
+        bandIdx = unique(round(linspace(1,numel(x),min(240,numel(x)))));
+        bandX = x(bandIdx); bandMean = y(bandIdx);
+        bandStd = deviation(bandIdx);
+        bandColor = 0.82*[1 1 1] + 0.18*colors(a,:);
+        fill(ax,[bandX;flipud(bandX)], ...
+            [max(0,bandMean-bandStd);flipud(bandMean+bandStd)], ...
+            bandColor,'EdgeColor','none','HandleVisibility','off');
         lineHandles(a) = stairs(ax,x,y,'Color',colors(a,:), ...
-            'LineWidth',2.0,'DisplayName',optimizers(a));
+            'LineWidth',2.0,'DisplayName',optimizer_label(optimizers(a)));
         markerStride = max(1,round(numel(x)/12));
         markerIdx = unique([1:markerStride:numel(x),numel(x)]);
         plot(ax,x(markerIdx),y(markerIdx),'o','Color',colors(a,:), ...
@@ -416,12 +499,122 @@ for mission = missions
     xlabel(ax,'Function evaluations','FontWeight','bold');
     ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
     apply_figure_style(ax);
-    lgd = legend(ax,lineHandles,cellstr(optimizers), ...
+    lgd = legend(ax,lineHandles,cellstr(optimizer_labels(optimizers)), ...
         'Location','northoutside','Orientation','horizontal', ...
         'NumColumns',numel(optimizers));
     format_legend(lgd);
     export_preview(fig,figureDir, ...
         "comparison_6000_convergence_"+mission_code(mission),saveFigures);
+end
+end
+
+
+function plot_comparison_metric_panel(results,missions,optimizers,figureDir,saveFigures)
+specs = { ...
+    'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
+    'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km', ...
+        'Effective position sigma (km)'; ...
+    'MeanStabilityMean','MeanStabilityStd','Mean stability index'; ...
+    'AvailableObserversMean','AvailableObserversStd', ...
+        'Mean available observers'};
+fig = create_paper_figure(7.6,6.5);
+tiled = tiledlayout(fig,2,2,'Padding','compact','TileSpacing','compact');
+for q = 1:size(specs,1)
+    ax = nexttile(tiled); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+    [values,errors] = metric_arrays(results,missions,optimizers,specs{q,1},specs{q,2});
+    b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
+    for a = 1:numel(optimizers)
+        lower = min(max(errors(:,a),0),max(values(:,a),0));
+        errorbar(ax,b(a).XEndPoints,values(:,a),lower,max(errors(:,a),0), ...
+            'k.','LineWidth',1.0,'CapSize',6,'HandleVisibility','off');
+        b(a).DisplayName = optimizer_label(optimizers(a));
+    end
+    ax.XTick = 1:numel(missions);
+    ax.XTickLabel = cellstr(mission_labels(missions));
+    ylabel(ax,specs{q,3},'FontWeight','bold');
+    apply_figure_style(ax);
+    if q == 1
+        lgd = legend(ax,b,cellstr(optimizer_labels(optimizers)), ...
+            'Orientation','horizontal','NumColumns',numel(optimizers));
+        format_legend(lgd);
+        lgd.Layout.Tile = 'north';
+    end
+end
+xlabel(tiled,'Target case','FontName','Times New Roman', ...
+    'FontSize',14,'FontWeight','bold');
+export_preview(fig,figureDir,'comparison_6000_tracking_metrics',saveFigures);
+end
+
+
+function plot_comparison_component_panel(results,missions,optimizers,figureDir,saveFigures)
+specs = { ...
+    'J1Mean','J1Std','Weighted J_1'; ...
+    'J2Mean','J2Std','Weighted J_2'; ...
+    'J3Mean','J3Std','Weighted J_3'};
+fig = create_paper_figure(7.6,6.4);
+tiled = tiledlayout(fig,2,2,'Padding','compact','TileSpacing','compact');
+for q = 1:3
+    ax = nexttile(tiled); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+    [values,errors] = metric_arrays(results,missions,optimizers,specs{q,1},specs{q,2});
+    b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
+    for a = 1:numel(optimizers)
+        lower = min(max(errors(:,a),0),max(values(:,a),0));
+        errorbar(ax,b(a).XEndPoints,values(:,a),lower,max(errors(:,a),0), ...
+            'k.','LineWidth',1.0,'CapSize',6,'HandleVisibility','off');
+    end
+    ax.XTick = 1:numel(missions);
+    ax.XTickLabel = cellstr(mission_labels(missions));
+    ylabel(ax,specs{q,3},'Interpreter','tex','FontWeight','bold');
+    apply_figure_style(ax);
+end
+ax = nexttile(tiled); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+[values,errors] = metric_arrays(results,missions,optimizers, ...
+    'BestJMean','BestJStd');
+b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
+for a = 1:numel(optimizers)
+    lower = min(max(errors(:,a),0),max(values(:,a),0));
+    errorbar(ax,b(a).XEndPoints,values(:,a),lower,max(errors(:,a),0), ...
+        'k.','LineWidth',1.0,'CapSize',6,'HandleVisibility','off');
+    b(a).DisplayName = optimizer_label(optimizers(a));
+end
+ax.XTick = 1:numel(missions); ax.XTickLabel = cellstr(mission_labels(missions));
+ylabel(ax,'Total objective','FontWeight','bold'); apply_figure_style(ax);
+lgd = legend(ax,b,cellstr(optimizer_labels(optimizers)), ...
+    'Orientation','horizontal','NumColumns',numel(optimizers));
+format_legend(lgd);
+lgd.Layout.Tile = 'north';
+export_preview(fig,figureDir,'comparison_6000_objective_components',saveFigures);
+end
+
+
+function plot_overall_ranking(overall,optimizers,figureDir,saveFigures)
+values = nan(numel(optimizers),1);
+for k = 1:numel(optimizers)
+    values(k) = overall.MeanObjectiveRank(overall.Optimizer == optimizers(k));
+end
+fig = create_paper_figure(6.6,4.2); ax = axes(fig);
+bar(ax,1:numel(optimizers),values,0.68,'FaceColor',[0.22 0.45 0.78]);
+box(ax,'on'); grid(ax,'on');
+ax.XTick = 1:numel(optimizers);
+ax.XTickLabel = cellstr(optimizer_labels(optimizers));
+ylim(ax,[0 numel(optimizers)+0.5]);
+xlabel(ax,'Optimizer','FontWeight','bold');
+ylabel(ax,'Mean objective rank','FontWeight','bold');
+apply_figure_style(ax);
+export_preview(fig,figureDir,'comparison_6000_overall_rank',saveFigures);
+end
+
+
+function [values,errors] = metric_arrays(results,missions,optimizers,valueField,errorField)
+values = nan(numel(missions),numel(optimizers)); errors = values;
+for m = 1:numel(missions)
+    for a = 1:numel(optimizers)
+        row = results(results.Mission == missions(m) & ...
+            results.Optimizer == optimizers(a),:);
+        assert(height(row) == 1,'Missing metric row for %s/%s.',missions(m),optimizers(a));
+        values(m,a) = row.(valueField);
+        errors(m,a) = row.(errorField);
+    end
 end
 end
 
@@ -460,6 +653,15 @@ end
 function labels = mission_labels(missions)
 missions = string(missions(:)); labels = strings(size(missions));
 for k = 1:numel(missions), labels(k) = mission_label(missions(k)); end
+end
+
+function labels = optimizer_labels(values)
+values = string(values(:)); labels = strings(size(values));
+for k = 1:numel(values), labels(k) = optimizer_label(values(k)); end
+end
+
+function label = optimizer_label(value)
+if upper(string(value)) == "BAYESIAN", label = "BO"; else, label = upper(string(value)); end
 end
 
 function label = mission_label(mission)
@@ -505,6 +707,7 @@ assert(strlength(string(figureDir)) > 0,'Figure directory is empty.');
 base = fullfile(char(figureDir),char(stem));
 print(fig,[base '.eps'],'-depsc','-painters');
 exportgraphics(fig,[base '.png'],'Resolution',300);
+close(fig);
 end
 
 function [mu,sigma] = sample_statistics(values)

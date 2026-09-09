@@ -83,11 +83,19 @@ for m = 1:numel(missions)
 
         x = fe(valid);
         y = meanBest(valid);
+        deviation = double(curve.std(valid));
         finalFE = max(finalFE,x(end));
+
+        bandIdx = unique(round(linspace(1,numel(x),min(200,numel(x)))));
+        bandX = x(bandIdx); bandMean = y(bandIdx); bandStd = deviation(bandIdx);
+        bandColor = 0.82*[1 1 1] + 0.18*colors(a,:);
+        fill(ax,[bandX;flipud(bandX)], ...
+            [max(0,bandMean-bandStd);flipud(bandMean+bandStd)], ...
+            bandColor,'EdgeColor','none','HandleVisibility','off');
 
         handles(a) = stairs(ax,x,y, ...
             'Color',colors(a,:),'LineWidth',2.0, ...
-            'DisplayName',optimizers(a));
+            'DisplayName',optimizer_label(optimizers(a)));
 
         % Sparse markers indicate the plotting grid without obscuring the
         % stair-step convergence trace on a 6000-FE study.
@@ -111,7 +119,7 @@ for m = 1:numel(missions)
     ax.XLabel.FontSize = 14;
     ax.YLabel.FontSize = 14;
 
-    lgd = legend(ax,handles,cellstr(optimizers), ...
+    lgd = legend(ax,handles,cellstr(optimizer_labels(optimizers)), ...
         'Location','northoutside','Orientation','horizontal', ...
         'NumColumns',numel(optimizers),'Box','on');
     lgd.FontName = 'Times New Roman';
@@ -138,6 +146,15 @@ fprintf('Full-FE convergence preview complete.\n');
 if saveFigures
     fprintf('Figures saved under:\n%s\n',figureDir);
 end
+end
+
+function labels = optimizer_labels(values)
+values = string(values(:)); labels = strings(size(values));
+for k = 1:numel(values), labels(k) = optimizer_label(values(k)); end
+end
+
+function label = optimizer_label(value)
+if upper(string(value)) == "BAYESIAN", label = "BO"; else, label = upper(string(value)); end
 end
 
 function analysisDir = newest_analysis_directory(root)

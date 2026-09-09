@@ -96,6 +96,7 @@ runtimeResults = build_runtime_results( ...
 formattedTable = format_runtime_table(runtimeResults);
 slowdownTable = build_bo_slowdown(runtimeResults);
 boDetails = build_bo_details(runMetrics,seeds,budget);
+conclusion = build_runtime_conclusion(runtimeResults);
 
 fprintf('\n--- 1200-FE objective/runtime results (mean +/- sample std) ---\n');
 disp(formattedTable);
@@ -105,6 +106,8 @@ fprintf(['BOTimeRatio = mean BO equal-budget runtime / mean runtime of ' ...
 disp(slowdownTable);
 fprintf('\n--- Bayesian FE/overflow audit ---\n');
 disp(boDetails);
+fprintf('\n--- Equal-FE pilot conclusion ---\n');
+disp(conclusion);
 
 writetable(runtimeResults, ...
     fullfile(analysisDir,'runtime_comparison_1200_results.csv'));
@@ -114,6 +117,8 @@ writetable(slowdownTable, ...
     fullfile(analysisDir,'runtime_comparison_1200_bo_slowdown.csv'));
 writetable(boDetails, ...
     fullfile(analysisDir,'runtime_comparison_1200_bo_audit.csv'));
+writetable(conclusion, ...
+    fullfile(analysisDir,'runtime_comparison_1200_conclusion.csv'));
 
 figureDir = "";
 if saveFigures
@@ -126,6 +131,8 @@ plot_runtime_convergence( ...
 plot_runtime_bar( ...
     runtimeResults,optimizers,figureDir,saveFigures);
 plot_objective_bar( ...
+    runtimeResults,optimizers,figureDir,saveFigures);
+plot_runtime_objective_tradeoff( ...
     runtimeResults,optimizers,figureDir,saveFigures);
 
 report = struct();
@@ -143,6 +150,7 @@ report.runtimeResults = runtimeResults;
 report.formattedTable = formattedTable;
 report.boSlowdown = slowdownTable;
 report.boAudit = boDetails;
+report.conclusion = conclusion;
 
 fprintf('\nReviewer 2 runtime pipeline passed.\n');
 fprintf('Validated runs: %d/%d\n',sum(inventory.valid),expectedRuns);
@@ -280,6 +288,26 @@ assert(all(boDetails.search_fe == budget), ...
 end
 
 
+function conclusion = build_runtime_conclusion(results)
+bo = results(results.Optimizer == "BAYESIAN",:);
+nonBO = results(results.Optimizer ~= "BAYESIAN",:);
+assert(height(bo) == 1 && ~isempty(nonBO),'Incomplete runtime comparison.');
+[bestNonBOObjective,idx] = min(nonBO.BestJMean);
+bestNonBOOptimizer = nonBO.Optimizer(idx);
+objectiveGapPct = 100*(bo.BestJMean-bestNonBOObjective)/max(abs(bestNonBOObjective),eps);
+runtimeRatioVsNonBOMean = bo.BudgetRuntimeMean_s/mean(nonBO.BudgetRuntimeMean_s);
+runtimeRatioVsFastest = bo.BudgetRuntimeMean_s/min(nonBO.BudgetRuntimeMean_s);
+boHasMeanObjectiveBenefit = bo.BestJMean < bestNonBOObjective;
+conclusion = table(bo.BestJMean,bestNonBOOptimizer,bestNonBOObjective, ...
+    objectiveGapPct,bo.BudgetRuntimeMean_s,runtimeRatioVsNonBOMean, ...
+    runtimeRatioVsFastest,boHasMeanObjectiveBenefit, ...
+    'VariableNames',{'BOObjectiveMean','BestNonBOOptimizer', ...
+    'BestNonBOObjectiveMean','BOObjectiveGapPct','BORuntimeMean_s', ...
+    'BORuntimeRatioVsNonBOMean','BORuntimeRatioVsFastest', ...
+    'BOHasMeanObjectiveBenefit'});
+end
+
+
 function plot_runtime_convergence( ...
     analysisDir,optimizers,budget,figureDir,saveFigures)
 
@@ -312,9 +340,16 @@ for k = 1:numel(optimizers)
 
     x = fe(valid);
     y = meanBest(valid);
+    deviation = double(curve.std(valid));
+    bandIdx = unique(round(linspace(1,numel(x),min(180,numel(x)))));
+    bandX = x(bandIdx); bandMean = y(bandIdx); bandStd = deviation(bandIdx);
+    bandColor = 0.82*[1 1 1] + 0.18*colors(k,:);
+    fill(ax,[bandX;flipud(bandX)], ...
+        [max(0,bandMean-bandStd);flipud(bandMean+bandStd)], ...
+        bandColor,'EdgeColor','none','HandleVisibility','off');
     lineHandles(k) = stairs(ax,x,y, ...
         'Color',colors(k,:),'LineWidth',2.0, ...
-        'DisplayName',optimizers(k));
+        'DisplayName',optimizer_label(optimizers(k)));
 
     markerStride = max(1,round(numel(x)/12));
     markerIdx = unique([1:markerStride:numel(x),numel(x)]);
@@ -328,7 +363,7 @@ xticks(ax,unique([plotStartFE 240 480 720 960 budget]));
 xlabel(ax,'Function evaluations','FontWeight','bold');
 ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
 apply_figure_style(ax);
-lgd = legend(ax,lineHandles,cellstr(optimizers), ...
+lgd = legend(ax,lineHandles,cellstr(optimizer_labels(optimizers)), ...
     'Location','northoutside','Orientation','horizontal', ...
     'NumColumns',numel(optimizers));
 lgd.FontSize = 12;
@@ -354,14 +389,16 @@ hold(ax,'on');
 box(ax,'on');
 grid(ax,'on');
 bar(ax,1:numel(optimizers),values,0.72);
-lowerErrors = min(max(errors,0),max(values,0));
+assert(all(values > 0),'Runtime means must be positive for log scaling.');
+lowerErrors = min(max(errors,0),0.9*values);
 upperErrors = max(errors,0);
 errorbar(ax,1:numel(optimizers),values,lowerErrors,upperErrors, ...
     'k.','LineWidth',1.35,'CapSize',9);
 ax.XTick = 1:numel(optimizers);
-ax.XTickLabel = cellstr(optimizers);
+ax.XTickLabel = cellstr(optimizer_labels(optimizers));
 xlabel(ax,'Optimizer','FontWeight','bold');
 ylabel(ax,'Runtime to 1200 FE (s)','FontWeight','bold');
+ax.YScale = 'log';
 apply_figure_style(ax);
 
 export_preview(fig,figureDir,'runtime_comparison_1200_runtime',saveFigures);
@@ -389,12 +426,46 @@ upperErrors = max(errors,0);
 errorbar(ax,1:numel(optimizers),values,lowerErrors,upperErrors, ...
     'k.','LineWidth',1.35,'CapSize',9);
 ax.XTick = 1:numel(optimizers);
-ax.XTickLabel = cellstr(optimizers);
+ax.XTickLabel = cellstr(optimizer_labels(optimizers));
 xlabel(ax,'Optimizer','FontWeight','bold');
 ylabel(ax,'Final best objective','FontWeight','bold');
 apply_figure_style(ax);
 
 export_preview(fig,figureDir,'runtime_comparison_1200_objective',saveFigures);
+end
+
+
+function plot_runtime_objective_tradeoff(results,optimizers,figureDir,saveFigures)
+fig = create_paper_figure(6.8,4.8); ax = axes(fig);
+hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+colors = lines(numel(optimizers));
+for k = 1:numel(optimizers)
+    row = results(results.Optimizer == optimizers(k),:);
+    errorbar(ax,row.BudgetRuntimeMean_s,row.BestJMean,row.BestJStd,row.BestJStd, ...
+        min(row.BudgetRuntimeStd_s,0.9*row.BudgetRuntimeMean_s), ...
+        row.BudgetRuntimeStd_s,'o','Color',colors(k,:), ...
+        'MarkerFaceColor',colors(k,:),'MarkerEdgeColor','k', ...
+        'MarkerSize',7,'LineWidth',1.1,'CapSize',7);
+    text(ax,row.BudgetRuntimeMean_s,row.BestJMean, ...
+        "  "+optimizer_label(optimizers(k)), ...
+        'FontName','Times New Roman','FontSize',12,'FontWeight','bold', ...
+        'VerticalAlignment','bottom');
+end
+ax.XScale = 'log';
+xlabel(ax,'Runtime to 1200 FE (s)','FontWeight','bold');
+ylabel(ax,'Final best objective','FontWeight','bold');
+apply_figure_style(ax);
+export_preview(fig,figureDir,'runtime_comparison_1200_tradeoff',saveFigures);
+end
+
+
+function labels = optimizer_labels(values)
+values = string(values(:)); labels = strings(size(values));
+for k = 1:numel(values), labels(k) = optimizer_label(values(k)); end
+end
+
+function label = optimizer_label(value)
+if upper(string(value)) == "BAYESIAN", label = "BO"; else, label = upper(string(value)); end
 end
 
 
@@ -409,6 +480,8 @@ end
 
 
 function apply_figure_style(ax)
+ax.FontName = 'Times New Roman';
+ax.FontWeight = 'bold';
 ax.FontSize = max(12,ax.FontSize);
 ax.LineWidth = 1.0;
 ax.TickDir = 'out';
@@ -424,6 +497,7 @@ assert(strlength(string(figureDir)) > 0,'Figure directory is empty.');
 base = fullfile(char(figureDir),stem);
 print(fig,[base '.eps'],'-depsc','-painters');
 exportgraphics(fig,[base '.png'],'Resolution',300);
+close(fig);
 end
 
 

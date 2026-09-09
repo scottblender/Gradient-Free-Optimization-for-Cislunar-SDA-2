@@ -8,15 +8,15 @@ function details = plot_reviewer2_constellation_geometry(selection,figureDir,ste
 % slots on the same periodic orbit.
 %
 % Target trajectories use the same mission colors as the tracking-case
-% introduction figures. Earth is intentionally omitted so the result panels
-% stay focused on the lunar-region constellation geometry. Low-thrust panels
-% also show the departure/arrival periodic orbits and transfer endpoints.
+% introduction figures. Earth and the low-thrust endpoint periodic orbits
+% are intentionally omitted so the panels focus on the optimized observer
+% geometry. Low-thrust transfer endpoints are retained as markers.
 %
 % Required selection columns:
 %   Mission, PanelKey, PanelLabel, RunFile, BestObjective
 %
-% The function exports one EPS/PNG panel per row so LaTeX can arrange the
-% panels as subfigures. It also returns the selected orbit/slot/family data.
+% The function exports one EPS/PNG panel per row plus one compact comparison
+% grid per mission. It also returns the selected orbit/slot/family data.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
@@ -34,6 +34,7 @@ if saveFigures
 end
 
 details = table();
+panelFigures = gobjects(height(selection),1);
 for k = 1:height(selection)
     runFile = string(selection.RunFile(k));
     trackingFile = string(fullfile(fileparts(runFile),'tracking_data.mat'));
@@ -49,6 +50,7 @@ for k = 1:height(selection)
         'Selected run does not contain observer solution data.');
 
     fig = make_geometry_figure(r,tracking);
+    panelFigures(k) = fig;
     panelStem = stemPrefix + "_" + mission_code(selection.Mission(k)) + ...
         "_" + sanitize_token(selection.PanelKey(k));
     if saveFigures
@@ -66,6 +68,25 @@ for k = 1:height(selection)
         'RunFile','NumObservers','OrbitFamilies','OrbitIndices','SlotIndices', ...
         'FigureStem'});
     details = [details;row]; %#ok<AGROW>
+end
+
+
+% Also export one concise four-panel comparison per mission. Individual
+% vector panels remain available for custom LaTeX arrangements.
+details.GridFigureStem = strings(height(details),1);
+for mission = unique(string(selection.Mission),'stable')'
+    idx = find(string(selection.Mission) == mission);
+    if numel(idx) < 2, continue; end
+    gridStem = stemPrefix + "_" + mission_code(mission) + "_grid";
+    gridFig = make_geometry_grid(panelFigures(idx),selection.PanelLabel(idx));
+    if saveFigures
+        export_geometry_figure(gridFig,fullfile(figureDir,gridStem));
+        close(gridFig);
+    end
+    details.GridFigureStem(idx) = gridStem;
+end
+if saveFigures
+    close(panelFigures(isgraphics(panelFigures)));
 end
 end
 
@@ -133,26 +154,11 @@ for j = 1:nObs
         'MarkerEdgeColor','k','LineWidth',0.7,'HandleVisibility','off');
 end
 
-% Low-thrust panels retain the same endpoint-orbit context as the
-% introductory target-case figure, while the optimized observer orbits
-% remain the main comparison quantity.
-endpointPoints = zeros(0,3);
-hEndpoint = gobjects(0);
+% Retain only transfer endpoint markers. The Gateway/arrival periodic orbits
+% are not observer candidates and add distracting geometry to this figure.
 hStart = gobjects(0);
 hEnd = gobjects(0);
 if mission == "LOW_THRUST_TRANSFER"
-    assert(size(tracking.truth,2) >= 6, ...
-        'Low-thrust geometry requires six-component saved truth states.');
-    [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits( ...
-        tracking.truth(1,1:6),tracking.truth(end,1:6));
-    cReference = [0.65 0.65 0.65];
-    hEndpoint = plot3(ax,departureOrbit(:,1),departureOrbit(:,2), ...
-        departureOrbit(:,3),'-','Color',cReference,'LineWidth',1.0, ...
-        'DisplayName','Endpoint orbits');
-    plot3(ax,arrivalOrbit(:,1),arrivalOrbit(:,2),arrivalOrbit(:,3),'-', ...
-        'Color',cReference,'LineWidth',1.0,'HandleVisibility','off');
-    endpointPoints = [departureOrbit(:,1:3);arrivalOrbit(:,1:3)];
-
     hStart = plot3(ax,truth(1,1),truth(1,2),truth(1,3),'o', ...
         'MarkerSize',8,'MarkerFaceColor',reviewer2_target_color("LUNAR_GATEWAY"), ...
         'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','Start');
@@ -180,7 +186,7 @@ hL2 = plot3(ax,xL2,0,0,'v','MarkerSize',8, ...
 
 % Size the result panel from lunar-region geometry only. Earth remains
 % intentionally absent from both the drawing and limits.
-allPoints = [truth;allObserverPoints;endpointPoints;moonCenter;xL1 0 0;xL2 0 0];
+allPoints = [truth;allObserverPoints;moonCenter;xL1 0 0;xL2 0 0];
 xlim(ax,padded_limits(allPoints(:,1),0.10));
 ylim(ax,padded_limits(allPoints(:,2),0.12));
 zlim(ax,padded_limits(allPoints(:,3),0.12));
@@ -197,8 +203,8 @@ set(ax,'FontName','Times New Roman','FontSize',12,'FontWeight','bold', ...
 ax.XLabel.FontSize = 14; ax.YLabel.FontSize = 14; ax.ZLabel.FontSize = 14;
 
 if mission == "LOW_THRUST_TRANSFER"
-    legendHandles = [hEndpoint hTarget hObserver hStart hEnd hMoon hL1 hL2];
-    legendLabels = {'Endpoint orbits','Target trajectory','Observer orbits', ...
+    legendHandles = [hTarget hObserver hStart hEnd hMoon hL1 hL2];
+    legendLabels = {'Target trajectory','Observer orbits', ...
         'Start','End','Moon','L1','L2'};
     numColumns = 4;
 else
@@ -214,6 +220,72 @@ lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [18 10];
 lgd.Units = 'normalized';
 finalize_centered_geometry_axes(ax,lgd,plotPosition);
+end
+
+
+function fig = make_geometry_grid(panelFigures,panelLabels)
+% Assemble already-centered vector panels without rerunning propagation.
+n = numel(panelFigures);
+columns = 2;
+rows = ceil(n/columns);
+widthIn = 8.2;
+heightIn = 3.25*rows+0.8;
+fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
+    'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
+    'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
+    'Renderer','painters','InvertHardcopy','off');
+movegui(fig,'center');
+
+left = 0.07;
+right = 0.53;
+panelWidth = 0.40;
+topMargin = 0.12;
+bottomMargin = 0.07;
+verticalGap = 0.055;
+panelHeight = (1-topMargin-bottomMargin-(rows-1)*verticalGap)/rows;
+positions = zeros(n,4);
+copiedAxes = gobjects(n,1);
+for k = 1:n
+    sourceAxes = findobj(panelFigures(k),'Type','axes');
+    assert(numel(sourceAxes) == 1,'Geometry panel must contain one axes object.');
+    copiedAxes(k) = copyobj(sourceAxes,fig);
+    col = mod(k-1,columns)+1;
+    row = floor((k-1)/columns)+1;
+    x = left;
+    if col == 2, x = right; end
+    y = 1-topMargin-row*panelHeight-(row-1)*verticalGap;
+    positions(k,:) = [x y panelWidth panelHeight];
+    copiedAxes(k).Units = 'normalized';
+    copiedAxes(k).PositionConstraint = 'innerposition';
+    copiedAxes(k).Position = positions(k,:);
+    copiedAxes(k).FontSize = 12;
+    copiedAxes(k).XLabel.FontSize = 12;
+    copiedAxes(k).YLabel.FontSize = 12;
+    copiedAxes(k).ZLabel.FontSize = 12;
+    annotation(fig,'textbox',[x y+panelHeight-0.005 panelWidth 0.035], ...
+        'String',string(panelLabels(k)),'HorizontalAlignment','center', ...
+        'VerticalAlignment','bottom','EdgeColor','none', ...
+        'FontName','Times New Roman','FontSize',12,'FontWeight','bold');
+end
+
+lgd = legend(copiedAxes(1),'show');
+lgd.Orientation = 'horizontal';
+lgd.NumColumns = 4;
+lgd.Box = 'on';
+lgd.FontName = 'Times New Roman';
+lgd.FontSize = 12;
+lgd.FontWeight = 'bold';
+lgd.Units = 'normalized';
+drawnow;
+position = lgd.Position;
+position(1) = 0.5-position(3)/2;
+position(2) = 0.965-position(4);
+lgd.Position = position;
+lgd.AutoUpdate = 'off';
+for k = 1:n
+    copiedAxes(k).Position = positions(k,:);
+end
+drawnow;
 end
 
 
@@ -245,61 +317,6 @@ minInset = [0.035 0.045 0.025 0.025];
 ax.LooseInset = max(tightInset,minInset);
 ax.Position = plotPosition;
 drawnow;
-end
-
-
-function [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits(startState,endState)
-% Recover the full periodic orbits containing the fixed LT endpoint states.
-persistent cachedStart cachedEnd cachedDeparture cachedArrival
-startState = double(startState(:).');
-endState = double(endState(:).');
-if ~isempty(cachedStart) && isequal(size(cachedStart),size(startState)) && ...
-        max(abs(cachedStart-startState)) < 1e-12 && ...
-        max(abs(cachedEnd-endState)) < 1e-12
-    departureOrbit = cachedDeparture;
-    arrivalOrbit = cachedArrival;
-    return;
-end
-
-paths = setup_project();
-catalog = load(paths.catalog,'T');
-departureOrbit = find_reference_orbit_for_state(catalog.T,startState);
-arrivalOrbit = find_reference_orbit_for_state(catalog.T,endState);
-cachedStart = startState;
-cachedEnd = endState;
-cachedDeparture = departureOrbit;
-cachedArrival = arrivalOrbit;
-end
-
-
-function orbitState = find_reference_orbit_for_state(T,targetState)
-% Phase-independent catalog lookup used only for LT endpoint visualization.
-assert(istable(T) && ismember('state',T.Properties.VariableNames), ...
-    'Observer catalog must contain the state trajectory column.');
-targetState = targetState(:).';
-assert(numel(targetState)==6 && all(isfinite(targetState)), ...
-    'Reference state must contain six finite CR3BP components.');
-
-bestError = inf;
-bestOrbit = [];
-for k = 1:height(T)
-    state = T.state{k};
-    if isempty(state) || size(state,2)<6, continue; end
-    state6 = state(:,1:6);
-    state6 = state6(all(isfinite(state6),2),:);
-    if isempty(state6), continue; end
-    thisError = min(vecnorm(state6-targetState,2,2));
-    if thisError < bestError
-        bestError = thisError;
-        bestOrbit = state(:,1:6);
-    end
-end
-assert(~isempty(bestOrbit) && isfinite(bestError), ...
-    'Could not identify an LT endpoint reference orbit.');
-assert(bestError < 2.5e-2, ...
-    ['LT endpoint does not match the observer catalog closely enough for ' ...
-     'reference-orbit plotting (minimum state error %.6e).'],bestError);
-orbitState = bestOrbit;
 end
 
 

@@ -83,7 +83,7 @@ for k = 1:size(settings,1)
     setenv(settings{k,1}, settings{k,2});
 end
 
-% Keep pilot results outside results/runs so the full-study processing
+% Keep pilot results outside the named full-study roots so processing
 % script cannot accidentally combine them with publication runs.
 stamp = char(datetime('now', 'Format','yyyyMMdd_HHmmss_SSS'));
 pilotRoot = fullfile(paths.results, ['FE_PILOT_' stamp]);
