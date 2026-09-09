@@ -10,6 +10,7 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 %   8/10/10 percent x/y/z padding
 %   centered north-outside legend with the axes restored afterward
 %   Times New Roman, 12-point minimum text and 14-point axis labels
+%   no grid lines and no surrounding axes box
 %
 % Geometry is qualitative only. The supplied realization should be nearest
 % the 20-run group mean objective; statistical conclusions use group mean
@@ -168,14 +169,15 @@ end
 
 
 function prepare_reference_axes(ax,style)
-hold(ax,'on'); box(ax,'on'); grid(ax,'off');
+hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 axis(ax,'equal');
 view(ax,style.geometryAzimuth,style.geometryElevation);
 ax.Projection = 'perspective';
 xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
 set(ax,'FontName',style.fontName,'FontSize',max(style.fontSize,12), ...
     'FontWeight','bold','LineWidth',style.axisLineWidth, ...
-    'TickLabelInterpreter','tex','Layer','top');
+    'TickLabelInterpreter','tex','Layer','top', ...
+    'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontName = style.fontName; ax.YLabel.FontName = style.fontName;
 ax.ZLabel.FontName = style.fontName;
 ax.XLabel.FontSize = max(style.labelFontSize,14);
@@ -251,7 +253,7 @@ end
 
 
 function format_case_legend(lgd,mission,style)
-lgd.Box = 'on';
+lgd.Box = 'off';
 lgd.FontName = style.fontName;
 lgd.FontSize = max(style.fontSize,12);
 lgd.FontWeight = 'bold';
