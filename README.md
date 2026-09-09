@@ -161,7 +161,7 @@ Final Reviewer 2 figures use:
 - 14 pt axis labels;
 - one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
 - directly overlaid comparable convergence curves on one axes;
-- no filled convergence uncertainty bands; sample standard deviation is shown only at the final FE point;
+- convergence figures show only the 20-run mean best-so-far curves; run-to-run variability is retained in the processed tables and metric figures;
 - no grid lines and no surrounding axes box;
 - 20-run mean +/- sample standard deviation for quantitative comparisons;
 - objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
