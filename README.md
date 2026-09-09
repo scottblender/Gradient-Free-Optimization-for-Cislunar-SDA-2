@@ -19,7 +19,8 @@ MATLAB tools for estimation-driven design of cislunar observer constellations in
 | `scripts/` | Catalog generation and Reviewer 2 result processing |
 | `tests/` | Scientific/configuration regression tests |
 | `data/` | Local catalog, target database, and caches |
-| `results/` | Raw optimization studies and timestamped processed results |
+| `results/` | Raw optimization studies |
+| `COMPILED_REVIEWER_2_RESULTS/` | Timestamped processed Reviewer-2 tables and manuscript figures |
 
 ## Setup
 
@@ -113,7 +114,7 @@ Launcher:
 .\scripts\batch\run_ga_objective_screening_soo.ps1
 ```
 
-Total objective values from `J111`, `J100`, `J010`, and `J001` are different mathematical objectives and are not compared directly. Objective-component studies are interpreted through physical metrics such as RMSE, effective covariance sigma, stability, coverage, and orbit-family selection. The matched `J111` screening ON/OFF pair may be compared directly.
+Total objective values from `J111`, `J100`, `J010`, and `J001` are different mathematical objectives and are not compared directly. Objective-component studies are interpreted primarily through tabulated RMSE, effective covariance sigma, stability, and selected orbit-family distributions. The matched `J111` screening ON/OFF pair may be compared directly.
 
 ## Final Reviewer 2 processing
 
@@ -140,13 +141,13 @@ reports = run_reviewer2_results("comparison");
 reports = run_reviewer2_results(["runtime","comparison"]);
 ```
 
-`run_reviewer2_results` executes the scientific processors with historical previews hidden, moves each new analysis out of the raw-study tree, and calls `make_reviewer2_final_figures`. Final CSVs, convergence MAT files, EPS figures, PNG figures, and the figure manifest are saved directly under `results/` as:
+`run_reviewer2_results` executes the scientific processors with historical previews hidden, moves each new analysis out of the raw-study tree, and calls `make_reviewer2_final_figures`, which routes through the curated manuscript renderer. Final CSVs, convergence MAT files, EPS figures, PNG figures, and the figure manifest are saved directly under:
 
 ```text
-results/runtime_1200_<timestamp>/
-results/comparison_<timestamp>/
-results/baseline_<timestamp>/
-results/objective_screening_<timestamp>/
+COMPILED_REVIEWER_2_RESULTS/runtime_1200_<timestamp>/
+COMPILED_REVIEWER_2_RESULTS/comparison_<timestamp>/
+COMPILED_REVIEWER_2_RESULTS/baseline_<timestamp>/
+COMPILED_REVIEWER_2_RESULTS/objective_screening_<timestamp>/
 ```
 
 The raw optimization runs remain under `results/RUNTIME_COMPARISON_1200/`, `results/COMPARISON/`, `results/BASELINE/`, and `results/GA_OBJECTIVE_SCREENING/`.
@@ -166,14 +167,19 @@ Final Reviewer 2 figures use:
 - the same 7.6 x 7.0 inch centered 3-D layout used by the introductory tracking-case figures;
 - solid observer-orbit lines, duplicate periodic orbits drawn once, no Earth, and low-thrust endpoint-orbit context.
 
-The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in the numerical tables rather than being repeated as a bar figure. Overall optimizer ranks/wins are also retained as tabular/text summaries rather than redundant figures. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
+The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in numerical tables rather than being repeated as a bar figure, and coverage-fraction figures are omitted. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
 
 The final paper figure set emphasizes:
 
 - **runtime:** equal-1200-FE objective, runtime, and convergence;
-- **comparison:** objective relative to the matched AO GA baseline, RMSE, effective uncertainty, stability, convergence, and representative geometry;
-- **baseline:** AO/AR observer-count and Gateway-duration objective/RMSE/uncertainty trends, convergence, and representative geometry;
-- **objective/screening:** matched screening sensitivity, objective-component physical metrics, orbit-family selection, convergence, and representative geometry.
+- **comparison:** objective relative to the matched AO GA baseline, RMSE, effective uncertainty, stability, convergence, five-family orbit-selection summary, and representative optimizer geometry;
+- **baseline:** AO/AR observer-count and Gateway-duration objective/RMSE/uncertainty trends, convergence, five-family orbit-selection summary, and representative 3/5/7/10-observer geometry;
+- **screening ON/OFF:** convergence plus RMSE, effective sigma, stability, and rejected-measurement counts across all three target cases;
+- **objective components:** numerical results in tables plus three mission-specific five-family selection figures with `Combined`, `J_1`, `J_2`, and `J_3` bars.
+
+Trajectory figures are intentionally produced only for the **comparison** and **baseline** studies because those are the geometry comparisons used in the paper. The objective/screening study does not emit trajectory figures.
+
+Orbit-family selection figures use all five manuscript families: `NHO`, `SHO`, `NNRHO`, `SNRHO`, and `DRO`.
 
 ## Baseline local Monte Carlo validation
 
@@ -188,7 +194,7 @@ The default study reproduces the low-thrust AO validation for 3, 5, 7, and 10 ob
 Outputs are saved to:
 
 ```text
-results/baseline_monte_carlo_<timestamp>/
+COMPILED_REVIEWER_2_RESULTS/baseline_monte_carlo_<timestamp>/
 ```
 
 including:
@@ -248,7 +254,7 @@ test_gateway_impulse_case;
 | Raw full comparison | `results/COMPARISON/` |
 | Raw baseline | `results/BASELINE/` |
 | Raw objective/screening | `results/GA_OBJECTIVE_SCREENING/` |
-| Processed final studies | `results/<study>_<timestamp>/` |
-| Baseline Monte Carlo | `results/baseline_monte_carlo_<timestamp>/` |
+| Processed final studies | `COMPILED_REVIEWER_2_RESULTS/<study>_<timestamp>/` |
+| Baseline Monte Carlo | `COMPILED_REVIEWER_2_RESULTS/baseline_monte_carlo_<timestamp>/` |
 
 Historical runs must be interpreted using the mission, visibility, noise, slot-definition, and stopping settings with which they were generated. Do not mix runs generated under different scientific configurations.
