@@ -52,6 +52,7 @@ function test_project_structure()
         'select_reviewer2_representative_runs', 'scripts/select_reviewer2_representative_runs.m'
         'plot_reviewer2_geometry_grid', 'scripts/plot_reviewer2_geometry_grid.m'
         'plot_reviewer2_constellation_geometry', 'scripts/plot_reviewer2_constellation_geometry.m'
+        'make_reviewer2_curated_figures', 'scripts/make_reviewer2_curated_figures.m'
         'make_reviewer2_final_figures', 'scripts/make_reviewer2_final_figures.m'
         'run_reviewer2_results', 'scripts/run_reviewer2_results.m'
         'run_reviewer2_runtime_pipeline', 'scripts/run_reviewer2_runtime_pipeline.m'
