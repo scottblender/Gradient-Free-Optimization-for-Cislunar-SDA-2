@@ -72,9 +72,15 @@ if saveFigures
     fprintf('\n>>> Creating curated journal figures\n');
     reports.paperFigureManifest = make_reviewer2_paper_figures(reports,true);
 
-    % Replace the compact generic screening panel with the four quantities
-    % used to make the screening conclusion directly: total J111 objective,
-    % position RMSE, equal-FE runtime, and rejected measurement opportunities.
+    % Overwrite the generic runtime summary with the reviewer-facing equal-FE
+    % cost/benefit panel that reports BO's objective gap and runtime penalty.
+    if isfield(reports,'runtime')
+        plot_reviewer2_runtime_summary(reports.runtime,true);
+    end
+
+    % Replace the generic screening panel with the four quantities used to
+    % make the screening conclusion directly: total J111 objective, position
+    % RMSE, equal-FE runtime, and rejected measurement opportunities.
     if isfield(reports,'objective_screening')
         plot_reviewer2_screening_summary(reports.objective_screening,true);
     end
