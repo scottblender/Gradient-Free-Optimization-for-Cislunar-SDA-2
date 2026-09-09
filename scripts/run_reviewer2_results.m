@@ -7,9 +7,13 @@ function reports = run_reviewer2_results(studies,saveFigures)
 % deviation across the 20 independent runs. A representative seed is used
 % only to visualize one realizable discrete constellation near the group mean.
 %
-% Legacy per-pipeline preview figures are hidden during data processing. The
-% only manuscript figures users should inspect are the centralized outputs in
-% each newest FE_DATA_*/paper_final directory.
+% Final processed outputs are moved out of the raw study trees and saved as:
+%   results/runtime_1200_<timestamp>/
+%   results/comparison_<timestamp>/
+%   results/baseline_<timestamp>/
+%   results/objective_screening_<timestamp>/
+% CSVs, convergence MAT files, manuscript EPS/PNG figures, and the figure
+% manifest all live directly in those folders.
 
 if nargin < 1 || isempty(studies), studies = "all"; end
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -28,16 +32,15 @@ else
     studies = unique(studies,'stable');
 end
 
-setup_project();
+paths = setup_project();
 reports = struct();
 fprintf('\n=== Reviewer 2 results processing ===\n');
 fprintf('Selected studies: %s\n',strjoin(cellstr(studies),', '));
 fprintf('Save curated paper figures: %s\n',string(saveFigures));
 fprintf('Reported performance statistics: 20-run mean +/- sample standard deviation\n\n');
 
-% The individual processors still contain some historical preview routines.
-% Hide figures while they validate/aggregate data so those obsolete plots do
-% not appear and cannot be mistaken for the final centralized figures.
+% Historical per-pipeline preview routines are hidden. Only the centralized
+% final renderer is intended for manuscript inspection.
 originalFigureVisible = get(groot,'defaultFigureVisible');
 visibilityCleanup = onCleanup(@() set(groot,'defaultFigureVisible',originalFigureVisible)); %#ok<NASGU>
 set(groot,'defaultFigureVisible','off');
@@ -48,6 +51,7 @@ for study = studies
     switch study
         case "runtime"
             [~,tmp] = evalc('run_reviewer2_runtime_pipeline(false)');
+            tmp = relocate_analysis(tmp,paths.results,"runtime_1200");
             reports.runtime = tmp;
             fprintf('\n1200-FE aggregate objective/runtime table:\n');
             disp(tmp.formattedTable);
@@ -58,6 +62,7 @@ for study = studies
 
         case "comparison"
             [~,tmp] = evalc('run_reviewer2_comparison_pipeline(false)');
+            tmp = relocate_analysis(tmp,paths.results,"comparison");
             tmp.results = attach_comparison_keys(tmp.results,tmp.summary);
             reports.comparison = tmp;
             fprintf('\n6000-FE aggregate objective/runtime table:\n');
@@ -71,6 +76,7 @@ for study = studies
 
         case "baseline"
             [~,tmp] = evalc('run_reviewer2_baseline_pipeline(false)');
+            tmp = relocate_analysis(tmp,paths.results,"baseline");
             reports.baseline = tmp;
             fprintf('\nBaseline aggregate table:\n');
             disp(tmp.formattedTable);
@@ -79,6 +85,7 @@ for study = studies
 
         case "objective_screening"
             [~,tmp] = evalc('run_reviewer2_objective_screening_pipeline(false)');
+            tmp = relocate_analysis(tmp,paths.results,"objective_screening");
             reports.objective_screening = tmp;
             fprintf('\nGA objective/screening aggregate results:\n');
             disp(format_objective_screening_for_console(tmp.results));
@@ -88,35 +95,48 @@ for study = studies
             disp(tmp.componentWinners);
     end
     close all force;
+    fprintf('Output: %s\n',reports.(study_field(study)).analysisDirectory);
     fprintf('<<< %s complete in %.1f s\n',upper(strrep(study,'_',' ')),toc(started));
 end
 
-% Restore normal MATLAB figure visibility before the centralized paper
-% renderer. These are the only figures intended for inspection/publication.
 set(groot,'defaultFigureVisible',originalFigureVisible);
 
 if saveFigures
     fprintf('\n>>> Creating curated journal figures\n');
-    reports.paperFigureManifest = make_reviewer2_paper_figures(reports,true);
+    reports.paperFigureManifest = make_reviewer2_final_figures(reports,true);
     fprintf('<<< Curated journal figures complete\n');
 else
     reports.paperFigureManifest = table();
 end
 
 fprintf('\nAll selected result processors completed successfully.\n');
-if saveFigures
-    fprintf(['Final manuscript figures are under the newest FE_DATA_*/paper_final ' ...
-        'directory for each selected study.\n']);
-    fprintf(['Metric/ranking claims use aggregate mean +/- sample standard deviation. ' ...
-        'Representative geometry seeds are recorded only for traceability.\n']);
+fprintf(['Metric/ranking claims use aggregate mean +/- sample standard deviation. ' ...
+    'Representative geometry seeds are recorded only for traceability.\n']);
+fprintf(['For local baseline Monte Carlo validation, run ' ...
+    'run_reviewer2_baseline_monte_carlo separately.\n']);
 end
+
+
+function tmp = relocate_analysis(tmp,resultsRoot,studyName)
+source = string(tmp.analysisDirectory);
+assert(isfolder(source),'Pipeline analysis directory does not exist: %s',source);
+stamp = string(datetime('now','Format','yyyyMMdd_HHmmss_SSS'));
+target = string(fullfile(resultsRoot,studyName+"_"+stamp));
+assert(~isfolder(target),'Timestamped results folder already exists: %s',target);
+[ok,msg] = movefile(char(source),char(target));
+assert(ok,'Could not move processed analysis to %s: %s',target,msg);
+tmp.analysisDirectory = target;
+tmp.figureDirectory = "";
+end
+
+
+function field = study_field(study)
+if study == "objective_screening", field = "objective_screening";
+else, field = study; end
 end
 
 
 function R = attach_comparison_keys(R,S)
-% The comparison aggregate table historically omitted comparison_key even
-% though the convergence MAT files are keyed by it. Attach the validated key
-% to each mission/optimizer row before the centralized renderer runs.
 keys = strings(height(R),1);
 for k = 1:height(R)
     row = S(S.mission == R.Mission(k) & S.optimizer == R.Optimizer(k),:);
