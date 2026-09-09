@@ -162,6 +162,7 @@ Final Reviewer 2 figures use:
 - one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
 - directly overlaid comparable convergence curves on one axes;
 - no filled convergence uncertainty bands; sample standard deviation is shown only at the final FE point;
+- no grid lines and no surrounding axes box;
 - 20-run mean +/- sample standard deviation for quantitative comparisons;
 - objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
 - the same 7.6 x 7.0 inch centered 3-D layout used by the introductory tracking-case figures;
@@ -189,7 +190,12 @@ The local baseline validation from the earlier manuscript is reproduced by a sep
 mcReport = run_reviewer2_baseline_monte_carlo;
 ```
 
-The default study reproduces the low-thrust AO validation for 3, 5, 7, and 10 observers. For each configuration it selects the best observed 6000-FE GA baseline realization as the local reference, then evaluates 250 discrete neighboring designs. The first Monte Carlo sample is exactly the optimized design; orbit indices are perturbed uniformly by up to +/-10 orbit IDs and slot indices by up to +/-5 slot IDs. Measurement noise remains fixed by the saved baseline configuration so the validation isolates the local orbit/slot design neighborhood.
+The no-argument default now reproduces both baseline AO Monte Carlo validation sets used in the manuscript:
+
+- low-thrust transfer for 3, 5, 7, and 10 observers;
+- Lunar Gateway for 3, 5, 7, and 10 observers over 1, 3, and 5 periods.
+
+This gives 16 cases total. At the default 250 samples per case, the full Monte Carlo validation performs 4000 objective evaluations. For each configuration it selects the best observed 6000-FE GA baseline realization as the local reference. The first Monte Carlo sample is exactly the optimized design; orbit indices are perturbed uniformly by up to +/-10 orbit IDs and slot indices by up to +/-5 slot IDs. Measurement noise remains fixed by the saved baseline configuration so the validation isolates the local orbit/slot design neighborhood.
 
 Outputs are saved to:
 
@@ -197,7 +203,7 @@ Outputs are saved to:
 COMPILED_REVIEWER_2_RESULTS/baseline_monte_carlo_<timestamp>/
 ```
 
-including:
+including the sample/summary tables and separate EPS/PNG box-and-whisker figures such as:
 
 ```text
 baseline_monte_carlo_samples.csv
@@ -207,17 +213,24 @@ baseline_mc_lt_ao_o3.eps/.png
 baseline_mc_lt_ao_o5.eps/.png
 baseline_mc_lt_ao_o7.eps/.png
 baseline_mc_lt_ao_o10.eps/.png
+baseline_mc_lg_ao_o3_p1.eps/.png
+baseline_mc_lg_ao_o3_p3.eps/.png
+baseline_mc_lg_ao_o3_p5.eps/.png
+...
+baseline_mc_lg_ao_o10_p5.eps/.png
 ```
 
-Each observer count is exported as a separate box-and-whisker figure for LaTeX assembly. The red horizontal line is the optimized reference objective.
+Each case is exported as a separate box-and-whisker figure for LaTeX assembly. The red horizontal line is the optimized reference objective, and the legend identifies the Monte Carlo distribution and optimized reference. Monte Carlo figures follow the same no-grid/no-axes-box convention as the other final figures.
 
-The same runner can validate Lunar Gateway cases:
+To run only the Lunar Gateway cases without repeating the low-thrust validation:
 
 ```matlab
 mcLG = run_reviewer2_baseline_monte_carlo( ...
     'Mission',"LUNAR_GATEWAY", ...
     'GatewayPeriods',[1 3 5]);
 ```
+
+`GATEWAY_IMPULSE` remains available through the same `Mission` option but is intentionally not part of the default Monte Carlo validation set.
 
 The Monte Carlo reference design is intentionally seed-specific because the purpose is local-neighborhood validation of one optimized discrete solution. This does not replace the 20-run mean +/- sample-standard-deviation statistics used for optimizer and baseline performance claims.
 
@@ -235,6 +248,7 @@ test_comparison_pipeline_configuration;
 test_baseline_pipeline_configuration;
 test_ga_objective_screening_configuration;
 test_reviewer2_paper_figures_configuration;
+test_reviewer2_legend_configuration;
 test_baseline_monte_carlo_configuration;
 test_visibility_keepout_definition;
 test_low_thrust_transfer_case;
