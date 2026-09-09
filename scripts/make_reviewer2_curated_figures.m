@@ -15,6 +15,8 @@ function manifest = make_reviewer2_curated_figures(reports,saveFigures)
 %   * all 2-D figures are standalone for LaTeX subfigure/subcaption assembly;
 %   * convergence figures show only the 20-run mean best-so-far curves;
 %     run-to-run variability remains in metric summaries/tables;
+%   * all result axes use concise labels that state when a plotted quantity
+%     is a 20-run mean;
 %   * all final axes have grid lines off and the surrounding axes box off.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -35,15 +37,15 @@ if isfield(reports,'runtime')
     out = prepare_output(r.analysisDirectory,saveFigures);
     baseline = matched_baseline(baselineResults,"LUNAR_GATEWAY",3,1);
 
-    plot_runtime_metric(r,'BestJMean','BestJStd','Final best objective', ...
+    plot_runtime_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
         "runtime_1200_objective",out,saveFigures,style,false,baseline);
     manifest = add_manifest(manifest,"runtime","runtime_1200_objective", ...
-        "Equal-1200-FE final objective with matched 6000-FE GA reference.");
+        "Equal-1200-FE mean final-best objective with matched 6000-FE GA reference.");
 
     plot_runtime_metric(r,'BudgetRuntimeMean_s','BudgetRuntimeStd_s', ...
-        'Runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
+        'Mean runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
     manifest = add_manifest(manifest,"runtime","runtime_1200_runtime", ...
-        "Equal-1200-FE computational cost showing BO scaling penalty.");
+        "Equal-1200-FE mean computational cost showing BO scaling penalty.");
 
     plot_runtime_convergence(r,out,saveFigures,style);
     manifest = add_manifest(manifest,"runtime","runtime_1200_convergence", ...
@@ -57,14 +59,14 @@ if isfield(reports,'comparison')
     missions = string(r.missions);
     refs = matched_baselines(baselineResults,missions,3,1);
 
-    plot_comparison_metric(r,'BestJMean','BestJStd','Final best objective', ...
+    plot_comparison_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
         "comparison_6000_objective",out,saveFigures,style,refs);
     manifest = add_manifest(manifest,"comparison","comparison_6000_objective", ...
-        "Case-wise optimizer objective with matched 6000-FE GA references.");
+        "Case-wise mean final-best objective with matched 6000-FE GA references.");
 
     specs = { ...
-        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','comparison_6000_position_rmse'; ...
-        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','comparison_6000_effective_sigma'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Mean position RMSE (km)','comparison_6000_position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Mean effective position sigma (km)','comparison_6000_effective_sigma'; ...
         'MeanStabilityMean','MeanStabilityStd','Mean observer stability index','comparison_6000_stability'};
     for q = 1:size(specs,1)
         plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...
@@ -105,9 +107,9 @@ if isfield(reports,'baseline')
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
 
     observerSpecs = { ...
-        'BestJMean','BestJStd','Final best objective','objective'; ...
-        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','position_rmse'; ...
-        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','effective_sigma'};
+        'BestJMean','BestJStd','Mean final best objective','objective'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Mean position RMSE (km)','position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Mean effective position sigma (km)','effective_sigma'};
     for mission = missions
         for q = 1:size(observerSpecs,1)
             stem = "baseline_observer_"+string(observerSpecs{q,4})+"_"+mission_code(mission);
@@ -126,9 +128,9 @@ if isfield(reports,'baseline')
     end
 
     durationSpecs = { ...
-        'BestJMean','BestJStd','Final best objective','objective'; ...
-        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','position_rmse'; ...
-        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','effective_sigma'};
+        'BestJMean','BestJStd','Mean final best objective','objective'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Mean position RMSE (km)','position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Mean effective position sigma (km)','effective_sigma'};
     for meas = ["ANGLES_ONLY","ANGLES_RANGE"]
         for q = 1:size(durationSpecs,1)
             stem = "baseline_gateway_duration_"+string(durationSpecs{q,4})+ ...
@@ -147,7 +149,7 @@ if isfield(reports,'baseline')
     familyData = build_baseline_family_data(r);
     writetable(familyData,fullfile(char(r.analysisDirectory), ...
         'baseline_orbit_family_selection.csv'));
-    plot_family_grouped_all_cases(familyData,"Observers", ...
+    plot_family_grouped_all_cases(familyData,"Number of observers", ...
         "baseline_orbit_family_selection",out,saveFigures,style);
     manifest = add_manifest(manifest,"baseline","baseline_orbit_family_selection", ...
         "Angles-only, one-period 3/5/7/10-observer selections across all five orbit families.");
@@ -168,10 +170,10 @@ if isfield(reports,'objective_screening')
 
     % Screening ON/OFF: only the physical metrics requested for the paper.
     screeningSpecs = { ...
-        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','ga_screening_position_rmse'; ...
-        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','ga_screening_effective_sigma'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Mean position RMSE (km)','ga_screening_position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Mean effective position sigma (km)','ga_screening_effective_sigma'; ...
         'MeanStabilityMean','MeanStabilityStd','Mean observer stability index','ga_screening_stability'; ...
-        'ScreeningMean','ScreeningStd','Rejected measurement opportunities','ga_screening_event_count'};
+        'ScreeningMean','ScreeningStd','Mean rejected measurements','ga_screening_event_count'};
     for q = 1:size(screeningSpecs,1)
         plot_screening_metric_all_cases(r.results,screeningSpecs{q,1}, ...
             screeningSpecs{q,2},screeningSpecs{q,3},string(screeningSpecs{q,4}), ...
@@ -323,6 +325,7 @@ for k = 1:numel(optimizers)
         'LineWidth',0.9,'CapSize',style.capSize,'HandleVisibility','off');
 end
 ax.XTick = 1:numel(missions); ax.XTickLabel = cellstr(mission_labels(missions));
+xlabel(ax,'Target case','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 legendHandles = b(:); legendLabels = optimizer_labels(optimizers);
 if ~isempty(baselineRefs)
@@ -410,7 +413,7 @@ for k = 1:numel(counts)
         'MarkerFaceColor',colors(k,:),'CapSize',style.capSize, ...
         'DisplayName',sprintf('%d observers',counts(k)));
 end
-ax.XTick = periods; xlabel(ax,'Gateway tracking periods','FontWeight','bold');
+ax.XTick = periods; xlabel(ax,'Tracking duration (Gateway periods)','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal','NumColumns',2,'Box','off');
 style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
@@ -458,6 +461,7 @@ for c = 1:2
         'CapSize',style.capSize,'HandleVisibility','off');
 end
 ax.XTick = 1:3; ax.XTickLabel = cellstr(mission_labels(missions));
+xlabel(ax,'Target case','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 lgd = legend(ax,b,{'Screening ON','Screening OFF'},'Location','northoutside', ...
     'Orientation','horizontal','Box','off'); style_legend(lgd,style);
@@ -590,7 +594,7 @@ ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,x,V,'stacked','BarWidth',0.82); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = x; ax.XTickLabel = cellstr(tickLabels); ylim(ax,[0 108]);
-xlabel(ax,groupAxisLabel,'FontWeight','bold'); ylabel(ax,'Selected observers (%)','FontWeight','bold');
+xlabel(ax,groupAxisLabel,'FontWeight','bold'); ylabel(ax,'Observer selections (%)','FontWeight','bold');
 for m = 1:3
     text(ax,centers(m),104,mission_short_label(missions(m)), ...
         'HorizontalAlignment','center','VerticalAlignment','middle', ...
@@ -615,7 +619,7 @@ ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:4,V,'stacked','BarWidth',0.78); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = 1:4; ax.XTickLabel = cellstr(labels); ylim(ax,[0 100]);
-xlabel(ax,'Objective configuration','FontWeight','bold'); ylabel(ax,'Selected observers (%)','FontWeight','bold');
+xlabel(ax,'Objective configuration','FontWeight','bold'); ylabel(ax,'Observer selections (%)','FontWeight','bold');
 style_axes(ax,style); lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
     'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,style);
 export_figure(fig,out,stem,saveFigures,style);
@@ -696,6 +700,7 @@ end
 
 function format_category_axis(ax,labels,yLabel,style)
 ax.XTick = 1:numel(labels); ax.XTickLabel = cellstr(labels); ax.XTickLabelRotation = 18;
+xlabel(ax,'Optimizer','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 end
 
