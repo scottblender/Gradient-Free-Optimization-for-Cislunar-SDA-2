@@ -1,16 +1,16 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% Final Reviewer 2 figures are sized for a journal column/page workflow and
-% use Times New Roman with 12-point minimum text. The geometry figures use a
-% fixed 6.5 x 6.5 inch canvas so every 3-D comparison has identical export
-% dimensions and enough physical margin for labels.
+% The 3-D result figures intentionally match the tracking-case figures in
+% plot_study_definition_figures.m: 7.6 x 7.0 inch canvas, centered inner
+% axes box, manuscript camera, and Times New Roman with 12-point minimum
+% text. This keeps the introduction and results visually identical.
 
 style.fontName = 'Times New Roman';
 style.fontSize = 12;
 style.labelFontSize = 14;
 style.lineWidth = 1.8;
-style.axisLineWidth = 1.0;
+style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
 style.capSize = 7;
 style.alphaBand = 0.16;
@@ -23,12 +23,16 @@ style.panelFigureHeight = 6.2;
 style.convergenceFigureWidth = 6.5;
 style.convergenceFigureHeight = 6.2;
 
-% Fixed geometry export requested for the manuscript.
-style.geometryFigureWidth = 6.5;
-style.geometryFigureHeight = 6.5;
-style.exportPaddingIn = 0.25;
+% Exact 3-D layout used by the introductory tracking-case figures.
+style.geometryFigureWidth = 7.6;
+style.geometryFigureHeight = 7.0;
+style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
+style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
+style.geometryXPadding = 0.08;
+style.geometryYPadding = 0.10;
+style.geometryZPadding = 0.10;
 
 % Fixed qualitative palette so optimizer identity never changes by figure.
 style.optimizerOrder = ["GA","PSO","BAYESIAN","ABC","ACO"];
