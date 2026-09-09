@@ -1,13 +1,14 @@
 function reports = run_reviewer2_results(studies,saveFigures)
-%RUN_REVIEWER2_RESULTS Process any or all completed Reviewer 2 studies.
+%RUN_REVIEWER2_RESULTS Process completed Reviewer 2 studies and final figures.
 %
 % This runner never launches optimization. It validates saved schema-v2
-% results, builds manuscript tables, and creates journal-ready figures.
+% results, builds manuscript tables, then creates one curated, consistent
+% paper-final figure set across the selected studies.
 %
 % Examples:
 %   reports = run_reviewer2_results;                       % everything
 %   reports = run_reviewer2_results("comparison");        % one study
-%   reports = run_reviewer2_results("baseline",false);    % display only
+%   reports = run_reviewer2_results("baseline",false);    % tables only
 %   reports = run_reviewer2_results(["runtime","objective_screening"]);
 %
 % Selectors:
@@ -16,6 +17,10 @@ function reports = run_reviewer2_results(studies,saveFigures)
 %   baseline            - GA AO/AR, observer-count, and duration study
 %   objective_screening - GA objective-component and screening study
 %   all                 - all four processors (default)
+%
+% When saveFigures is true, the individual processors are run in data-only
+% mode and make_reviewer2_paper_figures creates the final manuscript plots.
+% This avoids keeping multiple generations of nearly redundant preview plots.
 
 if nargin < 1 || isempty(studies), studies = "all"; end
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -41,24 +46,39 @@ setup_project();
 reports = struct();
 fprintf('\n=== Reviewer 2 results processing ===\n');
 fprintf('Selected studies: %s\n',strjoin(cellstr(studies),', '));
-fprintf('Save figures:     %s\n\n',string(saveFigures));
+fprintf('Save curated paper figures: %s\n\n',string(saveFigures));
 
+% Each processor still performs all scientific validation and writes its CSV
+% outputs. The centralized paper renderer is the only source of final plots.
 for study = studies
     started = tic;
     fprintf('\n>>> Processing %s\n',upper(strrep(study,'_',' ')));
     switch study
         case "runtime"
-            reports.runtime = run_reviewer2_runtime_pipeline(saveFigures);
+            reports.runtime = run_reviewer2_runtime_pipeline(false);
         case "comparison"
-            reports.comparison = run_reviewer2_comparison_pipeline(saveFigures);
+            reports.comparison = run_reviewer2_comparison_pipeline(false);
         case "baseline"
-            reports.baseline = run_reviewer2_baseline_pipeline(saveFigures);
+            reports.baseline = run_reviewer2_baseline_pipeline(false);
         case "objective_screening"
             reports.objective_screening = ...
-                run_reviewer2_objective_screening_pipeline(saveFigures);
+                run_reviewer2_objective_screening_pipeline(false);
     end
+    close all force;
     fprintf('<<< %s complete in %.1f s\n',upper(strrep(study,'_',' ')),toc(started));
 end
 
+if saveFigures
+    fprintf('\n>>> Creating curated journal figures\n');
+    reports.paperFigureManifest = make_reviewer2_paper_figures(reports,true);
+    fprintf('<<< Curated journal figures complete\n');
+else
+    reports.paperFigureManifest = table();
+end
+
 fprintf('\nAll selected result processors completed successfully.\n');
+if saveFigures
+    fprintf(['Final manuscript figures are under the newest FE_DATA_*/paper_final ' ...
+        'directory for each selected study.\n']);
+end
 end
