@@ -292,8 +292,11 @@ legendHandles = b; legendLabels = optimizer_labels(R.Optimizer);
 if ~isempty(baseline)
     hBase = plot(ax,[0.55 height(R)+0.45],[baseline.Mean baseline.Mean],'--', ...
         'Color',[0.30 0.30 0.30],'LineWidth',1.5,'DisplayName','Baseline AO');
-    errorbar(ax,0.72,baseline.Mean,baseline.Std,'none','Color',[0.30 0.30 0.30], ...
-        'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
+    hBaseErr = errorbar(ax,0.72,baseline.Mean,baseline.Std, ...
+        'Color',[0.30 0.30 0.30],'LineWidth',1.0, ...
+        'CapSize',style.capSize,'HandleVisibility','off');
+    hBaseErr.LineStyle = 'none';
+    hBaseErr.Marker = 'none';
     legendHandles = [legendHandles;hBase];
     legendLabels = [legendLabels;"Baseline AO"];
 end
@@ -357,8 +360,11 @@ if ~isempty(baselineRefs)
         if height(row) ~= 1, continue; end
         h = plot(ax,[m-0.46 m+0.46],[row.Mean row.Mean],'--', ...
             'Color',[0.30 0.30 0.30],'LineWidth',1.5,'HandleVisibility','off');
-        errorbar(ax,m,row.Mean,row.Std,'none','Color',[0.30 0.30 0.30], ...
-            'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
+        hBaseErr = errorbar(ax,m,row.Mean,row.Std, ...
+            'Color',[0.30 0.30 0.30],'LineWidth',1.0, ...
+            'CapSize',style.capSize,'HandleVisibility','off');
+        hBaseErr.LineStyle = 'none';
+        hBaseErr.Marker = 'none';
         if ~isgraphics(hBase), hBase = h; end
     end
     if isgraphics(hBase)
