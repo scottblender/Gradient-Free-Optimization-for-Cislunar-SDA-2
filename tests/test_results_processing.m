@@ -119,6 +119,7 @@ for opt = ["GA","BAYESIAN"]
         runState.solverFunctionEvaluations = 120+expectedPostSearch;
         runState.solverCallDifference = expectedPostSearch;
         runState.postSearchFunctionEvaluations = expectedPostSearch;
+        runState.parallelOverflowEvaluations = 0;
         runState.settings = struct('mission',struct('type',"LUNAR_GATEWAY", ...
             'optimization',struct('numObservers',3)), ...
             'measurements',struct('type',"ANGLES_ONLY",'noiseSeed',1001));
@@ -129,7 +130,9 @@ for opt = ["GA","BAYESIAN"]
         runState.validationStatus = "passed";
         runState.objectiveErrorCount = 0;
         runState.solverSettingsText = "fixed settings";
-        runState.runtime_s = 1;
+        runState.budgetRuntime_s = 1;
+        runState.solverWallRuntime_s = 1;
+        runState.runtime_s = runState.budgetRuntime_s;
         runState.validationRuntime_s = .1;
         if opt == "GA"
             runState.history = table([60;120],[8;3]+seed, ...
