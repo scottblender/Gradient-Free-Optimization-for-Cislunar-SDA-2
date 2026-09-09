@@ -6,6 +6,10 @@ function reports = run_reviewer2_results(studies,saveFigures)
 % here and used in manuscript figures are group mean +/- sample standard
 % deviation across the 20 independent runs. A representative seed is used
 % only to visualize one realizable discrete constellation near the group mean.
+%
+% Legacy per-pipeline preview figures are hidden during data processing. The
+% only manuscript figures users should inspect are the centralized outputs in
+% each newest FE_DATA_*/paper_final directory.
 
 if nargin < 1 || isempty(studies), studies = "all"; end
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -30,6 +34,13 @@ fprintf('\n=== Reviewer 2 results processing ===\n');
 fprintf('Selected studies: %s\n',strjoin(cellstr(studies),', '));
 fprintf('Save curated paper figures: %s\n',string(saveFigures));
 fprintf('Reported performance statistics: 20-run mean +/- sample standard deviation\n\n');
+
+% The individual processors still contain some historical preview routines.
+% Hide figures while they validate/aggregate data so those obsolete plots do
+% not appear and cannot be mistaken for the final centralized figures.
+originalFigureVisible = get(groot,'defaultFigureVisible');
+visibilityCleanup = onCleanup(@() set(groot,'defaultFigureVisible',originalFigureVisible)); %#ok<NASGU>
+set(groot,'defaultFigureVisible','off');
 
 for study = studies
     started = tic;
@@ -78,6 +89,10 @@ for study = studies
     close all force;
     fprintf('<<< %s complete in %.1f s\n',upper(strrep(study,'_',' ')),toc(started));
 end
+
+% Restore normal MATLAB figure visibility before the centralized paper
+% renderer. These are the only figures intended for inspection/publication.
+set(groot,'defaultFigureVisible',originalFigureVisible);
 
 if saveFigures
     fprintf('\n>>> Creating curated journal figures\n');
