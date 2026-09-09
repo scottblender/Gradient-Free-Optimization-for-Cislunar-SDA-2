@@ -24,12 +24,15 @@ style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = 6.5;
 style.convergenceFigureHeight = 4.6;
 
-% Exact 3-D layout used by the introductory tracking-case figures.
+% Exact 3-D layout used by all tracking and result trajectory figures.
+% The azimuth is rotated 7.5 deg from the previous view so the low-thrust
+% path no longer projects across the lunar disk while every trajectory
+% figure still uses one common camera orientation.
 style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
 style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
 style.geometryLegendGap = 0.012;
-style.geometryAzimuth = -37.5;
+style.geometryAzimuth = -45;
 style.geometryElevation = 30;
 style.geometryXPadding = 0.08;
 style.geometryYPadding = 0.10;
