@@ -11,23 +11,22 @@ function selection = select_reviewer2_representative_runs(report,study)
 study = lower(string(study));
 assert(isstruct(report) && isfield(report,'results') && isfield(report,'runMetrics'), ...
     'A processed Reviewer-2 report with results/runMetrics is required.');
-R = report.results;
-M = report.runMetrics;
 
 switch study
     case "comparison"
-        selection = comparison_selection(R,M);
+        assert(isfield(report,'summary'),'Comparison report requires summary metadata.');
+        selection = comparison_selection(report.results,report.runMetrics,report.summary);
     case "baseline"
-        selection = baseline_selection(R,M);
+        selection = baseline_selection(report.results,report.runMetrics);
     case "objective_screening"
-        selection = objective_selection(R,M);
+        selection = objective_selection(report.results,report.runMetrics);
     otherwise
         error('Study:UnknownRepresentativeStudy','Unknown study selector: %s',study);
 end
 end
 
 
-function selection = comparison_selection(R,M)
+function selection = comparison_selection(R,M,S)
 missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
 optimizers = ["GA","PSO","ABC","ACO"];
 n = numel(missions)*numel(optimizers);
@@ -37,8 +36,10 @@ for mission = missions
     for optimizer = optimizers
         row = row+1;
         group = R(R.Mission == mission & R.Optimizer == optimizer,:);
-        assert(height(group) == 1,'Missing comparison aggregate group.');
-        candidates = M(M.comparison_key == group.ComparisonKey & ...
+        summaryRow = S(S.mission == mission & S.optimizer == optimizer,:);
+        assert(height(group) == 1 && height(summaryRow) == 1, ...
+            'Missing comparison aggregate/summary group.');
+        candidates = M(M.comparison_key == summaryRow.comparison_key & ...
             M.optimizer == optimizer,:);
         selection = fill_row(selection,row,mission,lower(optimizer),optimizer, ...
             candidates,group.BestJMean,group.BestJStd);
@@ -96,7 +97,8 @@ end
 
 
 function T = fill_row(T,row,mission,key,label,candidates,mu,sigma)
-assert(~isempty(candidates),'Representative-run candidate group is empty.');
+assert(height(candidates) == 20, ...
+    'Representative geometry requires the complete 20-run group.');
 assert(all(isfinite(candidates.bestJ)),'Representative-run objectives must be finite.');
 [deviation,idx] = min(abs(double(candidates.bestJ)-double(mu)));
 T.Mission(row) = string(mission);
