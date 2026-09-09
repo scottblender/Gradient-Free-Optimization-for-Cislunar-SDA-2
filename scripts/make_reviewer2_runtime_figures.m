@@ -6,7 +6,7 @@ function manifest = make_reviewer2_runtime_figures(r,baselineResults,saveFigures
 % optimizer. MATLAB's bar() returns one Bar object for this flat-colored
 % categorical chart; pairing that single handle with five optimizer labels
 % produces the "Ignoring extra legend entries" warning. The objective chart
-% therefore uses a legend only for the dashed long-run Baseline AO reference.
+% therefore uses a legend only for the dashed 6000-FE GA reference.
 % The convergence chart uses one graphics handle per optimizer curve and
 % intentionally shows only the 20-run mean best-so-far history. Run-to-run
 % variability is reported in the metric summaries/tables rather than as
@@ -34,7 +34,7 @@ plot_runtime_convergence(r,out,saveFigures,style);
 manifest = table( ...
     repmat("runtime",3,1), ...
     ["runtime_1200_objective";"runtime_1200_runtime";"runtime_1200_convergence"], ...
-    ["Equal-1200-FE final objective with matched long-run AO GA baseline."; ...
+    ["Equal-1200-FE final objective with matched 6000-FE GA reference."; ...
      "Equal-1200-FE computational cost showing BO scaling penalty."; ...
      "Five-method equal-FE mean convergence comparison."], ...
     'VariableNames',{'Study','FigureStem','Purpose'});
@@ -62,30 +62,22 @@ ax.XTickLabelRotation = 18;
 ylabel(ax,yLabel,'FontWeight','bold');
 style_axes(ax,style);
 
-% Optimizers are identified by the x-axis labels. Only the baseline needs a
-% legend entry on the objective chart.
+% Optimizers are identified by the x-axis labels. The dashed reference is
+% the matched 6000-FE GA result; its run-to-run spread remains in the table
+% rather than being drawn as an error bar on a horizontal reference line.
 if ~isempty(baseline)
     hBase = plot(ax,[0.55 height(R)+0.45],[baseline.Mean baseline.Mean],'--', ...
-        'Color',[0.30 0.30 0.30],'LineWidth',1.5,'DisplayName','Baseline AO');
-    hErr = errorbar(ax,0.72,baseline.Mean,baseline.Std, ...
-        'Color',[0.30 0.30 0.30],'LineWidth',1.0, ...
-        'CapSize',style.capSize,'HandleVisibility','off');
-    hErr.LineStyle = 'none';
-    hErr.Marker = 'none';
-    lgd = legend(ax,hBase,{'Baseline AO'},'Location','northoutside', ...
+        'Color',[0.30 0.30 0.30],'LineWidth',1.5, ...
+        'DisplayName','6000-FE GA reference');
+    lgd = legend(ax,hBase,{'6000-FE GA reference'},'Location','northoutside', ...
         'Orientation','horizontal','Box','off');
     style_legend(lgd,style);
 end
 
+% The runtime bars and their standard-deviation error bars communicate the
+% BO cost directly. Do not add ratio callouts such as "x fastest" above BO.
 if annotateBO
-    idxBO = find(R.Optimizer == "BAYESIAN",1);
-    if ~isempty(idxBO)
-        fastest = min(values(R.Optimizer ~= "BAYESIAN"));
-        ratio = values(idxBO)/fastest;
-        text(ax,idxBO,values(idxBO)+errors(idxBO),sprintf('%.1fx fastest',ratio), ...
-            'HorizontalAlignment','center','VerticalAlignment','bottom', ...
-            'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
-    end
+    % Retained as an input for compatibility with the curated call pattern.
 end
 
 export_figure(fig,out,stem,saveFigures,style);
