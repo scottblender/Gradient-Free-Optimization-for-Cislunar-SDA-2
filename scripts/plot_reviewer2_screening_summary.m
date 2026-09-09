@@ -4,6 +4,10 @@ function stems = plot_reviewer2_screening_summary(report,saveFigures)
 % Mirrors the useful metric-panel structure of the original manuscript while
 % using the new GA-only equal-FE sensitivity study. Total objective is valid
 % here because screening ON and OFF use the identical J111 objective.
+%
+% screening_count is labeled as a visibility-rule violation count because
+% cr3bp_ekf evaluates visibility in both cases; violations are only rejected
+% from the EKF measurement update when screening is enabled.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
 validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
@@ -38,7 +42,7 @@ for m = 1:numel(missions)
     movegui(fig,'center');
     t = tiledlayout(fig,2,2,'Padding','loose','TileSpacing','compact');
     labels = {'Final best objective','Position RMSE (km)', ...
-        'Runtime to 6000 FE (s)','Rejected measurement opportunities'};
+        'Runtime to 6000 FE (s)','Visibility-rule violations'};
     panelLabels = {'(a)','(b)','(c)','(d)'};
     colors = style.configurationColors(1:2,:);
     handles = gobjects(2,1);
