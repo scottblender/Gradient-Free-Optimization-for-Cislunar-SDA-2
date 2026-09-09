@@ -16,6 +16,7 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 % the 20-run group mean objective; statistical conclusions use group mean
 % +/- sample standard deviation. Earth is omitted. Duplicate periodic orbits
 % are drawn once as solid curves while every selected phase marker is kept.
+% Gateway-impulse panels retain a dashed nominal Gateway reference trajectory.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
@@ -159,12 +160,17 @@ else
     panel.arrivalOrbit = zeros(0,3);
 end
 
+panel.nominalGateway = zeros(0,3);
+if panel.mission == "GATEWAY_IMPULSE"
+    panel.nominalGateway = nominal_gateway_reference(panel.mu);
+end
+
 moonExtent = panel.moonCenter + [ ...
     panel.moonRadius 0 0;-panel.moonRadius 0 0; ...
     0 panel.moonRadius 0;0 -panel.moonRadius 0; ...
     0 0 panel.moonRadius;0 0 -panel.moonRadius];
 panel.allPoints = [panel.truth;observerPoints;panel.endpointOrbitPoints; ...
-    moonExtent;panel.xL1 0 0;panel.xL2 0 0];
+    panel.nominalGateway;moonExtent;panel.xL1 0 0;panel.xL2 0 0];
 end
 
 
@@ -190,6 +196,17 @@ end
 
 function [handles,labels] = render_geometry_panel(ax,panel,~)
 observerColors = lines(max(1,numel(panel.uniqueOrbitKeys)));
+
+hNominal = gobjects(0);
+if panel.mission == "GATEWAY_IMPULSE"
+    gatewayColor = reviewer2_target_color("LUNAR_GATEWAY");
+    nominalAlpha = 0.45;
+    nominalColor = nominalAlpha*gatewayColor+(1-nominalAlpha)*[1 1 1];
+    hNominal = plot3(ax,panel.nominalGateway(:,1),panel.nominalGateway(:,2), ...
+        panel.nominalGateway(:,3),'--','Color',nominalColor,'LineWidth',2.2, ...
+        'DisplayName','Nominal Gateway');
+end
+
 hTarget = plot3(ax,panel.truth(:,1),panel.truth(:,2),panel.truth(:,3),'-', ...
     'Color',panel.targetColor,'LineWidth',2.8,'DisplayName','Target trajectory');
 
@@ -245,6 +262,10 @@ if panel.mission == "LOW_THRUST_TRANSFER"
     handles = [hEndpoint hTarget hObserver hStart hEnd hMoon hL1 hL2];
     labels = ["Endpoint orbits","Target trajectory","Observer orbits", ...
         "Start","End","Moon","L1","L2"];
+elseif panel.mission == "GATEWAY_IMPULSE"
+    handles = [hNominal hTarget hObserver hMoon hL1 hL2];
+    labels = ["Nominal Gateway","Target trajectory","Observer orbits", ...
+        "Moon","L1","L2"];
 else
     handles = [hTarget hObserver hMoon hL1 hL2];
     labels = ["Target trajectory","Observer orbits","Moon","L1","L2"];
@@ -258,7 +279,13 @@ lgd.FontName = style.fontName;
 lgd.FontSize = max(style.fontSize,12);
 lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [16 9];
-if mission == "LOW_THRUST_TRANSFER", lgd.NumColumns = 4; else, lgd.NumColumns = 5; end
+if mission == "LOW_THRUST_TRANSFER"
+    lgd.NumColumns = 4;
+elseif mission == "GATEWAY_IMPULSE"
+    lgd.NumColumns = 3;
+else
+    lgd.NumColumns = 5;
+end
 end
 
 
@@ -330,6 +357,24 @@ assert(~isempty(bestOrbit) && isfinite(bestError), ...
     'Could not identify a low-thrust endpoint reference orbit.');
 assert(bestError < 2.5e-2,'Low-thrust endpoint reference-orbit mismatch: %.6e.',bestError);
 orbitState = bestOrbit;
+end
+
+
+function nominalState = nominal_gateway_reference(mu)
+persistent cachedMu cachedState
+mu = double(mu);
+if ~isempty(cachedMu) && abs(cachedMu-mu) <= 10*eps(max(1,abs(mu)))
+    nominalState = cachedState;
+    return;
+end
+cfg = target_case_config("GATEWAY_IMPULSE");
+opts = odeset('RelTol',1e-13,'AbsTol',1e-13);
+[tImpulse,~,info] = build_target_truth(cfg,table(),{}, {}, {},mu,opts);
+[~,sNominal] = ode45(@(t,s) cr3bp_dynamics(t,s,mu), ...
+    tImpulse,info.statePreImpulse,opts);
+nominalState = double(sNominal(:,1:3));
+cachedMu = mu;
+cachedState = nominalState;
 end
 
 
