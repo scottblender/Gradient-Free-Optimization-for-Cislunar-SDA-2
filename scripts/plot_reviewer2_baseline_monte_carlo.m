@@ -4,8 +4,8 @@ function details = plot_reviewer2_baseline_monte_carlo(samples,summary,outDir,sa
 % Each baseline configuration is written as its own EPS/PNG so the paper can
 % assemble panels with subfigure/subcaption. The boxplot contains all local
 % design samples, including sample 1 (the optimized GA reference), and the
-% optimized objective is shown as a red horizontal line. Final axes use no
-% grid lines and no surrounding axes box.
+% optimized objective is shown as a red horizontal line. Final axes use clear
+% labels, no grid lines, and no surrounding axes box.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -46,8 +46,8 @@ for k = 1:height(summary)
 
     xlim(ax,[0.55 1.45]);
     xticks(ax,[]);
-    xlabel(ax,'MC samples','FontWeight','bold');
-    ylabel(ax,'Total cost','FontWeight','bold');
+    xlabel(ax,'Monte Carlo samples','FontWeight','bold');
+    ylabel(ax,'Objective value','FontWeight','bold');
     set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
         'FontWeight','bold','LineWidth',style.axisLineWidth, ...
         'TickDir','out','Layer','top','Box','off', ...
@@ -55,7 +55,7 @@ for k = 1:height(summary)
     ax.XLabel.FontSize = style.labelFontSize;
     ax.YLabel.FontSize = style.labelFontSize;
 
-    lgd = legend(ax,[hBox hRef],{'MC samples','Optimized reference'}, ...
+    lgd = legend(ax,[hBox hRef],{'Monte Carlo samples','Optimized reference'}, ...
         'Location','northoutside','Orientation','horizontal','Box','off');
     lgd.FontName = style.fontName;
     lgd.FontSize = style.fontSize;
