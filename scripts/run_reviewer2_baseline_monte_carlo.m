@@ -73,8 +73,10 @@ paths = setup_project();
 baselineRoot = fullfile(paths.results,'BASELINE');
 assert(isfolder(baselineRoot),'Baseline raw-result root does not exist: %s',baselineRoot);
 
+compiledRoot = fullfile(paths.root,'COMPILED_REVIEWER_2_RESULTS');
+if ~isfolder(compiledRoot), mkdir(compiledRoot); end
 stamp = string(datetime('now','Format','yyyyMMdd_HHmmss_SSS'));
-outDir = fullfile(paths.results,"baseline_monte_carlo_"+stamp);
+outDir = fullfile(compiledRoot,"baseline_monte_carlo_"+stamp);
 assert(~isfolder(outDir),'Monte Carlo output directory already exists: %s',outDir);
 mkdir(outDir);
 
