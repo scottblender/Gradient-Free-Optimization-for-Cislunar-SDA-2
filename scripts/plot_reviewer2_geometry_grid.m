@@ -6,7 +6,7 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 % tiled grids. The construction matches plot_study_definition_figures.m:
 %   7.6 x 7.0 inch canvas
 %   centered inner axes box [0.12 0.20 0.76 0.64]
-%   perspective view(-37.5,30), axis equal/vis3d
+%   maneuver-specific camera from reviewer2_paper_style, axis equal/vis3d
 %   8/10/10 percent x/y/z padding
 %   centered north-outside legend with the axes restored afterward
 %   Times New Roman, 12-point minimum text and 14-point axis labels
@@ -71,7 +71,7 @@ for k = 1:n
     ax = axes(fig,'Units','normalized','Position',plotPosition);
     ax.PositionConstraint = 'innerposition';
 
-    prepare_reference_axes(ax,style);
+    prepare_reference_axes(ax,style,mission);
     [legendHandles,legendLabels] = render_geometry_panel(ax,panel,style);
     limits = missionLimits(char(mission));
     xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
@@ -174,11 +174,17 @@ panel.allPoints = [panel.truth;observerPoints;panel.endpointOrbitPoints; ...
 end
 
 
-function prepare_reference_axes(ax,style)
+function prepare_reference_axes(ax,style,mission)
 hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 axis(ax,'equal');
-view(ax,style.geometryAzimuth,style.geometryElevation);
-ax.Projection = 'perspective';
+missionKey = char(upper(string(mission)));
+assert(isfield(style.maneuverViews,missionKey), ...
+    'No maneuver camera view configured for %s.',missionKey);
+assert(isfield(style.maneuverProjections,missionKey), ...
+    'No maneuver camera projection configured for %s.',missionKey);
+viewAngles = style.maneuverViews.(missionKey);
+view(ax,viewAngles(1),viewAngles(2));
+ax.Projection = style.maneuverProjections.(missionKey);
 xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
 set(ax,'FontName',style.fontName,'FontSize',max(style.fontSize,12), ...
     'FontWeight','bold','LineWidth',style.axisLineWidth, ...
