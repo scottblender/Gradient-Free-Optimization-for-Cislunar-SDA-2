@@ -24,16 +24,15 @@ style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = 6.5;
 style.convergenceFigureHeight = 4.6;
 
-% Shared 3-D layout used by all tracking and result trajectory figures.
-% This camera is intentionally rotated far enough from the original view
-% to separate the low-thrust transfer from the projected lunar disk while
-% preserving one common orientation across all trajectory figures.
+% Shared 3-D layout used by the manuscript trajectory/result figures.
+% The low-thrust study-definition panel has a small local camera override
+% in plot_study_definition_figures.m; all other 3-D figures use this view.
 style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
 style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
 style.geometryLegendGap = 0.012;
-style.geometryAzimuth = -60;
-style.geometryElevation = 25;
+style.geometryAzimuth = -37.5;
+style.geometryElevation = 30;
 style.geometryXPadding = 0.08;
 style.geometryYPadding = 0.10;
 style.geometryZPadding = 0.10;
