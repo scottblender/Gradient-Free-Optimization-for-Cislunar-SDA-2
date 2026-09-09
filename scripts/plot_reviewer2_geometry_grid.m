@@ -1,16 +1,20 @@
 function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,saveFigures)
-%PLOT_REVIEWER2_GEOMETRY_GRID Fixed-size journal constellation geometry grids.
+%PLOT_REVIEWER2_GEOMETRY_GRID Export representative 3-D result panels.
 %
-% Geometry panels are qualitative representatives only. Statistical claims
-% must use the 20-run aggregate mean +/- sample standard deviation. The
-% selection table is expected to contain a representative realization near
-% each aggregate mean, not the lowest-cost seed.
+% Despite the historical function name, each representative realization is
+% exported as its own full-size panel so it can be assembled as a LaTeX
+% subfigure without shrinking several perspective axes into one MATLAB grid.
+% The construction intentionally matches plot_study_definition_figures.m:
+%   7.6 x 7.0 inch canvas
+%   centered inner axes box [0.12 0.20 0.76 0.64]
+%   perspective view(-37.5,30), axis equal/vis3d
+%   8/10/10 percent x/y/z padding
+%   north-outside legend centered above the restored axes box
+%   Times New Roman, 12-point minimum text and 14-point axis labels
 %
-% Every mission grid is exported on a fixed 6.5 x 6.5 inch canvas. Axes use
-% manually assigned OuterPosition boxes so tick labels and x/y/z labels stay
-% inside the page. A common camera and common limits are used within a
-% mission so differences between panels are geometric rather than plotting
-% artifacts. Earth is intentionally omitted. All orbit lines are solid.
+% Statistical claims must use aggregate mean +/- sample standard deviation.
+% These plots use the saved realization nearest each group's mean objective
+% only to show a physically realizable representative constellation.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -28,96 +32,63 @@ if saveFigures
 end
 
 n = height(selection);
+panels = repmat(struct(),n,1);
 numObservers = nan(n,1);
 families = strings(n,1);
 orbitIndices = strings(n,1);
 slotIndices = strings(n,1);
 figureStem = strings(n,1);
 
+% Load first so every panel for the same mission uses exactly the same
+% dynamic limits. This preserves direct geometry comparability while using
+% the same centered construction as the introductory figures.
+missionLimits = containers.Map('KeyType','char','ValueType','any');
 for mission = unique(string(selection.Mission),'stable')'
     idx = find(string(selection.Mission) == mission);
-    panels = repmat(struct(),numel(idx),1);
     allPoints = zeros(0,3);
-
     for q = 1:numel(idx)
         k = idx(q);
-        panels(q) = load_geometry_panel(string(selection.RunFile(k)));
-        assert(panels(q).mission == mission, ...
+        panels(k) = load_geometry_panel(string(selection.RunFile(k)));
+        assert(panels(k).mission == mission, ...
             'Selection mission does not match saved run mission.');
-        allPoints = [allPoints;panels(q).allPoints]; %#ok<AGROW>
-        numObservers(k) = height(panels(q).observers);
-        families(k) = strjoin(string(panels(q).observers.orbit_family),';');
-        orbitIndices(k) = strjoin(string(panels(q).observers.orbit_index),';');
-        slotIndices(k) = strjoin(string(panels(q).observers.slot_index),';');
+        allPoints = [allPoints;panels(k).allPoints]; %#ok<AGROW>
+        numObservers(k) = height(panels(k).observers);
+        families(k) = strjoin(string(panels(k).observers.orbit_family),';');
+        orbitIndices(k) = strjoin(string(panels(k).observers.orbit_index),';');
+        slotIndices(k) = strjoin(string(panels(k).observers.slot_index),';');
     end
+    missionLimits(char(mission)) = data_limits(allPoints);
+end
 
-    limits = common_geometry_limits(allPoints);
-    nPanels = numel(idx);
-    if nPanels <= 2
-        nRows = 1; nColumns = nPanels;
-    else
-        nColumns = 2; nRows = ceil(nPanels/2);
-    end
+for k = 1:n
+    mission = string(selection.Mission(k));
+    panel = panels(k);
+    fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
+    plotPosition = style.geometryPlotPosition;
+    ax = axes(fig,'Units','normalized','Position',plotPosition);
+    ax.PositionConstraint = 'innerposition';
 
-    fig = paper_figure(style.geometryFigureWidth,style.geometryFigureHeight);
-    positions = panel_outer_positions(nRows,nColumns,nPanels);
-    legendHandles = gobjects(0); legendLabels = strings(0,1);
+    prepare_reference_axes(ax,style);
+    [legendHandles,legendLabels] = render_geometry_panel(ax,panel,style);
+    baseLimits = missionLimits(char(mission));
+    finalize_reference_axes(ax,baseLimits,style);
 
-    for q = 1:nPanels
-        ax = axes(fig,'Units','normalized','OuterPosition',positions(q,:), ...
-            'PositionConstraint','outerposition');
-        [handles,labels] = render_geometry_panel(ax,panels(q),limits,style);
-        title(ax,sprintf('(%c) %s',char('a'+q-1),string(selection.PanelLabel(idx(q)))), ...
-            'FontName',style.fontName,'FontSize',style.fontSize, ...
-            'FontWeight','bold','Interpreter','none');
-        if q == 1
-            legendHandles = handles; legendLabels = labels;
-        end
-    end
+    legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
+        'Location','northoutside','Orientation','horizontal');
+    format_case_legend(legendHandle,panel.mission,style);
+    center_reference_legend(ax,legendHandle,plotPosition,style);
 
-    lgd = legend(legendHandles,cellstr(legendLabels), ...
-        'Orientation','horizontal','NumColumns',min(4,numel(legendLabels)), ...
-        'Box','on');
-    lgd.Units = 'normalized';
-    lgd.FontName = style.fontName; lgd.FontSize = style.fontSize;
-    lgd.FontWeight = 'bold'; lgd.ItemTokenSize = [16 9];
-    drawnow;
-    legendHeight = 0.055;
-    if numel(legendLabels) > 5, legendHeight = 0.09; end
-    lgd.Position = [0.08,0.965-legendHeight,0.84,legendHeight];
-
-    % Reapply axes outer boxes after legend creation. MATLAB legends can
-    % otherwise shrink 3-D axes even when the intended export size is fixed.
-    for q = 1:nPanels
-        ax = fig.Children;
-    end
-    axesList = findobj(fig,'Type','axes');
-    axesList = flipud(axesList(:));
-    for q = 1:min(nPanels,numel(axesList))
-        axesList(q).OuterPosition = positions(q,:);
-    end
-    drawnow;
-
-    stem = stemPrefix + "_" + mission_code(mission) + "_grid";
-    figureStem(idx) = stem;
+    stem = stemPrefix + "_" + mission_code(mission) + "_" + ...
+        sanitize_key(string(selection.PanelKey(k)));
+    figureStem(k) = stem;
     export_figure(fig,figureDir,stem,saveFigures,style.exportDpi);
 end
 
-representativeObjective = nan(n,1);
-groupMeanObjective = nan(n,1); groupStdObjective = nan(n,1);
-representativeSeed = nan(n,1);
-if ismember('RepresentativeObjective',selection.Properties.VariableNames)
-    representativeObjective = double(selection.RepresentativeObjective);
-end
-if ismember('GroupMeanObjective',selection.Properties.VariableNames)
-    groupMeanObjective = double(selection.GroupMeanObjective);
-end
-if ismember('GroupStdObjective',selection.Properties.VariableNames)
-    groupStdObjective = double(selection.GroupStdObjective);
-end
-if ismember('RepresentativeSeed',selection.Properties.VariableNames)
-    representativeSeed = double(selection.RepresentativeSeed);
-elseif ismember('Seed',selection.Properties.VariableNames)
+representativeObjective = optional_numeric(selection,'RepresentativeObjective');
+groupMeanObjective = optional_numeric(selection,'GroupMeanObjective');
+groupStdObjective = optional_numeric(selection,'GroupStdObjective');
+representativeSeed = optional_numeric(selection,'RepresentativeSeed');
+if all(isnan(representativeSeed)) && ismember('Seed',selection.Properties.VariableNames)
     representativeSeed = double(selection.Seed);
 end
 
@@ -127,7 +98,7 @@ details = table(string(selection.Mission),string(selection.PanelKey), ...
     numObservers,families,orbitIndices,slotIndices,figureStem, ...
     'VariableNames',{'Mission','PanelKey','PanelLabel','RepresentativeObjective', ...
     'GroupMeanObjective','GroupStdObjective','RepresentativeSeed','RunFile', ...
-    'NumObservers','OrbitFamilies','OrbitIndices','SlotIndices','GridFigureStem'});
+    'NumObservers','OrbitFamilies','OrbitIndices','SlotIndices','FigureStem'});
 end
 
 
@@ -140,7 +111,6 @@ r = S.runState; tracking = T.tracking;
 assert(isfield(r,'observers') && istable(r.observers) && height(r.observers) >= 1, ...
     'Selected run does not contain observer solution data.');
 
-panel.runState = r; panel.tracking = tracking;
 panel.mission = string(r.settings.mission.type);
 panel.truth = double(tracking.truth(:,1:3));
 panel.observers = r.observers;
@@ -187,75 +157,79 @@ panel.allPoints = [panel.truth;observerPoints;panel.endpointOrbitPoints; ...
 end
 
 
-function [handles,labels] = render_geometry_panel(ax,panel,limits,style)
+function prepare_reference_axes(ax,style)
 hold(ax,'on'); box(ax,'on'); grid(ax,'off');
-axis(ax,'vis3d'); daspect(ax,[1 1 1]);
-observerColors = lines(max(1,numel(panel.uniqueOrbitKeys)));
+axis(ax,'equal');
+view(ax,style.geometryAzimuth,style.geometryElevation);
+ax.Projection = 'perspective';
+xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
+set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
+    'FontWeight','bold','LineWidth',style.axisLineWidth, ...
+    'TickLabelInterpreter','tex','Layer','top');
+ax.XLabel.FontName = style.fontName; ax.YLabel.FontName = style.fontName;
+ax.ZLabel.FontName = style.fontName;
+ax.XLabel.FontSize = style.labelFontSize;
+ax.YLabel.FontSize = style.labelFontSize;
+ax.ZLabel.FontSize = style.labelFontSize;
+ax.XLabel.FontWeight = 'bold'; ax.YLabel.FontWeight = 'bold';
+ax.ZLabel.FontWeight = 'bold';
+end
 
+
+function [handles,labels] = render_geometry_panel(ax,panel,style)
+observerColors = lines(max(1,numel(panel.uniqueOrbitKeys)));
 hTarget = plot3(ax,panel.truth(:,1),panel.truth(:,2),panel.truth(:,3),'-', ...
-    'Color',panel.targetColor,'LineWidth',2.25,'DisplayName','Target trajectory');
+    'Color',panel.targetColor,'LineWidth',2.8,'DisplayName','Target trajectory');
 
 hObserver = gobjects(1,1);
 for u = 1:numel(panel.uniqueOrbitKeys)
     state = panel.orbitTrajectories{u};
-    h = plot3(ax,state(:,1),state(:,2),state(:,3), ...
-        'LineStyle','-','Color',observerColors(u,:), ...
-        'LineWidth',1.35,'HandleVisibility','off');
+    h = plot3(ax,state(:,1),state(:,2),state(:,3),'-', ...
+        'Color',observerColors(u,:),'LineWidth',1.45,'HandleVisibility','off');
     if u == 1, hObserver = h; end
 end
 set(hObserver,'HandleVisibility','on','DisplayName','Observer orbits');
 
+% Plot every selected phase marker, even when several observers share the
+% same periodic orbit. The periodic curve itself is drawn only once above.
 for j = 1:height(panel.observers)
     u = find(panel.uniqueOrbitKeys == panel.orbitKeys(j),1,'first');
     p = double(panel.observers.initial_state(j,1:3));
-    plot3(ax,p(1),p(2),p(3),'o','MarkerSize',4.8, ...
+    plot3(ax,p(1),p(2),p(3),'o','MarkerSize',5.2, ...
         'MarkerFaceColor',observerColors(u,:),'MarkerEdgeColor','k', ...
-        'LineWidth',0.55,'HandleVisibility','off');
+        'LineWidth',0.7,'HandleVisibility','off');
 end
 
 hEndpoint = gobjects(0); hStart = gobjects(0); hEnd = gobjects(0);
 if panel.mission == "LOW_THRUST_TRANSFER"
-    endpointColor = [0.66 0.66 0.66];
+    endpointColor = [0.70 0.70 0.70];
     hEndpoint = plot3(ax,panel.departureOrbit(:,1),panel.departureOrbit(:,2), ...
-        panel.departureOrbit(:,3),'-','Color',endpointColor,'LineWidth',0.9, ...
+        panel.departureOrbit(:,3),'-','Color',endpointColor,'LineWidth',1.0, ...
         'DisplayName','Endpoint orbits');
     plot3(ax,panel.arrivalOrbit(:,1),panel.arrivalOrbit(:,2), ...
-        panel.arrivalOrbit(:,3),'-','Color',endpointColor,'LineWidth',0.9, ...
+        panel.arrivalOrbit(:,3),'-','Color',endpointColor,'LineWidth',1.0, ...
         'HandleVisibility','off');
     hStart = plot3(ax,panel.truth(1,1),panel.truth(1,2),panel.truth(1,3),'o', ...
-        'MarkerSize',5.5,'MarkerFaceColor',reviewer2_target_color("LUNAR_GATEWAY"), ...
-        'MarkerEdgeColor','k','LineWidth',0.7,'DisplayName','Start');
+        'MarkerSize',9,'MarkerFaceColor',reviewer2_target_color("LUNAR_GATEWAY"), ...
+        'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','Start');
     hEnd = plot3(ax,panel.truth(end,1),panel.truth(end,2),panel.truth(end,3),'s', ...
-        'MarkerSize',5.5,'MarkerFaceColor',panel.targetColor, ...
-        'MarkerEdgeColor','k','LineWidth',0.7,'DisplayName','End');
+        'MarkerSize',9,'MarkerFaceColor',panel.targetColor, ...
+        'MarkerEdgeColor','k','LineWidth',1.0,'DisplayName','End');
 end
 
-[sx,sy,sz] = sphere(20);
+[sx,sy,sz] = sphere(30);
 hMoon = surf(ax,panel.moonCenter(1)+panel.moonRadius*sx, ...
     panel.moonCenter(2)+panel.moonRadius*sy, ...
     panel.moonCenter(3)+panel.moonRadius*sz, ...
     'FaceColor',[0.72 0.72 0.72],'EdgeColor','none', ...
     'FaceLighting','gouraud','DisplayName','Moon');
-hL1 = plot3(ax,panel.xL1,0,0,'^','MarkerSize',6.5, ...
-    'MarkerFaceColor',[0.82 0.82 0.82],'MarkerEdgeColor','k', ...
-    'LineWidth',0.8,'DisplayName','L1');
-hL2 = plot3(ax,panel.xL2,0,0,'v','MarkerSize',6.5, ...
-    'MarkerFaceColor',[0.82 0.82 0.82],'MarkerEdgeColor','k', ...
-    'LineWidth',0.8,'DisplayName','L2');
+hL1 = plot3(ax,panel.xL1,0,0,'^','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80 0.80 0.80],'MarkerEdgeColor','k', ...
+    'LineWidth',1.2,'DisplayName','L1');
+hL2 = plot3(ax,panel.xL2,0,0,'v','MarkerSize',9, ...
+    'MarkerFaceColor',[0.80 0.80 0.80],'MarkerEdgeColor','k', ...
+    'LineWidth',1.2,'DisplayName','L2');
 camlight(ax,'headlight'); material(ax,'dull');
-
-xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
-ax.Projection = 'perspective';
-view(ax,style.geometryAzimuth,style.geometryElevation);
-xlabel(ax,'x (LU)','FontWeight','bold');
-ylabel(ax,'y (LU)','FontWeight','bold');
-zlabel(ax,'z (LU)','FontWeight','bold');
-set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
-    'FontWeight','bold','LineWidth',style.axisLineWidth,'TickDir','out', ...
-    'PositionConstraint','outerposition');
-ax.XLabel.FontSize = style.labelFontSize;
-ax.YLabel.FontSize = style.labelFontSize;
-ax.ZLabel.FontSize = style.labelFontSize;
 
 if panel.mission == "LOW_THRUST_TRANSFER"
     handles = [hEndpoint hTarget hObserver hStart hEnd hMoon hL1 hL2];
@@ -268,35 +242,58 @@ end
 end
 
 
-function positions = panel_outer_positions(nRows,nColumns,nPanels)
-% Manual outer boxes keep 12/14-point 3-D labels inside a 6.5-inch export.
-left = 0.055; right = 0.035; bottom = 0.055; top = 0.165;
-gapX = 0.015; gapY = 0.025;
-width = (1-left-right-(nColumns-1)*gapX)/nColumns;
-height = (1-bottom-top-(nRows-1)*gapY)/nRows;
-positions = nan(nPanels,4);
-for q = 1:nPanels
-    row = floor((q-1)/nColumns);
-    col = mod(q-1,nColumns);
-    x = left + col*(width+gapX);
-    y = 1-top-(row+1)*height-row*gapY;
-    positions(q,:) = [x y width height];
-end
+function finalize_reference_axes(ax,baseLimits,style)
+xlim(ax,pad_axis_limits(baseLimits(1,:),style.geometryXPadding));
+ylim(ax,pad_axis_limits(baseLimits(2,:),style.geometryYPadding));
+zlim(ax,pad_axis_limits(baseLimits(3,:),style.geometryZPadding));
+axis(ax,'vis3d');
 end
 
 
-function limits = common_geometry_limits(points)
+function format_case_legend(lgd,mission,style)
+lgd.Box = 'on'; lgd.FontName = style.fontName; lgd.FontSize = style.fontSize;
+lgd.FontWeight = 'bold'; lgd.ItemTokenSize = [16 9];
+if mission == "LOW_THRUST_TRANSFER", lgd.NumColumns = 4; else, lgd.NumColumns = 5; end
+end
+
+
+function center_reference_legend(ax,lgd,plotPosition,style)
+lgd.Units = 'normalized'; drawnow;
+pos = lgd.Position;
+pos(1) = 0.5-pos(3)/2;
+legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
+pos(2) = min(legendBottom,0.98-pos(4));
+lgd.Position = pos; lgd.AutoUpdate = 'off';
+% Match the introductory figures: creating/moving a perspective legend can
+% shift the axes, so restore the exact centered inner box after the legend.
+ax.PositionConstraint = 'innerposition';
+ax.Position = plotPosition;
+drawnow;
+end
+
+
+function limits = data_limits(points)
 assert(~isempty(points) && size(points,2) == 3,'Geometry points are empty.');
 limits = zeros(3,2);
 for k = 1:3
     v = points(:,k); v = v(isfinite(v));
-    lo = min(v); hi = max(v); span = hi-lo;
-    if span <= 100*eps(max(1,max(abs(v))))
-        span = max(0.02,0.05*max(1,abs(mean(v))));
-    end
-    padding = 0.065*span;
-    limits(k,:) = [lo-padding,hi+padding];
+    limits(k,:) = [min(v),max(v)];
 end
+end
+
+
+function limits = pad_axis_limits(limits,fraction)
+span = limits(2)-limits(1);
+if span <= 100*eps(max(1,max(abs(limits))))
+    span = max(0.02,0.05*max(1,abs(mean(limits))));
+end
+limits = limits+[-fraction*span,fraction*span];
+end
+
+
+function values = optional_numeric(T,name)
+values = nan(height(T),1);
+if ismember(name,T.Properties.VariableNames), values = double(T.(name)); end
 end
 
 
@@ -353,21 +350,38 @@ end
 end
 
 
-function fig = paper_figure(widthIn,heightIn)
+function key = sanitize_key(value)
+key = lower(regexprep(string(value),'[^a-zA-Z0-9]+','_'));
+key = strip(key,'_');
+end
+
+
+function fig = publication_figure(widthIn,heightIn)
 fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
-    'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
-    'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
+    'PaperUnits','inches','PaperPosition',[0 0 widthIn heightIn], ...
+    'PaperSize',[widthIn heightIn],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
 movegui(fig,'center');
 end
 
 
 function export_figure(fig,figureDir,stem,saveFigures,dpi)
-drawnow;
+enforce_minimum_font_size(fig,12); drawnow;
 if ~saveFigures, return; end
-assert(strlength(string(figureDir)) > 0,'Figure directory is empty.');
 base = fullfile(char(figureDir),char(stem));
-print(fig,[base '.eps'],'-depsc','-painters');
+set(fig,'Renderer','painters','PaperPositionMode','manual');
+print(fig,[base '.eps'],'-depsc2','-painters','-r600');
 exportgraphics(fig,[base '.png'],'Resolution',dpi);
 close(fig);
+end
+
+
+function enforce_minimum_font_size(fig,minFontSize)
+objects = findall(fig,'-property','FontSize');
+for k = 1:numel(objects)
+    try
+        if objects(k).FontSize < minFontSize, objects(k).FontSize = minFontSize; end
+    catch
+    end
+end
 end
