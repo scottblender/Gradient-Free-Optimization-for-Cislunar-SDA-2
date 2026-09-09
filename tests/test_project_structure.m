@@ -47,6 +47,11 @@ function test_project_structure()
         'build_target_case_database', 'scripts/build_target_case_database.m'
         'plot_study_definition_figures', 'scripts/plot_study_definition_figures.m'
         'process_fe_convergence', 'scripts/process_fe_convergence.m'
+        'reviewer2_target_color', 'scripts/reviewer2_target_color.m'
+        'reviewer2_paper_style', 'scripts/reviewer2_paper_style.m'
+        'plot_reviewer2_geometry_grid', 'scripts/plot_reviewer2_geometry_grid.m'
+        'plot_reviewer2_constellation_geometry', 'scripts/plot_reviewer2_constellation_geometry.m'
+        'make_reviewer2_paper_figures', 'scripts/make_reviewer2_paper_figures.m'
         'run_reviewer2_results', 'scripts/run_reviewer2_results.m'
         'run_reviewer2_runtime_pipeline', 'scripts/run_reviewer2_runtime_pipeline.m'
         'run_reviewer2_comparison_pipeline', 'scripts/run_reviewer2_comparison_pipeline.m'
@@ -56,6 +61,7 @@ function test_project_structure()
         'test_fe_study_configuration', 'tests/test_fe_study_configuration.m'
         'test_visibility_keepout_definition', 'tests/test_visibility_keepout_definition.m'
         'test_visibility_trajectories', 'tests/test_visibility_trajectories.m'
+        'test_reviewer2_paper_figures_configuration', 'tests/test_reviewer2_paper_figures_configuration.m'
     };
 
     for i = 1:size(expected, 1)
