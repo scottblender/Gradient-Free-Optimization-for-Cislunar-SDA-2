@@ -52,17 +52,20 @@ function test_project_structure()
         'select_reviewer2_representative_runs', 'scripts/select_reviewer2_representative_runs.m'
         'plot_reviewer2_geometry_grid', 'scripts/plot_reviewer2_geometry_grid.m'
         'plot_reviewer2_constellation_geometry', 'scripts/plot_reviewer2_constellation_geometry.m'
-        'make_reviewer2_paper_figures', 'scripts/make_reviewer2_paper_figures.m'
+        'make_reviewer2_final_figures', 'scripts/make_reviewer2_final_figures.m'
         'run_reviewer2_results', 'scripts/run_reviewer2_results.m'
         'run_reviewer2_runtime_pipeline', 'scripts/run_reviewer2_runtime_pipeline.m'
         'run_reviewer2_comparison_pipeline', 'scripts/run_reviewer2_comparison_pipeline.m'
         'run_reviewer2_baseline_pipeline', 'scripts/run_reviewer2_baseline_pipeline.m'
         'run_reviewer2_objective_screening_pipeline', 'scripts/run_reviewer2_objective_screening_pipeline.m'
+        'run_reviewer2_baseline_monte_carlo', 'scripts/run_reviewer2_baseline_monte_carlo.m'
+        'plot_reviewer2_baseline_monte_carlo', 'scripts/plot_reviewer2_baseline_monte_carlo.m'
         'test_observer_catalog', 'tests/test_observer_catalog.m'
         'test_fe_study_configuration', 'tests/test_fe_study_configuration.m'
         'test_visibility_keepout_definition', 'tests/test_visibility_keepout_definition.m'
         'test_visibility_trajectories', 'tests/test_visibility_trajectories.m'
         'test_reviewer2_paper_figures_configuration', 'tests/test_reviewer2_paper_figures_configuration.m'
+        'test_baseline_monte_carlo_configuration', 'tests/test_baseline_monte_carlo_configuration.m'
     };
 
     for i = 1:size(expected, 1)
