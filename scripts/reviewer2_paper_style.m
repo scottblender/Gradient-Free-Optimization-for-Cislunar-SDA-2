@@ -1,27 +1,36 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% All final Reviewer 2 figures use Times New Roman, 12-point minimum text,
-% 14-point axis labels, consistent optimizer/measurement colors, and the
-% target-case colors used by the study-definition figures.
+% Final Reviewer 2 figures are sized for a journal column/page workflow and
+% use Times New Roman with 12-point minimum text. The geometry figures use a
+% fixed 6.5 x 6.5 inch canvas so every 3-D comparison has identical export
+% dimensions and enough physical margin for labels.
 
 style.fontName = 'Times New Roman';
 style.fontSize = 12;
 style.labelFontSize = 14;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.0;
-style.markerSize = 6;
+style.markerSize = 5.5;
 style.capSize = 7;
-style.alphaBand = 0.14;
-style.figureWidth = 7.2;
-style.figureHeight = 4.8;
-style.panelFigureHeight = 6.4;
-style.geometryFigureWidth = 7.2;
-style.geometryPanelHeight = 3.0;
+style.alphaBand = 0.16;
 style.exportDpi = 300;
 
-% MATLAB default qualitative palette, fixed here so every study uses the
-% same algorithm colors.
+% Journal-sized 2-D figures.
+style.figureWidth = 6.5;
+style.figureHeight = 4.6;
+style.panelFigureHeight = 6.2;
+style.convergenceFigureWidth = 6.5;
+style.convergenceFigureHeight = 6.2;
+
+% Fixed geometry export requested for the manuscript.
+style.geometryFigureWidth = 6.5;
+style.geometryFigureHeight = 6.5;
+style.exportPaddingIn = 0.25;
+style.geometryAzimuth = -37.5;
+style.geometryElevation = 30;
+
+% Fixed qualitative palette so optimizer identity never changes by figure.
 style.optimizerOrder = ["GA","PSO","BAYESIAN","ABC","ACO"];
 style.optimizerColors = [ ...
     0.0000 0.4470 0.7410; ...
