@@ -4,7 +4,7 @@ function outputs = plot_study_definition_figures(inspectFigures)
 % Study-definition figures use the same manuscript styling as the final
 % Reviewer-2 figures: Times New Roman, 12-point axis/legend text, 14-point
 % axis labels, no grid lines, no surrounding axes box, box-free legends,
-% and the shared centered 3-D geometry layout from reviewer2_paper_style.
+% and camera perspectives defined centrally in reviewer2_paper_style.
 
 if nargin<1 || isempty(inspectFigures), inspectFigures = true; end
 
@@ -164,7 +164,8 @@ writetable(orbitMetrics,metricFile);
 
 
 % Preserve the original family-trajectory presentation while using the
-% rebuilt catalog directly. Each legend uses the same position and layout.
+% rebuilt catalog directly. Each family figure gets its camera from the
+% central reviewer2_paper_style configuration.
 familyGroups = { ...
     ["NHL1","NHL2"], ...
     ["SHL1","SHL2"], ...
@@ -192,9 +193,12 @@ figureFiles = strings(numel(familyGroups),1);
 
 for groupIndex = 1:numel(familyGroups)
     group = familyGroups{groupIndex};
+    style = reviewer2_paper_style();
+    familyViewKey = char(figureNames(groupIndex));
+    familyView = style.orbitFamilyViews.(familyViewKey);
+    familyProjection = style.orbitFamilyProjections.(familyViewKey);
 
     if numel(group)==2
-        style = reviewer2_paper_style();
         fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
         [ax,plotPosition] = create_centered_3d_axes(fig);
     else
@@ -208,12 +212,10 @@ for groupIndex = 1:numel(familyGroups)
     grid(ax,'off');
     axis(ax,'equal');
     set(ax,'TickLabelInterpreter','tex','Layer','top');
+    ax.Projection = familyProjection;
+    view(ax,familyView(1),familyView(2));
 
     if numel(group)==2
-        style = reviewer2_paper_style();
-        ax.Projection = 'perspective';
-        view(ax,style.geometryAzimuth,style.geometryElevation);
-
         familyHandles = gobjects(2,1);
         familyLabels = strings(2,1);
         colors = [cL1;cL2];
@@ -269,9 +271,6 @@ for groupIndex = 1:numel(familyGroups)
         axis(ax,'tight');
         axis(ax,'vis3d');
     else
-        ax.Projection = 'orthographic';
-        view(ax,2);
-
         familyRows = find(family=="DRO");
         assert(~isempty(familyRows),'No selected DROs were found.');
         assert(numel(familyRows)==50, ...
@@ -982,7 +981,8 @@ cPoint = [0.80,0.80,0.80];
 
 figGateway = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figGateway);
-prepare_axes(ax);
+prepare_axes(ax,style.maneuverViews.LUNAR_GATEWAY, ...
+    style.maneuverProjections.LUNAR_GATEWAY);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3),'-','Color',cGateway,'LineWidth',2.8);
 hMoon = draw_moon(ax,mu,LU);
 hL1 = plot3(ax,xL1,0,0,'^','MarkerFaceColor',cPoint, ...
@@ -1001,11 +1001,8 @@ export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
 
 figTransfer = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figTransfer);
-prepare_axes(ax);
-% The transfer is physically clear of the Moon, but the shared manuscript
-% camera makes the projected path appear to cross the lunar disk. Apply a
-% small local rotation only to this study-definition panel.
-view(ax,-47.5,35);
+prepare_axes(ax,style.maneuverViews.LOW_THRUST_TRANSFER, ...
+    style.maneuverProjections.LOW_THRUST_TRANSFER);
 endpointColor = [0.70,0.70,0.70];
 hEndpoint = plot3(ax,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3), ...
     '-','Color',endpointColor,'LineWidth',1.0);
@@ -1029,7 +1026,8 @@ export_publication_eps(figTransfer,figureFiles(2)); close(figTransfer);
 
 figImpulse = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figImpulse);
-prepare_axes(ax);
+prepare_axes(ax,style.maneuverViews.GATEWAY_IMPULSE, ...
+    style.maneuverProjections.GATEWAY_IMPULSE);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1),sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3),'--','Color',cNominal,'LineWidth',2.2);
 hImpulse = plot3(ax,sImpulse(:,1),sImpulse(:,2),sImpulse(:,3), ...
     '-','Color',cPostImpulse,'LineWidth',3.0);
@@ -1135,15 +1133,21 @@ limits = limits+[-padding,padding];
 end
 
 
-function prepare_axes(ax)
+function prepare_axes(ax,viewAngles,projection)
 
 style = reviewer2_paper_style();
+if nargin<2 || isempty(viewAngles)
+    viewAngles = [style.geometryAzimuth style.geometryElevation];
+end
+if nargin<3 || isempty(projection)
+    projection = style.geometryProjection;
+end
 hold(ax,'on');
 box(ax,'off');
 grid(ax,'off');
 axis(ax,'equal');
-view(ax,style.geometryAzimuth,style.geometryElevation);
-ax.Projection = 'perspective';
+view(ax,viewAngles(1),viewAngles(2));
+ax.Projection = projection;
 xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
 zlabel(ax,'z (LU)');
