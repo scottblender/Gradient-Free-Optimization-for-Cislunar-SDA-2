@@ -46,6 +46,7 @@ function test_project_structure()
         'build_observer_orbit_catalog', 'scripts/build_observer_orbit_catalog.m'
         'build_target_case_database', 'scripts/build_target_case_database.m'
         'plot_study_definition_figures', 'scripts/plot_study_definition_figures.m'
+        'run_study_definition_figures', 'scripts/run_study_definition_figures.m'
         'process_fe_convergence', 'scripts/process_fe_convergence.m'
         'reviewer2_target_color', 'scripts/reviewer2_target_color.m'
         'reviewer2_paper_style', 'scripts/reviewer2_paper_style.m'
