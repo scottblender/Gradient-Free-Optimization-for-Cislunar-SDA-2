@@ -37,11 +37,11 @@ for k = 1:height(summary)
     ax = axes(fig,'Units','normalized','Position',[0.18 0.18 0.76 0.74]);
     hold(ax,'on'); box(ax,'on'); grid(ax,'on');
 
-    boxchart(ax,ones(height(rows),1),rows.TotalCost, ...
+    hBox = boxchart(ax,ones(height(rows),1),rows.TotalCost, ...
         'BoxFaceColor',style.optimizerColors(1,:), ...
         'MarkerStyle','.');
-    yline(ax,s.ReferenceObjective,'-','Color',[1.00 0.30 0.30], ...
-        'LineWidth',1.5,'HandleVisibility','off');
+    hRef = yline(ax,s.ReferenceObjective,'-','Color',[1.00 0.30 0.30], ...
+        'LineWidth',1.5);
 
     xlim(ax,[0.55 1.45]);
     xticks(ax,[]);
@@ -52,6 +52,12 @@ for k = 1:height(summary)
         'TickDir','out','Layer','top');
     ax.XLabel.FontSize = style.labelFontSize;
     ax.YLabel.FontSize = style.labelFontSize;
+
+    lgd = legend(ax,[hBox hRef],{'MC samples','Optimized reference'}, ...
+        'Location','northoutside','Orientation','horizontal','Box','off');
+    lgd.FontName = style.fontName;
+    lgd.FontSize = style.fontSize;
+    lgd.FontWeight = 'bold';
 
     stem = "baseline_mc_"+mission_code(s.Mission)+"_"+ ...
         measurement_code(s.Measurement)+"_o"+string(s.NumObservers);
