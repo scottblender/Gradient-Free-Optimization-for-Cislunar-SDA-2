@@ -71,6 +71,17 @@ end
 if saveFigures
     fprintf('\n>>> Creating curated journal figures\n');
     reports.paperFigureManifest = make_reviewer2_paper_figures(reports,true);
+    if isfield(reports,'comparison')
+        rankingStem = plot_reviewer2_optimizer_ranking(reports.comparison,true);
+        rankingRow = table("comparison",string(rankingStem), ...
+            "Overall objective rank and target-case win count.", ...
+            'VariableNames',reports.paperFigureManifest.Properties.VariableNames);
+        reports.paperFigureManifest = [reports.paperFigureManifest;rankingRow];
+        comparisonRows = reports.paperFigureManifest( ...
+            reports.paperFigureManifest.Study == "comparison",:);
+        writetable(comparisonRows,fullfile( ...
+            char(reports.comparison.analysisDirectory),'paper_figure_manifest.csv'));
+    end
     fprintf('<<< Curated journal figures complete\n');
 else
     reports.paperFigureManifest = table();
