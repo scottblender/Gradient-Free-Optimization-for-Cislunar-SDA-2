@@ -8,6 +8,7 @@ function manifest = make_reviewer2_runtime_figures(r,baselineResults,saveFigures
 % produces the "Ignoring extra legend entries" warning. The objective chart
 % therefore uses a legend only for the dashed long-run Baseline AO reference.
 % The convergence chart still uses one graphics handle per optimizer curve.
+% All final axes use no grid lines and no surrounding axes box.
 
 if nargin < 2 || isempty(baselineResults), baselineResults = table(); end
 if nargin < 3 || isempty(saveFigures), saveFigures = true; end
@@ -45,7 +46,7 @@ R = sort_to_order(R,'Optimizer',order);
 colors = colors_for_optimizers(R.Optimizer,style);
 
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
 b = bar(ax,1:height(R),values,0.72,'FaceColor','flat');
 b.CData = colors;
@@ -108,7 +109,7 @@ end
 
 function plot_curve_overlay(curves,labels,colors,budget,out,stem,saveFigures,style)
 fig = paper_figure(style.convergenceFigureWidth,style.convergenceFigureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 handles = gobjects(numel(curves),1);
 allY = zeros(0,1);
 for k = 1:numel(curves)
@@ -193,7 +194,8 @@ end
 
 function style_axes(ax,style)
 set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
-    'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top');
+    'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top', ...
+    'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontSize = style.labelFontSize;
 ax.YLabel.FontSize = style.labelFontSize;
 end
