@@ -1,13 +1,16 @@
 function manifest = make_reviewer2_paper_figures(reports,saveFigures)
-%MAKE_REVIEWER2_PAPER_FIGURES Create the final Reviewer-2 manuscript figures.
+%MAKE_REVIEWER2_PAPER_FIGURES Create final Reviewer-2 manuscript figures.
 %
-% Design rules:
+% Final plotting rules:
 %   * statistical comparisons use 20-run mean +/- sample standard deviation;
-%   * convergence uses small multiples, never overlapping uncertainty bands;
-%   * geometry uses a representative realization nearest the group-mean
-%     objective, never the lowest-cost seed as the statistical comparison;
-%   * geometry grids are fixed at 6.5 x 6.5 inches and use common limits;
-%   * Times New Roman, 12-point minimum ticks/legends, 14-point axis labels.
+%   * comparable convergence curves share one axes for direct comparison;
+%   * convergence never uses filled uncertainty bands; only the final-FE
+%     point carries a sample-standard-deviation error bar;
+%   * every bar, ranking, and trend metric is exported as its own figure;
+%   * 3-D geometry remains one full-size intro-style export per realization;
+%   * representative geometry is the realization nearest the group-mean
+%     objective and is never used as the statistical performance result;
+%   * Times New Roman, 12-point minimum text, 14-point axis labels.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -17,122 +20,194 @@ manifest = table(strings(0,1),strings(0,1),strings(0,1), ...
     'VariableNames',{'Study','FigureStem','Purpose'});
 
 if isfield(reports,'runtime')
-    r = reports.runtime; out = prepare_output(r.analysisDirectory,saveFigures);
-    plot_runtime_summary(r,out,saveFigures,style);
-    manifest = add_manifest(manifest,"runtime","runtime_1200_summary", ...
-        "Mean +/- sample std final objective and equal-FE runtime; quantifies BO cost/benefit.");
-    plot_runtime_convergence_small_multiples(r,out,saveFigures,style);
+    r = reports.runtime;
+    out = prepare_output(r.analysisDirectory,saveFigures);
+
+    plot_runtime_metric(r,'BestJMean','BestJStd','Final best objective', ...
+        "runtime_1200_objective",out,saveFigures,style,false);
+    manifest = add_manifest(manifest,"runtime","runtime_1200_objective", ...
+        "Equal-1200-FE final objective, mean +/- sample std across 20 runs.");
+
+    plot_runtime_metric(r,'BudgetRuntimeMean_s','BudgetRuntimeStd_s', ...
+        'Runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true);
+    manifest = add_manifest(manifest,"runtime","runtime_1200_runtime", ...
+        "Equal-1200-FE computational cost; BO slowdown is annotated.");
+
+    plot_runtime_convergence_overlay(r,out,saveFigures,style);
     manifest = add_manifest(manifest,"runtime","runtime_1200_convergence", ...
-        "One optimizer per axes; mean convergence with final-FE sample standard deviation.");
+        "All five mean best-so-far curves on one axes; final-FE sample std only.");
 end
 
 if isfield(reports,'comparison')
-    r = reports.comparison; out = prepare_output(r.analysisDirectory,saveFigures);
-    plot_comparison_summary(r,out,saveFigures,style);
-    manifest = add_manifest(manifest,"comparison","comparison_6000_summary", ...
-        "Mean +/- sample std objective, RMSE, uncertainty, and runtime by target case.");
-    plot_optimizer_ranking(r,out,saveFigures,style);
-    manifest = add_manifest(manifest,"comparison","comparison_6000_optimizer_ranking", ...
-        "Overall optimizer ranking computed from mission-wise mean objective, not individual seeds.");
+    r = reports.comparison;
+    out = prepare_output(r.analysisDirectory,saveFigures);
+
+    specs = { ...
+        'BestJMean','BestJStd','Final best objective','comparison_6000_objective'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','comparison_6000_position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','comparison_6000_effective_sigma'; ...
+        'RuntimeMean_s','RuntimeStd_s','Runtime to 6000 FE (s)','comparison_6000_runtime'; ...
+        'MeanStabilityMean','MeanStabilityStd','Mean observer stability index','comparison_6000_stability'; ...
+        'CoverageMean','CoverageStd','Coverage fraction','comparison_6000_coverage'; ...
+        'ScreeningMean','ScreeningStd','Rejected measurement opportunities','comparison_6000_screening_count'};
+    for q = 1:size(specs,1)
+        plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...
+            string(specs{q,4}),out,saveFigures,style);
+        manifest = add_manifest(manifest,"comparison",string(specs{q,4}), ...
+            "Case-wise optimizer comparison using mean +/- sample std.");
+    end
+
+    plot_optimizer_rank_metric(r,'MeanObjectiveRank','Mean objective rank', ...
+        "comparison_6000_objective_rank",out,saveFigures,style,true);
+    manifest = add_manifest(manifest,"comparison","comparison_6000_objective_rank", ...
+        "Overall solution-quality rank computed from mission-wise mean objective.");
+
+    plot_optimizer_rank_metric(r,'MissionWins','Target-case wins', ...
+        "comparison_6000_mission_wins",out,saveFigures,style,false);
+    manifest = add_manifest(manifest,"comparison","comparison_6000_mission_wins", ...
+        "Number of target cases won using mean final objective.");
+
     for mission = string(r.missions)
         stem = "comparison_6000_convergence_"+mission_code(mission);
-        plot_comparison_convergence_small_multiples(r,mission,out,stem,saveFigures,style);
+        plot_comparison_convergence_overlay(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"comparison",stem, ...
-            "One optimizer per axes with shared limits; mean convergence and final-FE sample std.");
+            "GA/PSO/ABC/ACO mean convergence overlaid for direct comparison.");
     end
+
     selection = select_reviewer2_representative_runs(r,"comparison");
     writetable(selection,fullfile(char(r.analysisDirectory), ...
         'comparison_6000_geometry_representative_runs.csv'));
-    plot_reviewer2_geometry_grid(selection,out,"comparison_geometry",saveFigures);
-    for mission = string(r.missions)
-        stem = "comparison_geometry_"+mission_code(mission)+"_grid";
-        manifest = add_manifest(manifest,"comparison",stem, ...
-            "Representative optimizer geometry: realization nearest each 20-run mean objective.");
-    end
+    geometryDetails = plot_reviewer2_geometry_grid( ...
+        selection,out,"comparison_geometry",saveFigures);
+    manifest = add_geometry_manifest(manifest,"comparison",geometryDetails, ...
+        "Representative optimizer geometry nearest each 20-run mean objective.");
 end
 
 if isfield(reports,'baseline')
-    r = reports.baseline; out = prepare_output(r.analysisDirectory,saveFigures);
+    r = reports.baseline;
+    out = prepare_output(r.analysisDirectory,saveFigures);
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
+
+    observerSpecs = { ...
+        'BestJMean','BestJStd','Final best objective','objective'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','effective_sigma'; ...
+        'RuntimeMean_s','RuntimeStd_s','Runtime to 6000 FE (s)','runtime'; ...
+        'CoverageMean','CoverageStd','Coverage fraction','coverage'};
+
     for mission = missions
-        stem = "baseline_observer_trends_"+mission_code(mission);
-        plot_baseline_observer_trends(r,mission,out,stem,saveFigures,style);
-        manifest = add_manifest(manifest,"baseline",stem, ...
-            "AO/AR observer-count trends using mean +/- sample standard deviation.");
+        for q = 1:size(observerSpecs,1)
+            stem = "baseline_observer_"+string(observerSpecs{q,4})+"_"+mission_code(mission);
+            plot_baseline_observer_metric(r,mission,observerSpecs{q,1}, ...
+                observerSpecs{q,2},observerSpecs{q,3},out,stem,saveFigures,style);
+            manifest = add_manifest(manifest,"baseline",stem, ...
+                "AO/AR observer-count trend using mean +/- sample std.");
+        end
         for meas = ["ANGLES_ONLY","ANGLES_RANGE"]
-            cstem = "baseline_convergence_observers_"+mission_code(mission)+ ...
+            stem = "baseline_convergence_observers_"+mission_code(mission)+ ...
                 "_"+measurement_code(meas);
-            plot_baseline_observer_convergence_small_multiples( ...
-                r,mission,meas,out,cstem,saveFigures,style);
-            manifest = add_manifest(manifest,"baseline",cstem, ...
-                "One observer-count case per axes with shared convergence limits.");
+            plot_baseline_observer_convergence_overlay( ...
+                r,mission,meas,out,stem,saveFigures,style);
+            manifest = add_manifest(manifest,"baseline",stem, ...
+                "3/5/7/10-observer GA mean convergence overlaid on one axes.");
         end
     end
+
+    durationSpecs = { ...
+        'BestJMean','BestJStd','Final best objective','objective'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','effective_sigma'};
     for meas = ["ANGLES_ONLY","ANGLES_RANGE"]
-        stem = "baseline_gateway_duration_objective_"+measurement_code(meas);
-        plot_baseline_duration_metric(r,meas,"BestJMean","BestJStd", ...
-            'Final best objective',out,stem,saveFigures,style);
-        manifest = add_manifest(manifest,"baseline",stem, ...
-            "Tracking-duration effect on mean objective for 3/5/7/10 observers.");
-        stem = "baseline_gateway_duration_rmse_"+measurement_code(meas);
-        plot_baseline_duration_metric(r,meas,"RMSEPosMean_km","RMSEPosStd_km", ...
-            'Position RMSE (km)',out,stem,saveFigures,style);
-        manifest = add_manifest(manifest,"baseline",stem, ...
-            "Tracking-duration effect on mean position RMSE for 3/5/7/10 observers.");
+        for q = 1:size(durationSpecs,1)
+            stem = "baseline_gateway_duration_"+string(durationSpecs{q,4})+ ...
+                "_"+measurement_code(meas);
+            plot_baseline_duration_metric(r,meas,durationSpecs{q,1}, ...
+                durationSpecs{q,2},durationSpecs{q,3},out,stem,saveFigures,style);
+            manifest = add_manifest(manifest,"baseline",stem, ...
+                "Gateway-duration effect for 3/5/7/10 observers, mean +/- sample std.");
+        end
+
         stem = "baseline_convergence_duration_"+measurement_code(meas);
-        plot_baseline_duration_convergence_small_multiples(r,meas,out,stem,saveFigures,style);
+        plot_baseline_duration_convergence_overlay(r,meas,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"baseline",stem, ...
-            "One Gateway duration per axes with shared convergence limits.");
+            "1/3/5-period GA mean convergence overlaid on one axes.");
     end
+
     selection = select_reviewer2_representative_runs(r,"baseline");
     writetable(selection,fullfile(char(r.analysisDirectory), ...
         'baseline_6000_geometry_representative_runs.csv'));
-    plot_reviewer2_geometry_grid(selection,out,"baseline_geometry",saveFigures);
-    for mission = missions
-        stem = "baseline_geometry_"+mission_code(mission)+"_grid";
-        manifest = add_manifest(manifest,"baseline",stem, ...
-            "Representative AO geometry nearest the mean objective for 3/5/7/10 observers.");
-    end
+    geometryDetails = plot_reviewer2_geometry_grid( ...
+        selection,out,"baseline_geometry",saveFigures);
+    manifest = add_geometry_manifest(manifest,"baseline",geometryDetails, ...
+        "Representative AO geometry nearest the mean objective for each observer count.");
 end
 
 if isfield(reports,'objective_screening')
-    r = reports.objective_screening; out = prepare_output(r.analysisDirectory,saveFigures);
+    r = reports.objective_screening;
+    out = prepare_output(r.analysisDirectory,saveFigures);
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
+
+    screeningSpecs = { ...
+        'BestJMean','BestJStd','Final best objective','objective'; ...
+        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','effective_sigma'; ...
+        'ScreeningMean','ScreeningStd','Rejected measurement opportunities','screening_count'};
+    componentSpecs = { ...
+        'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','position_rmse'; ...
+        'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)','effective_sigma'; ...
+        'MeanStabilityMean','MeanStabilityStd','Mean stability index','stability'; ...
+        'CoverageMean','CoverageStd','Coverage fraction','coverage'};
+
     for mission = missions
-        stem = "ga_screening_summary_"+mission_code(mission);
-        plot_screening_summary(r,mission,out,stem,saveFigures,style);
-        manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Matched J111 screening ON/OFF mean +/- sample std comparison.");
+        for q = 1:size(screeningSpecs,1)
+            stem = "ga_screening_"+string(screeningSpecs{q,4})+"_"+mission_code(mission);
+            plot_configuration_metric(r.results,mission, ...
+                ["combined_on","combined_off"],screeningSpecs{q,1}, ...
+                screeningSpecs{q,2},screeningSpecs{q,3},out,stem,saveFigures,style);
+            manifest = add_manifest(manifest,"objective_screening",stem, ...
+                "Screening ON/OFF comparison using mean +/- sample std.");
+        end
+
         stem = "ga_screening_convergence_"+mission_code(mission);
-        plot_screening_convergence_small_multiples(r,mission,out,stem,saveFigures,style);
+        plot_screening_convergence_overlay(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Screening ON/OFF convergence shown on separate axes with shared limits.");
-        stem = "ga_objective_components_"+mission_code(mission);
-        plot_objective_component_summary(r,mission,out,stem,saveFigures,style);
-        manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Physical metrics for J111/J100/J010/J001 using mean +/- sample std.");
+            "Matched J111 screening ON/OFF mean convergence overlaid on one axes.");
+
+        % Total objective is intentionally omitted here because J111/J100/
+        % J010/J001 are different mathematical objectives and are therefore
+        % not directly comparable as scalar objective values.
+        for q = 1:size(componentSpecs,1)
+            stem = "ga_objective_"+string(componentSpecs{q,4})+"_"+mission_code(mission);
+            plot_configuration_metric(r.results,mission, ...
+                ["combined_on","j1_only","j2_only","j3_only"], ...
+                componentSpecs{q,1},componentSpecs{q,2},componentSpecs{q,3}, ...
+                out,stem,saveFigures,style);
+            manifest = add_manifest(manifest,"objective_screening",stem, ...
+                "J111/J100/J010/J001 physical-metric comparison using mean +/- sample std.");
+        end
+
         stem = "ga_objective_families_"+mission_code(mission);
         plot_objective_family_summary(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Orbit-family distribution by objective configuration.");
+            "Selected orbit-family distribution by objective configuration.");
     end
 
     selection = select_reviewer2_representative_runs(r,"objective_screening");
     writetable(selection,fullfile(char(r.analysisDirectory), ...
         'ga_objective_screening_geometry_representative_runs.csv'));
-    screeningSelection = selection(ismember(selection.PanelKey,["combined_on","combined_off"]),:);
+    screeningSelection = selection(ismember(selection.PanelKey, ...
+        ["combined_on","combined_off"]),:);
     componentSelection = selection(ismember(selection.PanelKey, ...
         ["combined_on","j1_only","j2_only","j3_only"]),:);
-    plot_reviewer2_geometry_grid(screeningSelection,out,"ga_screening_geometry",saveFigures);
-    plot_reviewer2_geometry_grid(componentSelection,out,"ga_objective_geometry",saveFigures);
-    for mission = missions
-        manifest = add_manifest(manifest,"objective_screening", ...
-            "ga_screening_geometry_"+mission_code(mission)+"_grid", ...
-            "Representative screening ON/OFF geometry nearest each group mean objective.");
-        manifest = add_manifest(manifest,"objective_screening", ...
-            "ga_objective_geometry_"+mission_code(mission)+"_grid", ...
-            "Representative objective-component geometry nearest each group mean objective.");
-    end
+    screeningDetails = plot_reviewer2_geometry_grid( ...
+        screeningSelection,out,"ga_screening_geometry",saveFigures);
+    componentDetails = plot_reviewer2_geometry_grid( ...
+        componentSelection,out,"ga_objective_geometry",saveFigures);
+    manifest = add_geometry_manifest(manifest,"objective_screening", ...
+        screeningDetails,"Representative screening ON/OFF geometry nearest each group mean objective.");
+    manifest = add_geometry_manifest(manifest,"objective_screening", ...
+        componentDetails,"Representative objective-component geometry nearest each group mean objective.");
+
     trendTable = build_objective_screening_trends(r);
     writetable(trendTable,fullfile(char(r.analysisDirectory), ...
         'ga_objective_screening_trends.csv'));
@@ -144,13 +219,37 @@ end
 
 function out = prepare_output(analysisDir,saveFigures)
 out = string(fullfile(char(analysisDir),'paper_final'));
-if saveFigures && ~isfolder(out), mkdir(out); end
+if saveFigures
+    if ~isfolder(out), mkdir(out); end
+    % Remove stale rendered figures from earlier plotting layouts. Keep CSVs
+    % and processed numerical data intact.
+    delete_if_present(fullfile(char(out),'*.eps'));
+    delete_if_present(fullfile(char(out),'*.png'));
+end
+end
+
+
+function delete_if_present(pattern)
+files = dir(pattern);
+for k = 1:numel(files)
+    delete(fullfile(files(k).folder,files(k).name));
+end
 end
 
 
 function manifest = add_manifest(manifest,study,stem,purpose)
 manifest = [manifest;table(string(study),string(stem),string(purpose), ...
     'VariableNames',manifest.Properties.VariableNames)]; %#ok<AGROW>
+end
+
+
+function manifest = add_geometry_manifest(manifest,study,details,purpose)
+if isempty(details), return; end
+assert(ismember('FigureStem',details.Properties.VariableNames), ...
+    'Geometry details must contain FigureStem.');
+for k = 1:height(details)
+    manifest = add_manifest(manifest,study,string(details.FigureStem(k)),purpose);
+end
 end
 
 
@@ -165,104 +264,90 @@ end
 end
 
 
-function plot_runtime_summary(r,out,saveFigures,style)
+function plot_runtime_metric(r,valueField,stdField,yLabel,stem,out,saveFigures,style,annotateBO)
 R = r.runtimeResults;
 order = style.optimizerOrder(ismember(style.optimizerOrder,R.Optimizer));
 R = sort_to_order(R,'Optimizer',order);
 colors = colors_for_optimizers(R.Optimizer,style);
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-t = tiledlayout(fig,1,2,'Padding','loose','TileSpacing','compact');
-
-ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-b = bar(ax,1:height(R),R.BestJMean,0.72,'FaceColor','flat'); b.CData = colors;
-errorbar(ax,1:height(R),R.BestJMean,R.BestJStd,'k.','LineWidth',1.0, ...
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+values = R.(valueField); errors = R.(stdField);
+b = bar(ax,1:height(R),values,0.72,'FaceColor','flat'); b.CData = colors;
+errorbar(ax,1:height(R),values,errors,'k.','LineWidth',1.0, ...
     'CapSize',style.capSize,'HandleVisibility','off');
-format_category_axis(ax,optimizer_labels(R.Optimizer),'Final best objective',style);
-
-ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-b = bar(ax,1:height(R),R.BudgetRuntimeMean_s,0.72,'FaceColor','flat'); b.CData = colors;
-errorbar(ax,1:height(R),R.BudgetRuntimeMean_s,R.BudgetRuntimeStd_s,'k.', ...
-    'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
-format_category_axis(ax,optimizer_labels(R.Optimizer),'Runtime to 1200 FE (s)',style);
-idxBO = find(R.Optimizer == "BAYESIAN",1);
-if ~isempty(idxBO)
-    fastest = min(R.BudgetRuntimeMean_s(R.Optimizer ~= "BAYESIAN"));
-    ratio = R.BudgetRuntimeMean_s(idxBO)/fastest;
-    text(ax,idxBO,R.BudgetRuntimeMean_s(idxBO)+R.BudgetRuntimeStd_s(idxBO), ...
-        sprintf('%.1fx fastest',ratio),'HorizontalAlignment','center', ...
-        'VerticalAlignment','bottom','FontName',style.fontName, ...
-        'FontSize',style.fontSize,'FontWeight','bold');
+format_category_axis(ax,optimizer_labels(R.Optimizer),yLabel,style);
+if annotateBO
+    idxBO = find(R.Optimizer == "BAYESIAN",1);
+    if ~isempty(idxBO)
+        fastest = min(values(R.Optimizer ~= "BAYESIAN"));
+        ratio = values(idxBO)/fastest;
+        text(ax,idxBO,values(idxBO)+errors(idxBO),sprintf('%.1fx fastest',ratio), ...
+            'HorizontalAlignment','center','VerticalAlignment','bottom', ...
+            'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
+    end
 end
-export_figure(fig,out,"runtime_1200_summary",saveFigures,style);
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_runtime_convergence_small_multiples(r,out,saveFigures,style)
+function plot_runtime_convergence_overlay(r,out,saveFigures,style)
 files = dir(fullfile(char(r.analysisDirectory),'convergence_*.mat'));
 assert(numel(files) == 1,'Expected one runtime convergence file.');
 S = load(fullfile(files(1).folder,files(1).name),'curves');
-optimizers = style.optimizerOrder(ismember(style.optimizerOrder,upper(string({S.curves.optimizer}))));
+optimizers = style.optimizerOrder(ismember(style.optimizerOrder, ...
+    upper(string({S.curves.optimizer}))));
 curves = cell(numel(optimizers),1);
 for k = 1:numel(optimizers)
     idx = find(upper(string({S.curves.optimizer})) == optimizers(k),1);
     curves{k} = S.curves(idx);
 end
-plot_curve_small_multiples(curves,optimizer_labels(optimizers), ...
-    colors_for_optimizers(optimizers,style),r.budget,3,2,out, ...
+plot_curve_overlay(curves,optimizer_labels(optimizers), ...
+    colors_for_optimizers(optimizers,style),r.budget,out, ...
     "runtime_1200_convergence",saveFigures,style);
 end
 
 
-function plot_comparison_summary(r,out,saveFigures,style)
+function plot_comparison_metric(r,valueField,stdField,yLabel,stem,out,saveFigures,style)
 R = r.results; missions = string(r.missions); optimizers = string(r.optimizers);
-specs = { ...
-    'BestJMean','BestJStd','Final best objective'; ...
-    'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
-    'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)'; ...
-    'RuntimeMean_s','RuntimeStd_s','Runtime to 6000 FE (s)'};
-fig = paper_figure(style.figureWidth,style.panelFigureHeight,style);
-t = tiledlayout(fig,2,2,'Padding','loose','TileSpacing','compact');
-legendHandles = gobjects(numel(optimizers),1);
-for q = 1:4
-    ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-    [values,errors] = grouped_values(R,missions,optimizers,specs{q,1},specs{q,2});
-    b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
-    for k = 1:numel(optimizers)
-        b(k).FaceColor = optimizer_color(optimizers(k),style);
-        errorbar(ax,b(k).XEndPoints,values(:,k),errors(:,k),'k.', ...
-            'LineWidth',0.9,'CapSize',style.capSize,'HandleVisibility','off');
-        if q == 1, legendHandles(k) = b(k); end
-    end
-    ax.XTick = 1:numel(missions); ax.XTickLabel = cellstr(mission_labels(missions));
-    ylabel(ax,specs{q,3},'FontWeight','bold'); style_axes(ax,style);
+[values,errors] = grouped_values(R,missions,optimizers,valueField,stdField);
+fig = paper_figure(style.figureWidth,style.figureHeight,style);
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
+for k = 1:numel(optimizers)
+    b(k).FaceColor = optimizer_color(optimizers(k),style);
+    errorbar(ax,b(k).XEndPoints,values(:,k),errors(:,k),'k.', ...
+        'LineWidth',0.9,'CapSize',style.capSize,'HandleVisibility','off');
 end
-lgd = legend(legendHandles,cellstr(optimizer_labels(optimizers)), ...
-    'Orientation','horizontal','NumColumns',numel(optimizers),'Box','off');
-style_legend(lgd,style); lgd.Layout.Tile = 'north';
-export_figure(fig,out,"comparison_6000_summary",saveFigures,style);
+ax.XTick = 1:numel(missions);
+ax.XTickLabel = cellstr(mission_labels(missions));
+ylabel(ax,yLabel,'FontWeight','bold');
+style_axes(ax,style);
+lgd = legend(ax,b,cellstr(optimizer_labels(optimizers)), ...
+    'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',numel(optimizers),'Box','off');
+style_legend(lgd,style);
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_optimizer_ranking(r,out,saveFigures,style)
-T = r.overallRanking;
-T = sortrows(T,'OverallRank','ascend');
+function plot_optimizer_rank_metric(r,field,yLabel,stem,out,saveFigures,style,lowerIsBetter)
+T = sortrows(r.overallRanking,'OverallRank','ascend');
 colors = colors_for_optimizers(T.Optimizer,style);
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
-t = tiledlayout(fig,1,2,'Padding','loose','TileSpacing','compact');
-ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-b = bar(ax,1:height(T),T.MeanObjectiveRank,0.72,'FaceColor','flat'); b.CData = colors;
-format_category_axis(ax,optimizer_labels(T.Optimizer),'Mean objective rank',style);
-yline(ax,1,'k:','HandleVisibility','off');
-ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-b = bar(ax,1:height(T),T.MissionWins,0.72,'FaceColor','flat'); b.CData = colors;
-format_category_axis(ax,optimizer_labels(T.Optimizer),'Target-case wins',style);
-export_figure(fig,out,"comparison_6000_optimizer_ranking",saveFigures,style);
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:height(T),T.(field),0.72,'FaceColor','flat'); b.CData = colors;
+format_category_axis(ax,optimizer_labels(T.Optimizer),yLabel,style);
+if lowerIsBetter
+    yline(ax,1,'k:','HandleVisibility','off');
+else
+    ylim(ax,[0 max(3,max(T.(field))+0.5)]);
+end
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_comparison_convergence_small_multiples(r,mission,out,stem,saveFigures,style)
-row = r.results(r.results.Mission == mission,:);
-key = string(row.ComparisonKey(1));
+function plot_comparison_convergence_overlay(r,mission,out,stem,saveFigures,style)
+key = comparison_key_for_mission(r,mission);
 S = load(fullfile(char(r.analysisDirectory),"convergence_"+key+".mat"),'curves');
 optimizers = string(r.optimizers); curves = cell(numel(optimizers),1);
 for k = 1:numel(optimizers)
@@ -270,77 +355,85 @@ for k = 1:numel(optimizers)
     assert(~isempty(idx),'Missing convergence curve for %s.',optimizers(k));
     curves{k} = S.curves(idx);
 end
-plot_curve_small_multiples(curves,optimizer_labels(optimizers), ...
-    colors_for_optimizers(optimizers,style),r.budget,2,2,out,stem,saveFigures,style);
+plot_curve_overlay(curves,optimizer_labels(optimizers), ...
+    colors_for_optimizers(optimizers,style),r.budget,out,stem,saveFigures,style);
 end
 
 
-function plot_baseline_observer_trends(r,mission,out,stem,saveFigures,style)
+function key = comparison_key_for_mission(r,mission)
+if ismember('ComparisonKey',r.results.Properties.VariableNames)
+    rows = r.results(r.results.Mission == mission,:);
+    keys = unique(string(rows.ComparisonKey));
+else
+    rows = r.summary(r.summary.mission == mission,:);
+    keys = unique(string(rows.comparison_key));
+end
+assert(numel(keys) == 1,'Expected one comparison key for %s.',mission);
+key = keys(1);
+end
+
+
+function plot_baseline_observer_metric(r,mission,valueField,stdField,yLabel,out,stem,saveFigures,style)
 R = r.results; measurements = ["ANGLES_ONLY","ANGLES_RANGE"]; counts = [3 5 7 10];
-specs = { ...
-    'BestJMean','BestJStd','Final best objective'; ...
-    'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
-    'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)'; ...
-    'RuntimeMean_s','RuntimeStd_s','Runtime to 6000 FE (s)'};
-fig = paper_figure(style.figureWidth,style.panelFigureHeight,style);
-t = tiledlayout(fig,2,2,'Padding','loose','TileSpacing','compact');
-legendHandles = gobjects(2,1);
-for q = 1:4
-    ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-    for m = 1:2
-        values = nan(size(counts)); errors = values;
-        for k = 1:numel(counts)
-            row = R(R.Mission == mission & R.Measurement == measurements(m) & ...
-                R.NumObservers == counts(k) & R.NPeriods == 1,:);
-            assert(height(row) == 1,'Missing baseline observer-count point.');
-            values(k) = row.(specs{q,1}); errors(k) = row.(specs{q,2});
-        end
-        c = style.measurementColors(m,:);
-        h = errorbar(ax,counts,values,errors,'-o','Color',c, ...
-            'LineWidth',style.lineWidth,'MarkerSize',style.markerSize, ...
-            'MarkerFaceColor',c,'CapSize',style.capSize, ...
-            'DisplayName',measurement_label(measurements(m)));
-        if q == 1, legendHandles(m) = h; end
+fig = paper_figure(style.figureWidth,style.figureHeight,style);
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+handles = gobjects(2,1);
+for m = 1:2
+    values = nan(size(counts)); errors = values;
+    for k = 1:numel(counts)
+        row = R(R.Mission == mission & R.Measurement == measurements(m) & ...
+            R.NumObservers == counts(k) & R.NPeriods == 1,:);
+        assert(height(row) == 1,'Missing baseline observer-count point.');
+        values(k) = row.(valueField); errors(k) = row.(stdField);
     end
-    ax.XTick = counts; xlabel(ax,'Number of observers','FontWeight','bold');
-    ylabel(ax,specs{q,3},'FontWeight','bold'); style_axes(ax,style);
+    c = style.measurementColors(m,:);
+    handles(m) = errorbar(ax,counts,values,errors,'-o','Color',c, ...
+        'LineWidth',style.lineWidth,'MarkerSize',style.markerSize, ...
+        'MarkerFaceColor',c,'CapSize',style.capSize, ...
+        'DisplayName',measurement_label(measurements(m)));
 end
-lgd = legend(legendHandles,{'AO','AR'},'Orientation','horizontal','Box','off');
-style_legend(lgd,style); lgd.Layout.Tile = 'north';
+ax.XTick = counts;
+xlabel(ax,'Number of observers','FontWeight','bold');
+ylabel(ax,yLabel,'FontWeight','bold');
+style_axes(ax,style);
+lgd = legend(ax,handles,{'AO','AR'},'Location','northoutside', ...
+    'Orientation','horizontal','Box','off');
+style_legend(lgd,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
 
 function plot_baseline_duration_metric(r,measurement,valueField,stdField,yLabel,out,stem,saveFigures,style)
-R = r.results; counts = [3 5 7 10]; periods = [1 3 5];
-fig = paper_figure(style.figureWidth,style.panelFigureHeight,style);
-t = tiledlayout(fig,2,2,'Padding','loose','TileSpacing','compact');
-colors = lines(numel(counts));
+R = r.results; counts = [3 5 7 10]; periods = [1 3 5]; colors = lines(numel(counts));
+fig = paper_figure(style.figureWidth,style.figureHeight,style);
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+handles = gobjects(numel(counts),1);
 for k = 1:numel(counts)
-    ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-    rows = R(R.Mission == "LUNAR_GATEWAY" & R.Measurement == measurement & ...
-        R.NumObservers == counts(k),:);
     values = nan(size(periods)); errors = values;
     for p = 1:numel(periods)
-        row = rows(rows.NPeriods == periods(p),:);
+        row = R(R.Mission == "LUNAR_GATEWAY" & R.Measurement == measurement & ...
+            R.NumObservers == counts(k) & R.NPeriods == periods(p),:);
         assert(height(row) == 1,'Missing Gateway duration point.');
         values(p) = row.(valueField); errors(p) = row.(stdField);
     end
-    errorbar(ax,periods,values,errors,'-o','Color',colors(k,:), ...
+    handles(k) = errorbar(ax,periods,values,errors,'-o','Color',colors(k,:), ...
         'LineWidth',style.lineWidth,'MarkerSize',style.markerSize, ...
-        'MarkerFaceColor',colors(k,:),'CapSize',style.capSize);
-    ax.XTick = periods; xlabel(ax,'Gateway periods','FontWeight','bold');
-    ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
-    title(ax,string(counts(k))+" observers",'FontName',style.fontName, ...
-        'FontSize',style.fontSize,'FontWeight','bold');
+        'MarkerFaceColor',colors(k,:),'CapSize',style.capSize, ...
+        'DisplayName',sprintf('%d observers',counts(k)));
 end
+ax.XTick = periods;
+xlabel(ax,'Gateway tracking periods','FontWeight','bold');
+ylabel(ax,yLabel,'FontWeight','bold');
+style_axes(ax,style);
+lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',2,'Box','off');
+style_legend(lgd,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_baseline_observer_convergence_small_multiples(r,mission,measurement,out,stem,saveFigures,style)
-counts = [3 5 7 10]; curves = cell(4,1); labels = strings(4,1);
-colors = lines(4);
+function plot_baseline_observer_convergence_overlay(r,mission,measurement,out,stem,saveFigures,style)
+counts = [3 5 7 10]; curves = cell(4,1); labels = strings(4,1); colors = lines(4);
 for k = 1:4
     row = r.results(r.results.Mission == mission & r.results.Measurement == measurement & ...
         r.results.NumObservers == counts(k) & r.results.NPeriods == 1,:);
@@ -348,11 +441,11 @@ for k = 1:4
     curves{k} = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
     labels(k) = string(counts(k))+" observers";
 end
-plot_curve_small_multiples(curves,labels,colors,r.budget,2,2,out,stem,saveFigures,style);
+plot_curve_overlay(curves,labels,colors,r.budget,out,stem,saveFigures,style);
 end
 
 
-function plot_baseline_duration_convergence_small_multiples(r,measurement,out,stem,saveFigures,style)
+function plot_baseline_duration_convergence_overlay(r,measurement,out,stem,saveFigures,style)
 periods = [1 3 5]; curves = cell(3,1); labels = strings(3,1); colors = lines(3);
 for k = 1:3
     row = r.results(r.results.Mission == "LUNAR_GATEWAY" & ...
@@ -362,64 +455,39 @@ for k = 1:3
     curves{k} = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
     labels(k) = string(periods(k))+" period"+plural_s(periods(k));
 end
-plot_curve_small_multiples(curves,labels,colors,r.budget,1,3,out,stem,saveFigures,style);
+plot_curve_overlay(curves,labels,colors,r.budget,out,stem,saveFigures,style);
 end
 
 
-function plot_screening_summary(r,mission,out,stem,saveFigures,style)
-configs = ["combined_on","combined_off"];
-specs = { ...
-    'BestJMean','BestJStd','Final best objective'; ...
-    'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
-    'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)'; ...
-    'ScreeningMean','ScreeningStd','Rejected measurement opportunities'};
-plot_configuration_panel(r.results,mission,configs,specs,out,stem,saveFigures,style);
+function plot_configuration_metric(R,mission,configs,valueField,stdField,yLabel,out,stem,saveFigures,style)
+colors = colors_for_configurations(configs,style);
+values = nan(numel(configs),1); errors = values;
+for k = 1:numel(configs)
+    row = objective_result(R,mission,configs(k));
+    values(k) = row.(valueField); errors(k) = row.(stdField);
+end
+fig = paper_figure(style.figureWidth,style.figureHeight,style);
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:numel(configs),values,0.72,'FaceColor','flat'); b.CData = colors;
+errorbar(ax,1:numel(configs),values,errors,'k.','LineWidth',0.9, ...
+    'CapSize',style.capSize,'HandleVisibility','off');
+ax.XTick = 1:numel(configs);
+ax.XTickLabel = cellstr(configuration_labels(configs));
+ax.XTickLabelRotation = 18;
+ylabel(ax,yLabel,'FontWeight','bold');
+style_axes(ax,style);
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_screening_convergence_small_multiples(r,mission,out,stem,saveFigures,style)
+function plot_screening_convergence_overlay(r,mission,out,stem,saveFigures,style)
 configs = ["combined_on","combined_off"]; curves = cell(2,1);
 for k = 1:2
     row = objective_result(r.results,mission,configs(k));
     curves{k} = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
 end
-plot_curve_small_multiples(curves,configuration_labels(configs), ...
-    colors_for_configurations(configs,style),r.budget,1,2,out,stem,saveFigures,style);
-end
-
-
-function plot_objective_component_summary(r,mission,out,stem,saveFigures,style)
-% Total objective is intentionally omitted because J111/J100/J010/J001 are
-% different mathematical objectives and therefore are not directly comparable.
-configs = ["combined_on","j1_only","j2_only","j3_only"];
-specs = { ...
-    'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
-    'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)'; ...
-    'MeanStabilityMean','MeanStabilityStd','Mean stability index'; ...
-    'CoverageMean','CoverageStd','Coverage fraction'};
-plot_configuration_panel(r.results,mission,configs,specs,out,stem,saveFigures,style);
-end
-
-
-function plot_configuration_panel(R,mission,configs,specs,out,stem,saveFigures,style)
-fig = paper_figure(style.figureWidth,style.panelFigureHeight,style);
-t = tiledlayout(fig,2,2,'Padding','loose','TileSpacing','compact');
-colors = colors_for_configurations(configs,style);
-for q = 1:4
-    ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-    values = nan(numel(configs),1); errors = values;
-    for k = 1:numel(configs)
-        row = objective_result(R,mission,configs(k));
-        values(k) = row.(specs{q,1}); errors(k) = row.(specs{q,2});
-    end
-    b = bar(ax,1:numel(configs),values,0.72,'FaceColor','flat'); b.CData = colors;
-    errorbar(ax,1:numel(configs),values,errors,'k.','LineWidth',0.9, ...
-        'CapSize',style.capSize,'HandleVisibility','off');
-    ax.XTick = 1:numel(configs); ax.XTickLabel = cellstr(configuration_labels(configs));
-    ax.XTickLabelRotation = 18; ylabel(ax,specs{q,3},'FontWeight','bold');
-    style_axes(ax,style);
-end
-export_figure(fig,out,stem,saveFigures,style);
+plot_curve_overlay(curves,configuration_labels(configs), ...
+    colors_for_configurations(configs,style),r.budget,out,stem,saveFigures,style);
 end
 
 
@@ -435,67 +503,67 @@ for k = 1:numel(configs)
         values(k,f) = 100*row.Fraction;
     end
 end
-fig = paper_figure(style.figureWidth,style.figureHeight,style); ax = axes(fig);
-b = bar(ax,1:numel(configs),values,'stacked'); box(ax,'on'); grid(ax,'on');
-ax.XTick = 1:numel(configs); ax.XTickLabel = cellstr(configuration_labels(configs));
-ax.XTickLabelRotation = 18; ylim(ax,[0 100]);
+fig = paper_figure(style.figureWidth,style.figureHeight,style);
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:numel(configs),values,'stacked');
+ax.XTick = 1:numel(configs);
+ax.XTickLabel = cellstr(configuration_labels(configs));
+ax.XTickLabelRotation = 18;
+ylim(ax,[0 100]);
 xlabel(ax,'Objective configuration','FontWeight','bold');
-ylabel(ax,'Selected observers (%)','FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,b,cellstr(families),'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',numel(families)); style_legend(lgd,style);
+ylabel(ax,'Selected observers (%)','FontWeight','bold');
+style_axes(ax,style);
+lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
+    'Orientation','horizontal','NumColumns',numel(families));
+style_legend(lgd,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_curve_small_multiples(curves,labels,colors,budget,nRows,nCols,out,stem,saveFigures,style)
-% One curve per axes avoids unreadable overlap. Each axes shows the across-run
-% mean best-so-far trace and a final-FE +/- sample-standard-deviation bar.
-assert(numel(curves) == numel(labels));
+function plot_curve_overlay(curves,labels,colors,budget,out,stem,saveFigures,style)
+% Plot comparable across-run mean best-so-far histories together. Filled
+% uncertainty bands are intentionally omitted because they obscure direct
+% algorithm/configuration comparison. Sample standard deviation is shown
+% only at the final admitted FE for each curve.
+assert(numel(curves) == numel(labels) && size(colors,1) == numel(curves));
 fig = paper_figure(style.convergenceFigureWidth,style.convergenceFigureHeight,style);
-t = tiledlayout(fig,nRows,nCols,'Padding','loose','TileSpacing','compact');
+ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+handles = gobjects(numel(curves),1);
 allY = zeros(0,1);
-for k = 1:numel(curves)
-    c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean);
-    y = double(c.mean(valid)); allY = [allY;y]; %#ok<AGROW>
-    if any(valid)
-        dEnd = double(c.std(find(valid,1,'last')));
-        if isfinite(dEnd), allY = [allY;y(end)-dEnd;y(end)+dEnd]; end %#ok<AGROW>
-    end
-end
-allY = allY(isfinite(allY));
-lo = min(allY); hi = max(allY); span = max(hi-lo,0.05*max(1,abs(hi)));
-yLimits = [lo-0.06*span,hi+0.08*span];
-if yLimits(1) >= 0, yLimits(1) = max(0,yLimits(1)); end
 
 for k = 1:numel(curves)
-    ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-    c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean);
+    c = curves{k};
+    valid = c.fe >= 60 & isfinite(c.mean);
+    assert(any(valid),'Convergence curve contains no valid FE >= 60.');
     x = double(c.fe(valid)); y = double(c.mean(valid));
-    stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth);
-    if ~isempty(x)
-        dEnd = double(c.std(find(valid,1,'last')));
-        if isfinite(dEnd)
-            errorbar(ax,x(end),y(end),dEnd,'o','Color',colors(k,:), ...
-                'MarkerFaceColor',colors(k,:),'MarkerSize',4.5, ...
-                'LineWidth',1.0,'CapSize',style.capSize);
-        else
-            plot(ax,x(end),y(end),'o','Color',colors(k,:), ...
-                'MarkerFaceColor',colors(k,:),'MarkerSize',4.5);
-        end
+    handles(k) = stairs(ax,x,y,'Color',colors(k,:), ...
+        'LineWidth',style.lineWidth,'DisplayName',string(labels(k)));
+    dEnd = double(c.std(find(valid,1,'last')));
+    if isfinite(dEnd)
+        errorbar(ax,x(end),y(end),dEnd,'o','Color',colors(k,:), ...
+            'MarkerFaceColor',colors(k,:),'MarkerSize',5.0, ...
+            'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
+        allY = [allY;y;y(end)-dEnd;y(end)+dEnd]; %#ok<AGROW>
+    else
+        plot(ax,x(end),y(end),'o','Color',colors(k,:), ...
+            'MarkerFaceColor',colors(k,:),'MarkerSize',5.0, ...
+            'HandleVisibility','off');
+        allY = [allY;y]; %#ok<AGROW>
     end
-    xlim(ax,[60 budget]); ylim(ax,yLimits);
-    title(ax,sprintf('(%c) %s',char('a'+k-1),string(labels(k))), ...
-        'FontName',style.fontName,'FontSize',style.fontSize, ...
-        'FontWeight','bold','Interpreter','none');
-    style_axes(ax,style);
 end
-for k = numel(curves)+1:nRows*nCols
-    ax = nexttile(t); axis(ax,'off');
-end
-xlabel(t,'Function evaluations','FontName',style.fontName, ...
-    'FontSize',style.labelFontSize,'FontWeight','bold');
-ylabel(t,'Mean best-so-far objective','FontName',style.fontName, ...
-    'FontSize',style.labelFontSize,'FontWeight','bold');
+
+allY = allY(isfinite(allY));
+lo = min(allY); hi = max(allY);
+span = max(hi-lo,0.05*max(1,abs(hi)));
+yLimits = [lo-0.06*span,hi+0.08*span];
+if yLimits(1) >= 0, yLimits(1) = max(0,yLimits(1)); end
+xlim(ax,[60 budget]); ylim(ax,yLimits);
+xlabel(ax,'Function evaluations','FontWeight','bold');
+ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
+style_axes(ax,style);
+lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
+    'NumColumns',min(numel(handles),5),'Box','off');
+style_legend(lgd,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -531,7 +599,8 @@ end
 function curve = load_ga_curve(analysisDir,key)
 S = load(fullfile(char(analysisDir),"convergence_"+string(key)+".mat"),'curves');
 idx = find(upper(string({S.curves.optimizer})) == "GA",1);
-assert(~isempty(idx),'Missing GA convergence curve.'); curve = S.curves(idx);
+assert(~isempty(idx),'Missing GA convergence curve.');
+curve = S.curves(idx);
 end
 
 
@@ -555,20 +624,25 @@ end
 
 function R = sort_to_order(R,field,order)
 idx = nan(numel(order),1);
-for k = 1:numel(order), idx(k) = find(string(R.(field)) == order(k),1); end
+for k = 1:numel(order)
+    idx(k) = find(string(R.(field)) == order(k),1);
+end
 R = R(idx,:);
 end
 
 
 function colors = colors_for_optimizers(optimizers,style)
 colors = zeros(numel(optimizers),3);
-for k = 1:numel(optimizers), colors(k,:) = optimizer_color(optimizers(k),style); end
+for k = 1:numel(optimizers)
+    colors(k,:) = optimizer_color(optimizers(k),style);
+end
 end
 
 
 function c = optimizer_color(optimizer,style)
 idx = find(style.optimizerOrder == upper(string(optimizer)),1);
-assert(~isempty(idx),'Unknown optimizer color: %s',optimizer); c = style.optimizerColors(idx,:);
+assert(~isempty(idx),'Unknown optimizer color: %s',optimizer);
+c = style.optimizerColors(idx,:);
 end
 
 
@@ -576,7 +650,8 @@ function colors = colors_for_configurations(configs,style)
 colors = zeros(numel(configs),3);
 for k = 1:numel(configs)
     idx = find(style.configurationOrder == string(configs(k)),1);
-    assert(~isempty(idx)); colors(k,:) = style.configurationColors(idx,:);
+    assert(~isempty(idx),'Unknown configuration color: %s',configs(k));
+    colors(k,:) = style.configurationColors(idx,:);
 end
 end
 
@@ -594,37 +669,57 @@ end
 function style_axes(ax,style)
 set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
     'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top');
-ax.XLabel.FontSize = style.labelFontSize; ax.YLabel.FontSize = style.labelFontSize;
+ax.XLabel.FontSize = style.labelFontSize;
+ax.YLabel.FontSize = style.labelFontSize;
 end
 
 
 function style_legend(lgd,style)
-lgd.FontName = style.fontName; lgd.FontSize = style.fontSize; lgd.FontWeight = 'bold';
+lgd.FontName = style.fontName;
+lgd.FontSize = style.fontSize;
+lgd.FontWeight = 'bold';
 end
 
 
 function format_category_axis(ax,labels,yLabel,style)
-ax.XTick = 1:numel(labels); ax.XTickLabel = cellstr(labels);
-ax.XTickLabelRotation = 18; ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
+ax.XTick = 1:numel(labels);
+ax.XTickLabel = cellstr(labels);
+ax.XTickLabelRotation = 18;
+ylabel(ax,yLabel,'FontWeight','bold');
+style_axes(ax,style);
 end
 
 
 function export_figure(fig,out,stem,saveFigures,style)
-drawnow; if ~saveFigures, return; end
+enforce_minimum_font_size(fig,12);
+drawnow;
+if ~saveFigures, return; end
 base = fullfile(char(out),char(stem));
-print(fig,[base '.eps'],'-depsc','-painters');
+print(fig,[base '.eps'],'-depsc2','-painters','-r600');
 exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
 close(fig);
 end
 
 
-function labels = optimizer_labels(values)
-values = upper(string(values(:))); labels = values; labels(values == "BAYESIAN") = "BO";
+function enforce_minimum_font_size(fig,minFontSize)
+objects = findall(fig,'-property','FontSize');
+for k = 1:numel(objects)
+    try
+        if objects(k).FontSize < minFontSize
+            objects(k).FontSize = minFontSize;
+        end
+    catch
+    end
+end
 end
 
-function label = optimizer_label(value)
-label = optimizer_labels(value); label = label(1);
+
+function labels = optimizer_labels(values)
+values = upper(string(values(:)));
+labels = values;
+labels(values == "BAYESIAN") = "BO";
 end
+
 
 function labels = mission_labels(values)
 values = string(values(:)); labels = strings(size(values));
@@ -638,14 +733,17 @@ for k = 1:numel(values)
 end
 end
 
+
 function label = measurement_label(value)
 if string(value) == "ANGLES_ONLY", label = "AO"; else, label = "AR"; end
 end
+
 
 function labels = configuration_labels(values)
 values = string(values(:)); labels = strings(size(values));
 for k = 1:numel(values), labels(k) = configuration_label(values(k)); end
 end
+
 
 function label = configuration_label(value)
 switch string(value)
@@ -658,6 +756,7 @@ switch string(value)
 end
 end
 
+
 function code = mission_code(mission)
 switch string(mission)
     case "LUNAR_GATEWAY", code = "lg";
@@ -667,13 +766,16 @@ switch string(mission)
 end
 end
 
+
 function code = measurement_code(measurement)
 if string(measurement) == "ANGLES_ONLY", code = "ao"; else, code = "ar"; end
 end
 
+
 function s = plural_s(value)
 if value == 1, s = ""; else, s = "s"; end
 end
+
 
 function value = percent_change(before,after)
 value = 100*(double(after)-double(before))/max(abs(double(before)),eps);
