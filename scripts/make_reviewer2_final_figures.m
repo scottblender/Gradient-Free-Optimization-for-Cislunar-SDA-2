@@ -1,11 +1,33 @@
 function manifest = make_reviewer2_final_figures(reports,saveFigures)
-%MAKE_REVIEWER2_FINAL_FIGURES Compatibility entry point for final figures.
+%MAKE_REVIEWER2_FINAL_FIGURES Stable entry point for curated final figures.
 %
-% The manuscript renderer is intentionally curated in
-% make_reviewer2_curated_figures.m so only figures that communicate core
-% Reviewer-2 results are emitted. Keep this public entry point stable for the
-% results runner and existing user workflows.
+% The focused 1200-FE runtime figures use a dedicated renderer because the
+% flat-colored categorical bar charts have one MATLAB Bar handle but five
+% optimizer categories. Their optimizer identities are carried by x-axis
+% labels, while the only bar-chart legend entry is the Baseline AO reference.
+% All remaining Reviewer-2 figures are produced by the curated renderer.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
-manifest = make_reviewer2_curated_figures(reports,saveFigures);
+saveFigures = logical(saveFigures);
+assert(isstruct(reports),'reports must come from run_reviewer2_results.');
+
+manifest = table(strings(0,1),strings(0,1),strings(0,1), ...
+    'VariableNames',{'Study','FigureStem','Purpose'});
+remaining = reports;
+
+if isfield(reports,'runtime')
+    baselineResults = table();
+    if isfield(reports,'baseline') && isfield(reports.baseline,'results')
+        baselineResults = reports.baseline.results;
+    end
+    runtimeManifest = make_reviewer2_runtime_figures( ...
+        reports.runtime,baselineResults,saveFigures);
+    manifest = [manifest;runtimeManifest]; %#ok<AGROW>
+    remaining = rmfield(remaining,'runtime');
+end
+
+if ~isempty(fieldnames(remaining))
+    otherManifest = make_reviewer2_curated_figures(remaining,saveFigures);
+    manifest = [manifest;otherManifest]; %#ok<AGROW>
+end
 end
