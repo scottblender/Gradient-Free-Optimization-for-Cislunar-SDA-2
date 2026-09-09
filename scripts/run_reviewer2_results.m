@@ -71,6 +71,14 @@ end
 if saveFigures
     fprintf('\n>>> Creating curated journal figures\n');
     reports.paperFigureManifest = make_reviewer2_paper_figures(reports,true);
+
+    % Replace the compact generic screening panel with the four quantities
+    % used to make the screening conclusion directly: total J111 objective,
+    % position RMSE, equal-FE runtime, and rejected measurement opportunities.
+    if isfield(reports,'objective_screening')
+        plot_reviewer2_screening_summary(reports.objective_screening,true);
+    end
+
     if isfield(reports,'comparison')
         rankingStem = plot_reviewer2_optimizer_ranking(reports.comparison,true);
         rankingRow = table("comparison",string(rankingStem), ...
