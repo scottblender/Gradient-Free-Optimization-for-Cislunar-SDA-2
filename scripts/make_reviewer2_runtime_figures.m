@@ -11,7 +11,8 @@ function manifest = make_reviewer2_runtime_figures(r,baselineResults,saveFigures
 % intentionally shows only the 20-run mean best-so-far history. Run-to-run
 % variability is reported in the metric summaries/tables rather than as
 % terminal error bars on the convergence figure.
-% All final axes use no grid lines and no surrounding axes box.
+% All final axes use clear statistical labels, no grid lines, and no
+% surrounding axes box.
 
 if nargin < 2 || isempty(baselineResults), baselineResults = table(); end
 if nargin < 3 || isempty(saveFigures), saveFigures = true; end
@@ -25,17 +26,17 @@ if saveFigures
 end
 
 baseline = matched_baseline(baselineResults,"LUNAR_GATEWAY",3,1);
-plot_runtime_metric(r,'BestJMean','BestJStd','Final best objective', ...
+plot_runtime_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
     "runtime_1200_objective",out,saveFigures,style,false,baseline);
 plot_runtime_metric(r,'BudgetRuntimeMean_s','BudgetRuntimeStd_s', ...
-    'Runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
+    'Mean runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
 plot_runtime_convergence(r,out,saveFigures,style);
 
 manifest = table( ...
     repmat("runtime",3,1), ...
     ["runtime_1200_objective";"runtime_1200_runtime";"runtime_1200_convergence"], ...
-    ["Equal-1200-FE final objective with matched 6000-FE GA reference."; ...
-     "Equal-1200-FE computational cost showing BO scaling penalty."; ...
+    ["Equal-1200-FE mean final-best objective with matched 6000-FE GA reference."; ...
+     "Equal-1200-FE mean computational cost showing BO scaling penalty."; ...
      "Five-method equal-FE mean convergence comparison."], ...
     'VariableNames',{'Study','FigureStem','Purpose'});
 writetable(manifest,fullfile(char(out),'paper_figure_manifest.csv'));
@@ -59,6 +60,7 @@ errorbar(ax,1:height(R),values,errors,'k.','LineWidth',1.0, ...
 ax.XTick = 1:height(R);
 ax.XTickLabel = cellstr(optimizer_labels(R.Optimizer));
 ax.XTickLabelRotation = 18;
+xlabel(ax,'Optimizer','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold');
 style_axes(ax,style);
 
