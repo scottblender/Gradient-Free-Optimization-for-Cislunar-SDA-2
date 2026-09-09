@@ -19,7 +19,7 @@ MATLAB tools for estimation-driven design of cislunar observer constellations in
 | `scripts/` | Catalog generation and Reviewer 2 result processing |
 | `tests/` | Scientific/configuration regression tests |
 | `data/` | Local catalog, target database, and caches |
-| `results/` | Generated optimization runs and analyses |
+| `results/` | Raw optimization studies and timestamped processed results |
 
 ## Setup
 
@@ -117,7 +117,7 @@ Total objective values from `J111`, `J100`, `J010`, and `J001` are different mat
 
 ## Final Reviewer 2 processing
 
-The four final processors validate the complete run factorials and write numeric/formatted CSV outputs:
+The scientific processors validate the complete run factorials and produce aggregate data:
 
 ```matlab
 run_reviewer2_runtime_pipeline
@@ -126,48 +126,94 @@ run_reviewer2_baseline_pipeline
 run_reviewer2_objective_screening_pipeline
 ```
 
-For the final paper, use the central runner:
+For the paper, use the central runner:
 
 ```matlab
 setup_project;
 reports = run_reviewer2_results;
 ```
 
-Or process only selected studies:
+Or process selected studies:
 
 ```matlab
-reports = run_reviewer2_results("objective_screening");
+reports = run_reviewer2_results("comparison");
 reports = run_reviewer2_results(["runtime","comparison"]);
 ```
 
-The central runner executes each scientific processor in data-only mode and then calls `make_reviewer2_paper_figures`. Curated manuscript figures are written under the newest
+`run_reviewer2_results` executes the scientific processors with historical previews hidden, moves each new analysis out of the raw-study tree, and calls `make_reviewer2_final_figures`. Final CSVs, convergence MAT files, EPS figures, PNG figures, and the figure manifest are saved directly under `results/` as:
 
 ```text
-results/<study>/FE_DATA_*/paper_final/
+results/runtime_1200_<timestamp>/
+results/comparison_<timestamp>/
+results/baseline_<timestamp>/
+results/objective_screening_<timestamp>/
 ```
 
-directory. Each study also receives `paper_figure_manifest.csv` describing the intended role of each figure.
+The raw optimization runs remain under `results/RUNTIME_COMPARISON_1200/`, `results/COMPARISON/`, `results/BASELINE/`, and `results/GA_OBJECTIVE_SCREENING/`.
 
-### Figure conventions
+### Final figure conventions
 
 Final Reviewer 2 figures use:
 
 - Times New Roman;
 - 12 pt minimum axis, tick, annotation, and legend text;
 - 14 pt axis labels;
-- consistent optimizer, measurement-model, and target-case colors;
-- FE-aligned mean best-so-far convergence with sample-standard-deviation bands;
-- compact 3-D geometry grids with common per-mission axis limits and camera;
-- solid observer-orbit lines, with duplicate periodic orbits drawn once and all observer phase markers retained;
-- no Earth in lunar-region result geometry plots;
-- low-thrust departure/arrival periodic orbits and transfer start/end markers for context.
+- one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
+- directly overlaid comparable convergence curves on one axes;
+- no filled convergence uncertainty bands; sample standard deviation is shown only at the final FE point;
+- 20-run mean +/- sample standard deviation for quantitative comparisons;
+- objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
+- the same 7.6 x 7.0 inch centered 3-D layout used by the introductory tracking-case figures;
+- solid observer-orbit lines, duplicate periodic orbits drawn once, no Earth, and low-thrust endpoint-orbit context.
 
-The final paper figure set is intentionally curated to support the conclusions rather than reproduce every intermediate diagnostic:
+The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in the numerical tables rather than being repeated as a bar figure. Overall optimizer ranks/wins are also retained as tabular/text summaries rather than redundant figures. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
 
-- **runtime:** equal-FE objective, runtime, BO slowdown, and convergence;
-- **comparison:** overall/case optimizer metrics, convergence, rankings, and best-solution geometry;
-- **baseline:** AO/AR, observer-count, tracking-duration, convergence, and geometry trends;
-- **objective/screening:** matched screening sensitivity, objective-component physical metrics, family selection, convergence, and geometry changes.
+The final paper figure set emphasizes:
+
+- **runtime:** equal-1200-FE objective, runtime, and convergence;
+- **comparison:** objective relative to the matched AO GA baseline, RMSE, effective uncertainty, stability, convergence, and representative geometry;
+- **baseline:** AO/AR observer-count and Gateway-duration objective/RMSE/uncertainty trends, convergence, and representative geometry;
+- **objective/screening:** matched screening sensitivity, objective-component physical metrics, orbit-family selection, convergence, and representative geometry.
+
+## Baseline local Monte Carlo validation
+
+The local baseline validation from the earlier manuscript is reproduced by a separate runner:
+
+```matlab
+mcReport = run_reviewer2_baseline_monte_carlo;
+```
+
+The default study reproduces the low-thrust AO validation for 3, 5, 7, and 10 observers. For each configuration it selects the best observed 6000-FE GA baseline realization as the local reference, then evaluates 250 discrete neighboring designs. The first Monte Carlo sample is exactly the optimized design; orbit indices are perturbed uniformly by up to +/-10 orbit IDs and slot indices by up to +/-5 slot IDs. Measurement noise remains fixed by the saved baseline configuration so the validation isolates the local orbit/slot design neighborhood.
+
+Outputs are saved to:
+
+```text
+results/baseline_monte_carlo_<timestamp>/
+```
+
+including:
+
+```text
+baseline_monte_carlo_samples.csv
+baseline_monte_carlo_summary.csv
+baseline_monte_carlo_figures.csv
+baseline_mc_lt_ao_o3.eps/.png
+baseline_mc_lt_ao_o5.eps/.png
+baseline_mc_lt_ao_o7.eps/.png
+baseline_mc_lt_ao_o10.eps/.png
+```
+
+Each observer count is exported as a separate box-and-whisker figure for LaTeX assembly. The red horizontal line is the optimized reference objective.
+
+The same runner can validate Lunar Gateway cases:
+
+```matlab
+mcLG = run_reviewer2_baseline_monte_carlo( ...
+    'Mission',"LUNAR_GATEWAY", ...
+    'GatewayPeriods',[1 3 5]);
+```
+
+The Monte Carlo reference design is intentionally seed-specific because the purpose is local-neighborhood validation of one optimized discrete solution. This does not replace the 20-run mean +/- sample-standard-deviation statistics used for optimizer and baseline performance claims.
 
 ## Recommended regression checks
 
@@ -183,6 +229,7 @@ test_comparison_pipeline_configuration;
 test_baseline_pipeline_configuration;
 test_ga_objective_screening_configuration;
 test_reviewer2_paper_figures_configuration;
+test_baseline_monte_carlo_configuration;
 test_visibility_keepout_definition;
 test_low_thrust_transfer_case;
 test_gateway_impulse_case;
@@ -197,10 +244,11 @@ test_gateway_impulse_case;
 | Raw JPL CSV files | `data/JPL_Data/` |
 | Orbit cache | `data/cache/orbits/` |
 | Transfer cache | `data/cache/transfers/` |
-| Runtime study | `results/RUNTIME_COMPARISON_1200/` |
-| Full comparison | `results/COMPARISON/` |
-| Baseline | `results/BASELINE/` |
-| Objective/screening | `results/GA_OBJECTIVE_SCREENING/` |
-| Final paper figures | `results/<study>/FE_DATA_*/paper_final/` |
+| Raw runtime study | `results/RUNTIME_COMPARISON_1200/` |
+| Raw full comparison | `results/COMPARISON/` |
+| Raw baseline | `results/BASELINE/` |
+| Raw objective/screening | `results/GA_OBJECTIVE_SCREENING/` |
+| Processed final studies | `results/<study>_<timestamp>/` |
+| Baseline Monte Carlo | `results/baseline_monte_carlo_<timestamp>/` |
 
 Historical runs must be interpreted using the mission, visibility, noise, slot-definition, and stopping settings with which they were generated. Do not mix runs generated under different scientific configurations.
