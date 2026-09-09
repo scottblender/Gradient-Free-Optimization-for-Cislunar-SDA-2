@@ -4,6 +4,7 @@
 !/data/README.md
 /results/*
 !/results/README.md
+/COMPILED_REVIEWER_2_RESULTS/*
 
 # Legacy locations remain ignored for existing local workspaces.
 /JPL_Data/
