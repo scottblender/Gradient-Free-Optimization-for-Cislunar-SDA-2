@@ -1,5 +1,10 @@
 function outputs = plot_study_definition_figures(inspectFigures)
 % Generate catalog, slot-definition, geometry, and target-case figures.
+%
+% Study-definition figures use the same manuscript styling as the final
+% Reviewer-2 figures: Times New Roman, 12-point axis/legend text, 14-point
+% axis labels, no grid lines, no surrounding axes box, box-free legends,
+% and the shared centered 3-D geometry layout from reviewer2_paper_style.
 
 if nargin<1 || isempty(inspectFigures), inspectFigures = true; end
 
@@ -189,7 +194,8 @@ for groupIndex = 1:numel(familyGroups)
     group = familyGroups{groupIndex};
 
     if numel(group)==2
-        fig = publication_figure(7.6,7.0);
+        style = reviewer2_paper_style();
+        fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
         [ax,plotPosition] = create_centered_3d_axes(fig);
     else
         fig = publication_figure(6.5,5.4);
@@ -198,14 +204,15 @@ for groupIndex = 1:numel(familyGroups)
     end
 
     hold(ax,'on');
-    box(ax,'on');
+    box(ax,'off');
     grid(ax,'off');
     axis(ax,'equal');
     set(ax,'TickLabelInterpreter','tex','Layer','top');
 
     if numel(group)==2
+        style = reviewer2_paper_style();
         ax.Projection = 'perspective';
-        view(ax,-37.5,30);
+        view(ax,style.geometryAzimuth,style.geometryElevation);
 
         familyHandles = gobjects(2,1);
         familyLabels = strings(2,1);
@@ -318,7 +325,7 @@ for groupIndex = 1:numel(familyGroups)
 
     xlabel(ax,'x (LU)');
     ylabel(ax,'y (LU)');
-    format_publication_axes(ax,13);
+    format_publication_axes(ax,12);
 
     if numel(group)==2
         legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
@@ -329,12 +336,7 @@ for groupIndex = 1:numel(familyGroups)
             'Location','northeast','Orientation','vertical');
         legendColumns = 1;
     end
-    legendHandle.Box = 'on';
-    legendHandle.FontName = 'Times New Roman';
-    legendHandle.FontSize = 12;
-    legendHandle.FontWeight = 'bold';
-    legendHandle.ItemTokenSize = [14,8];
-    legendHandle.NumColumns = legendColumns;
+    format_study_legend(legendHandle,legendColumns,[14 8]);
 
     if numel(group)==2
         finalize_centered_3d_axes(ax,legendHandle,plotPosition);
@@ -417,7 +419,8 @@ mu = 1.215058560962404E-2;
 LU = 384400;
 
 % Figure 1: the orbit and its 50 equal-time candidate states.
-figGeometry = publication_figure(7.6,7.0);
+style = reviewer2_paper_style();
+figGeometry = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figGeometry);
 prepare_axes(ax);
 
@@ -438,14 +441,11 @@ hNext = plot3(ax,slotState(nextSlot,1), ...
     'MarkerEdgeColor','k','LineWidth',1.2);
 hMoon = draw_moon(ax,mu,LU);
 
-set(ax,'FontName','Times New Roman','FontSize',18, ...
-    'FontWeight','bold','LineWidth',1.8);
+format_publication_axes(ax,12);
 legendHandle = legend(ax,[hOrbit,hSlots,hSelected,hNext,hMoon], ...
     {'Orbit','Candidate slots','Slot j','Slot j+1','Moon'}, ...
-    'Location','northoutside','Orientation','horizontal', ...
-    'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
-legendHandle.NumColumns = 3;
-legendHandle.Box = 'on';
+    'Location','northoutside','Orientation','horizontal');
+format_study_legend(legendHandle,3,[16 9]);
 finalize_centered_3d_axes(ax,legendHandle,plotPosition);
 
 % The projected x axis is short for this representative NRHO. Retain the
@@ -465,7 +465,8 @@ close(figGeometry);
 figPhase = publication_figure(7.2,3.8);
 ax = axes(figPhase);
 hold(ax,'on');
-box(ax,'on');
+box(ax,'off');
+grid(ax,'off');
 
 phase = slotTime/period;
 plot(ax,[0,1],[0,0],'-','Color',0.65*[1,1,1], ...
@@ -485,25 +486,23 @@ plot(ax,phase([selectedSlot,selectedSlot]),[0,0.16],':k');
 plot(ax,phase([nextSlot,nextSlot]),[0,0.16],':k');
 text(ax,mean(phase([selectedSlot,nextSlot])),0.20, ...
     '\Delta t/T=1/50','HorizontalAlignment','center', ...
-    'FontName','Times New Roman','FontSize',16,'FontWeight','bold');
+    'FontName',style.fontName,'FontSize',16,'FontWeight','bold');
 text(ax,0.99,-0.025,{'t=T','not stored'}, ...
     'HorizontalAlignment','right','VerticalAlignment','top', ...
-    'FontName','Times New Roman','FontSize',15,'FontWeight','bold');
+    'FontName',style.fontName,'FontSize',15,'FontWeight','bold');
 
 xlabel(ax,'Normalized epoch, t/T');
 yticks(ax,[]);
 ylim(ax,[-0.18,0.30]);
 xlim(ax,[-0.02,1.02]);
-set(ax,'FontName','Times New Roman','FontSize',18, ...
-    'FontWeight','bold','LineWidth',1.8,'TickLabelInterpreter','tex');
+format_publication_axes(ax,12);
 
 legendHandle = legend(ax, ...
     [hCandidate,hSelectedPhase,hNextPhase,hEndpoint], ...
     {'Candidate slots','Slot j','Slot j+1','Excluded endpoint'}, ...
-    'Location','northoutside','Orientation','horizontal', ...
-    'FontName','Times New Roman','FontSize',14,'FontWeight','bold');
-legendHandle.Box = 'on';
-place_legend_above(legendHandle,2,13);
+    'Location','northoutside','Orientation','horizontal');
+format_study_legend(legendHandle,2,[16 9]);
+place_legend_above(legendHandle,2,12);
 ax.Position = [0.12,0.19,0.80,0.56];
 
 phaseFile = fullfile(outputDir,'slot_phase_grid.eps');
@@ -580,6 +579,8 @@ target = observer + targetRange*[cos(thetaB),sin(thetaB)];
 
 ax = axes(fig,'Units','normalized','Position',[0.05,0.06,0.90,0.88]);
 hold(ax,'on');
+box(ax,'off');
+grid(ax,'off');
 axis(ax,'equal');
 axis(ax,'off');
 
@@ -698,7 +699,7 @@ draw_leader_arrow(ax,marginArrowStart,ptMargin,cExclusion);
 
 xlim(ax,[-3.20,3.25]);
 ylim(ax,[-2.10,3.50]);
-set(findall(fig,'Type','text'),'FontName','Times New Roman');
+set(findall(fig,'Type','text'),'FontName',reviewer2_paper_style().fontName);
 
 figureFile = fullfile(outputDir,'visibility_keepout_geometry.eps');
 inspect_before_export(fig,inspectFigure,'unified visibility / keepout geometry');
@@ -725,6 +726,7 @@ projectPaths = setup_project();
 outputDir = fullfile(projectPaths.results,'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
 
+style = reviewer2_paper_style();
 cObserver = [0.90,0.12,0.10];
 cTarget = [0.00,0.39,0.72];
 cProjection = [0.42,0.42,0.42];
@@ -739,6 +741,8 @@ delta = asin(rho(3)/norm(rho));
 figRa = publication_figure(4.45,4.55);
 ax1 = axes(figRa,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax1,'on');
+box(ax1,'off');
+grid(ax1,'off');
 axis(ax1,'equal');
 axis(ax1,'off');
 
@@ -774,7 +778,7 @@ title(ax1,'(a) Right ascension, \alpha', ...
     'FontSize',16,'FontWeight','bold');
 xlim(ax1,[-0.72,4.65]);
 ylim(ax1,[-0.72,3.85]);
-set(findall(figRa,'Type','text'),'FontName','Times New Roman');
+set(findall(figRa,'Type','text'),'FontName',style.fontName);
 
 raFigureFile = fullfile(outputDir, ...
     'measurement_model_right_ascension.eps');
@@ -787,6 +791,8 @@ close(figRa);
 figDec = publication_figure(4.45,4.55);
 ax2 = axes(figDec,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax2,'on');
+box(ax2,'off');
+grid(ax2,'off');
 axis(ax2,'equal');
 axis(ax2,'off');
 
@@ -826,7 +832,7 @@ title(ax2,'(b) Declination, \delta', ...
     'FontSize',16,'FontWeight','bold');
 xlim(ax2,[-0.72,4.75]);
 ylim(ax2,[-0.72,3.60]);
-set(findall(figDec,'Type','text'),'FontName','Times New Roman');
+set(findall(figDec,'Type','text'),'FontName',style.fontName);
 
 decFigureFile = fullfile(outputDir, ...
     'measurement_model_declination.eps');
@@ -892,6 +898,8 @@ for k = 1:numPanels
         panelWidthInches/widthInches, ...
         geometryHeightInches/heightInches]);
     axesHandles(k).PositionConstraint = 'innerposition';
+    box(axesHandles(k),'off');
+    grid(axesHandles(k),'off');
 end
 
 if textLineCount > 0
@@ -925,6 +933,7 @@ if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
 projectPaths = setup_project();
+style = reviewer2_paper_style();
 
 outputDir = fullfile(projectPaths.results,'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
@@ -969,7 +978,7 @@ cPostImpulse = postImpulseAlpha*cImpulse+ ...
 
 cPoint = [0.80,0.80,0.80];
 
-figGateway = publication_figure(7.6,7.0);
+figGateway = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figGateway);
 prepare_axes(ax);
 hGateway = plot3(ax,sGateway(:,1),sGateway(:,2),sGateway(:,3),'-','Color',cGateway,'LineWidth',2.8);
@@ -988,7 +997,7 @@ figureFiles(1) = fullfile(outputDir,'case_lunar_gateway.eps');
 inspect_before_export(figGateway,inspectFigure,'Lunar Gateway case');
 export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
 
-figTransfer = publication_figure(7.6,7.0);
+figTransfer = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figTransfer);
 prepare_axes(ax);
 hTransfer = plot3(ax,sTransfer(:,1),sTransfer(:,2),sTransfer(:,3),'-','Color',cTransfer,'LineWidth',3.0);
@@ -1007,7 +1016,7 @@ figureFiles(2) = fullfile(outputDir,'case_low_thrust_transfer.eps');
 inspect_before_export(figTransfer,inspectFigure,'low-thrust transfer case');
 export_publication_eps(figTransfer,figureFiles(2)); close(figTransfer);
 
-figImpulse = publication_figure(7.6,7.0);
+figImpulse = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figImpulse);
 prepare_axes(ax);
 hNominal = plot3(ax,sNominalAfterPerilune(:,1),sNominalAfterPerilune(:,2),sNominalAfterPerilune(:,3),'--','Color',cNominal,'LineWidth',2.2);
@@ -1071,27 +1080,28 @@ end
 function [ax,plotPosition] = create_centered_3d_axes(fig)
 %CENTERED_3D_AXES Use the manuscript-wide centered 3-D plot box.
 
-plotPosition = [0.12 0.20 0.76 0.64];
+style = reviewer2_paper_style();
+plotPosition = style.geometryPlotPosition;
 ax = axes(fig,'Units','normalized','Position',plotPosition);
 ax.PositionConstraint = 'innerposition';
 end
 
 
 function finalize_centered_3d_axes(ax,legendHandle,plotPosition)
-%FINALIZE_CENTERED_3D_AXES Match the 1200-FE trajectory construction.
+%FINALIZE_CENTERED_3D_AXES Match the final paper trajectory construction.
 
+style = reviewer2_paper_style();
 axis(ax,'tight');
-xlim(ax,pad_axis_limits(ax.XLim,0.08));
-ylim(ax,pad_axis_limits(ax.YLim,0.10));
-zlim(ax,pad_axis_limits(ax.ZLim,0.10));
+xlim(ax,pad_axis_limits(ax.XLim,style.geometryXPadding));
+ylim(ax,pad_axis_limits(ax.YLim,style.geometryYPadding));
+zlim(ax,pad_axis_limits(ax.ZLim,style.geometryZPadding));
 axis(ax,'vis3d');
 
 legendHandle.Units = 'normalized';
 drawnow;
 legendPosition = legendHandle.Position;
 legendPosition(1) = 0.5-legendPosition(3)/2;
-legendGap = 0.012;
-legendBottom = plotPosition(2)+plotPosition(4)+legendGap;
+legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
 legendPosition(2) = min(legendBottom,0.98-legendPosition(4));
 legendHandle.Position = legendPosition;
 legendHandle.AutoUpdate = 'off';
@@ -1117,14 +1127,17 @@ end
 
 function prepare_axes(ax)
 
+style = reviewer2_paper_style();
 hold(ax,'on');
-box(ax,'on');
+box(ax,'off');
+grid(ax,'off');
 axis(ax,'equal');
-view(ax,-37.5,30);
+view(ax,style.geometryAzimuth,style.geometryElevation);
 ax.Projection = 'perspective';
 xlabel(ax,'x (LU)');
 ylabel(ax,'y (LU)');
 zlabel(ax,'z (LU)');
+format_publication_axes(ax,style.fontSize);
 end
 
 
@@ -1176,23 +1189,32 @@ end
 
 function format_case_axes(ax)
 
-format_publication_axes(ax,12);
+style = reviewer2_paper_style();
+format_publication_axes(ax,style.fontSize);
 end
 
 
 function format_case_legend(legendHandle,numColumns)
 
-legendHandle.Box = 'on';
-legendHandle.FontName = 'Times New Roman';
-legendHandle.FontSize = 12;
+format_study_legend(legendHandle,numColumns,[16 9]);
+end
+
+
+function format_study_legend(legendHandle,numColumns,itemTokenSize)
+
+style = reviewer2_paper_style();
+legendHandle.Box = 'off';
+legendHandle.FontName = style.fontName;
+legendHandle.FontSize = style.fontSize;
 legendHandle.FontWeight = 'bold';
-legendHandle.ItemTokenSize = [16,9];
+legendHandle.ItemTokenSize = itemTokenSize;
 legendHandle.NumColumns = numColumns;
 end
 
 
 function fig = publication_figure(widthInches,heightInches)
 
+style = reviewer2_paper_style();
 fig = figure( ...
     'Color','w', ...
     'Units','inches', ...
@@ -1203,26 +1225,35 @@ fig = figure( ...
     'PaperPositionMode','manual', ...
     'Renderer','painters', ...
     'InvertHardcopy','off');
+set(fig,'DefaultAxesFontName',style.fontName, ...
+    'DefaultAxesFontSize',style.fontSize);
 end
 
 
 function format_publication_axes(ax,fontSize)
 
-fontSize = max(fontSize,12);
+style = reviewer2_paper_style();
+fontSize = max(style.fontSize,min(fontSize,style.fontSize));
 
 set(ax, ...
-    'FontName','Times New Roman', ...
+    'FontName',style.fontName, ...
     'FontSize',fontSize, ...
     'FontWeight','bold', ...
-    'LineWidth',1.35, ...
+    'LineWidth',style.axisLineWidth, ...
+    'TickDir','out', ...
+    'Layer','top', ...
+    'Box','off', ...
+    'XGrid','off', ...
+    'YGrid','off', ...
+    'ZGrid','off', ...
     'TickLabelInterpreter','tex');
 
-ax.XLabel.FontName = 'Times New Roman';
-ax.YLabel.FontName = 'Times New Roman';
-ax.ZLabel.FontName = 'Times New Roman';
-ax.XLabel.FontSize = fontSize+2;
-ax.YLabel.FontSize = fontSize+2;
-ax.ZLabel.FontSize = fontSize+2;
+ax.XLabel.FontName = style.fontName;
+ax.YLabel.FontName = style.fontName;
+ax.ZLabel.FontName = style.fontName;
+ax.XLabel.FontSize = style.labelFontSize;
+ax.YLabel.FontSize = style.labelFontSize;
+ax.ZLabel.FontSize = style.labelFontSize;
 ax.XLabel.FontWeight = 'bold';
 ax.YLabel.FontWeight = 'bold';
 ax.ZLabel.FontWeight = 'bold';
@@ -1231,12 +1262,11 @@ end
 
 function place_legend_above(legendHandle,numColumns,fontSize)
 
-fontSize = max(fontSize,12);
-
+style = reviewer2_paper_style(); %#ok<NASGU>
+fontSize = max(fontSize,12); %#ok<NASGU>
+format_study_legend(legendHandle,numColumns,[16 9]);
 legendHandle.Location = 'northoutside';
 legendHandle.Orientation = 'horizontal';
-legendHandle.NumColumns = numColumns;
-legendHandle.FontSize = fontSize;
 drawnow;
 
 % MATLAB's automatic northoutside placement can extend beyond the paper
