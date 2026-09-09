@@ -7,7 +7,10 @@ function manifest = make_reviewer2_runtime_figures(r,baselineResults,saveFigures
 % categorical chart; pairing that single handle with five optimizer labels
 % produces the "Ignoring extra legend entries" warning. The objective chart
 % therefore uses a legend only for the dashed long-run Baseline AO reference.
-% The convergence chart still uses one graphics handle per optimizer curve.
+% The convergence chart uses one graphics handle per optimizer curve and
+% intentionally shows only the 20-run mean best-so-far history. Run-to-run
+% variability is reported in the metric summaries/tables rather than as
+% terminal error bars on the convergence figure.
 % All final axes use no grid lines and no surrounding axes box.
 
 if nargin < 2 || isempty(baselineResults), baselineResults = table(); end
@@ -33,7 +36,7 @@ manifest = table( ...
     ["runtime_1200_objective";"runtime_1200_runtime";"runtime_1200_convergence"], ...
     ["Equal-1200-FE final objective with matched long-run AO GA baseline."; ...
      "Equal-1200-FE computational cost showing BO scaling penalty."; ...
-     "Five-method equal-FE convergence comparison."], ...
+     "Five-method equal-FE mean convergence comparison."], ...
     'VariableNames',{'Study','FigureStem','Purpose'});
 writetable(manifest,fullfile(char(out),'paper_figure_manifest.csv'));
 end
@@ -120,15 +123,7 @@ for k = 1:numel(curves)
     y = double(c.mean(valid));
     handles(k) = stairs(ax,x,y,'Color',colors(k,:), ...
         'LineWidth',style.lineWidth,'DisplayName',string(labels(k)));
-    dEnd = double(c.std(find(valid,1,'last')));
-    if isfinite(dEnd)
-        errorbar(ax,x(end),y(end),dEnd,'o','Color',colors(k,:), ...
-            'MarkerFaceColor',colors(k,:),'MarkerSize',5, ...
-            'LineWidth',1,'CapSize',style.capSize,'HandleVisibility','off');
-        allY = [allY;y;y(end)-dEnd;y(end)+dEnd]; %#ok<AGROW>
-    else
-        allY = [allY;y]; %#ok<AGROW>
-    end
+    allY = [allY;y]; %#ok<AGROW>
 end
 allY = allY(isfinite(allY));
 lo = min(allY); hi = max(allY);
