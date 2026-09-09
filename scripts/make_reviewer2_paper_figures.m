@@ -1,125 +1,137 @@
 function manifest = make_reviewer2_paper_figures(reports,saveFigures)
-%MAKE_REVIEWER2_PAPER_FIGURES Create the curated Reviewer 2 manuscript plots.
+%MAKE_REVIEWER2_PAPER_FIGURES Create the final Reviewer-2 manuscript figures.
 %
-% This function consumes report structs returned by the four final result
-% processors. It does not run optimization. The figures are deliberately
-% limited to plots that support the paper conclusions:
-%   runtime: BO equal-FE runtime penalty and convergence/objective benefit;
-%   comparison: overall/case optimizer quality, metrics, convergence, geometry;
-%   baseline: AO/AR, observer-count, duration, convergence, geometry;
-%   objective/screening: screening effects, component effects, families,
-%                        convergence, and specialized constellation geometry.
-%
-% All axes/legends use Times New Roman with 12-point minimum text.
+% Design rules:
+%   * statistical comparisons use 20-run mean +/- sample standard deviation;
+%   * convergence uses small multiples, never overlapping uncertainty bands;
+%   * geometry uses a representative realization nearest the group-mean
+%     objective, never the lowest-cost seed as the statistical comparison;
+%   * geometry grids are fixed at 6.5 x 6.5 inches and use common limits;
+%   * Times New Roman, 12-point minimum ticks/legends, 14-point axis labels.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
-validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
 saveFigures = logical(saveFigures);
-assert(isstruct(reports),'reports must be the struct returned by run_reviewer2_results.');
+assert(isstruct(reports),'reports must come from run_reviewer2_results.');
 style = reviewer2_paper_style();
 manifest = table(strings(0,1),strings(0,1),strings(0,1), ...
     'VariableNames',{'Study','FigureStem','Purpose'});
 
 if isfield(reports,'runtime')
-    r = reports.runtime;
-    out = prepare_output(r.analysisDirectory,saveFigures);
+    r = reports.runtime; out = prepare_output(r.analysisDirectory,saveFigures);
     plot_runtime_summary(r,out,saveFigures,style);
     manifest = add_manifest(manifest,"runtime","runtime_1200_summary", ...
-        "Equal-FE final objective and runtime; highlights BO runtime penalty.");
-    plot_runtime_convergence(r,out,saveFigures,style);
+        "Mean +/- sample std final objective and equal-FE runtime; quantifies BO cost/benefit.");
+    plot_runtime_convergence_small_multiples(r,out,saveFigures,style);
     manifest = add_manifest(manifest,"runtime","runtime_1200_convergence", ...
-        "Five-method mean best-so-far convergence at the common 1200-FE budget.");
+        "One optimizer per axes; mean convergence with final-FE sample standard deviation.");
 end
 
 if isfield(reports,'comparison')
-    r = reports.comparison;
-    out = prepare_output(r.analysisDirectory,saveFigures);
+    r = reports.comparison; out = prepare_output(r.analysisDirectory,saveFigures);
     plot_comparison_summary(r,out,saveFigures,style);
     manifest = add_manifest(manifest,"comparison","comparison_6000_summary", ...
-        "Case-wise objective, RMSE, uncertainty, and runtime comparison.");
+        "Mean +/- sample std objective, RMSE, uncertainty, and runtime by target case.");
+    plot_optimizer_ranking(r,out,saveFigures,style);
+    manifest = add_manifest(manifest,"comparison","comparison_6000_optimizer_ranking", ...
+        "Overall optimizer ranking computed from mission-wise mean objective, not individual seeds.");
     for mission = string(r.missions)
         stem = "comparison_6000_convergence_"+mission_code(mission);
-        plot_comparison_convergence(r,mission,out,stem,saveFigures,style);
+        plot_comparison_convergence_small_multiples(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"comparison",stem, ...
-            "Four-method 6000-FE mean best-so-far convergence.");
+            "One optimizer per axes with shared limits; mean convergence and final-FE sample std.");
     end
-    plot_reviewer2_geometry_grid(r.bestGeometryRuns,out, ...
-        "comparison_geometry",saveFigures);
+    selection = select_reviewer2_representative_runs(r,"comparison");
+    writetable(selection,fullfile(char(r.analysisDirectory), ...
+        'comparison_6000_geometry_representative_runs.csv'));
+    plot_reviewer2_geometry_grid(selection,out,"comparison_geometry",saveFigures);
     for mission = string(r.missions)
         stem = "comparison_geometry_"+mission_code(mission)+"_grid";
         manifest = add_manifest(manifest,"comparison",stem, ...
-            "Best observed constellation geometry for each optimizer.");
+            "Representative optimizer geometry: realization nearest each 20-run mean objective.");
     end
 end
 
 if isfield(reports,'baseline')
-    r = reports.baseline;
-    out = prepare_output(r.analysisDirectory,saveFigures);
+    r = reports.baseline; out = prepare_output(r.analysisDirectory,saveFigures);
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
     for mission = missions
         stem = "baseline_observer_trends_"+mission_code(mission);
         plot_baseline_observer_trends(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"baseline",stem, ...
-            "AO/AR sensitivity to 3, 5, 7, and 10 observers.");
+            "AO/AR observer-count trends using mean +/- sample standard deviation.");
         for meas = ["ANGLES_ONLY","ANGLES_RANGE"]
             cstem = "baseline_convergence_observers_"+mission_code(mission)+ ...
                 "_"+measurement_code(meas);
-            plot_baseline_observer_convergence( ...
+            plot_baseline_observer_convergence_small_multiples( ...
                 r,mission,meas,out,cstem,saveFigures,style);
             manifest = add_manifest(manifest,"baseline",cstem, ...
-                "GA convergence as observer count changes.");
+                "One observer-count case per axes with shared convergence limits.");
         end
     end
-    plot_baseline_duration_trends(r,out,"baseline_gateway_duration_trends", ...
-        saveFigures,style);
-    manifest = add_manifest(manifest,"baseline","baseline_gateway_duration_trends", ...
-        "AO/AR sensitivity to one, three, and five Gateway periods.");
     for meas = ["ANGLES_ONLY","ANGLES_RANGE"]
-        stem = "baseline_convergence_duration_"+measurement_code(meas);
-        plot_baseline_duration_convergence(r,meas,out,stem,saveFigures,style);
+        stem = "baseline_gateway_duration_objective_"+measurement_code(meas);
+        plot_baseline_duration_metric(r,meas,"BestJMean","BestJStd", ...
+            'Final best objective',out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"baseline",stem, ...
-            "GA convergence as Gateway tracking duration changes.");
+            "Tracking-duration effect on mean objective for 3/5/7/10 observers.");
+        stem = "baseline_gateway_duration_rmse_"+measurement_code(meas);
+        plot_baseline_duration_metric(r,meas,"RMSEPosMean_km","RMSEPosStd_km", ...
+            'Position RMSE (km)',out,stem,saveFigures,style);
+        manifest = add_manifest(manifest,"baseline",stem, ...
+            "Tracking-duration effect on mean position RMSE for 3/5/7/10 observers.");
+        stem = "baseline_convergence_duration_"+measurement_code(meas);
+        plot_baseline_duration_convergence_small_multiples(r,meas,out,stem,saveFigures,style);
+        manifest = add_manifest(manifest,"baseline",stem, ...
+            "One Gateway duration per axes with shared convergence limits.");
     end
-    plot_reviewer2_geometry_grid(r.bestGeometryRuns,out, ...
-        "baseline_geometry",saveFigures);
+    selection = select_reviewer2_representative_runs(r,"baseline");
+    writetable(selection,fullfile(char(r.analysisDirectory), ...
+        'baseline_6000_geometry_representative_runs.csv'));
+    plot_reviewer2_geometry_grid(selection,out,"baseline_geometry",saveFigures);
     for mission = missions
         stem = "baseline_geometry_"+mission_code(mission)+"_grid";
         manifest = add_manifest(manifest,"baseline",stem, ...
-            "Best observed geometry for 3, 5, 7, and 10 observers.");
+            "Representative AO geometry nearest the mean objective for 3/5/7/10 observers.");
     end
 end
 
 if isfield(reports,'objective_screening')
-    r = reports.objective_screening;
-    out = prepare_output(r.analysisDirectory,saveFigures);
+    r = reports.objective_screening; out = prepare_output(r.analysisDirectory,saveFigures);
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
     for mission = missions
         stem = "ga_screening_summary_"+mission_code(mission);
         plot_screening_summary(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Matched combined-objective screening ON/OFF comparison.");
+            "Matched J111 screening ON/OFF mean +/- sample std comparison.");
         stem = "ga_screening_convergence_"+mission_code(mission);
-        plot_screening_convergence(r,mission,out,stem,saveFigures,style);
+        plot_screening_convergence_small_multiples(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Matched combined-objective screening ON/OFF convergence.");
+            "Screening ON/OFF convergence shown on separate axes with shared limits.");
         stem = "ga_objective_components_"+mission_code(mission);
         plot_objective_component_summary(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Physical metric comparison for J111, J100, J010, and J001.");
+            "Physical metrics for J111/J100/J010/J001 using mean +/- sample std.");
         stem = "ga_objective_families_"+mission_code(mission);
         plot_objective_family_summary(r,mission,out,stem,saveFigures,style);
         manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Selected orbit-family distribution by objective configuration.");
+            "Orbit-family distribution by objective configuration.");
     end
-    geometrySelection = select_objective_geometry_runs(r);
-    writetable(geometrySelection,fullfile(char(r.analysisDirectory), ...
-        'ga_objective_screening_geometry_selected_runs.csv'));
-    plot_reviewer2_geometry_grid(geometrySelection,out, ...
-        "ga_objective_geometry",saveFigures);
+
+    selection = select_reviewer2_representative_runs(r,"objective_screening");
+    writetable(selection,fullfile(char(r.analysisDirectory), ...
+        'ga_objective_screening_geometry_representative_runs.csv'));
+    screeningSelection = selection(ismember(selection.PanelKey,["combined_on","combined_off"]),:);
+    componentSelection = selection(ismember(selection.PanelKey, ...
+        ["combined_on","j1_only","j2_only","j3_only"]),:);
+    plot_reviewer2_geometry_grid(screeningSelection,out,"ga_screening_geometry",saveFigures);
+    plot_reviewer2_geometry_grid(componentSelection,out,"ga_objective_geometry",saveFigures);
     for mission = missions
-        stem = "ga_objective_geometry_"+mission_code(mission)+"_grid";
-        manifest = add_manifest(manifest,"objective_screening",stem, ...
-            "Best observed within-configuration geometry for screening/objective cases.");
+        manifest = add_manifest(manifest,"objective_screening", ...
+            "ga_screening_geometry_"+mission_code(mission)+"_grid", ...
+            "Representative screening ON/OFF geometry nearest each group mean objective.");
+        manifest = add_manifest(manifest,"objective_screening", ...
+            "ga_objective_geometry_"+mission_code(mission)+"_grid", ...
+            "Representative objective-component geometry nearest each group mean objective.");
     end
     trendTable = build_objective_screening_trends(r);
     writetable(trendTable,fullfile(char(r.analysisDirectory), ...
@@ -157,67 +169,52 @@ function plot_runtime_summary(r,out,saveFigures,style)
 R = r.runtimeResults;
 order = style.optimizerOrder(ismember(style.optimizerOrder,R.Optimizer));
 R = sort_to_order(R,'Optimizer',order);
+colors = colors_for_optimizers(R.Optimizer,style);
 fig = paper_figure(style.figureWidth,style.figureHeight,style);
 t = tiledlayout(fig,1,2,'Padding','loose','TileSpacing','compact');
 
-ax1 = nexttile(t); hold(ax1,'on'); box(ax1,'on'); grid(ax1,'on');
-colors = colors_for_optimizers(R.Optimizer,style);
-b = bar(ax1,1:height(R),R.BestJMean,0.72,'FaceColor','flat'); b.CData = colors;
-errorbar(ax1,1:height(R),R.BestJMean,R.BestJStd,'k.','LineWidth',1.0, ...
+ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:height(R),R.BestJMean,0.72,'FaceColor','flat'); b.CData = colors;
+errorbar(ax,1:height(R),R.BestJMean,R.BestJStd,'k.','LineWidth',1.0, ...
     'CapSize',style.capSize,'HandleVisibility','off');
-format_category_axis(ax1,optimizer_labels(R.Optimizer), ...
-    'Final best objective',style);
-title(ax1,'(a) Equal-FE solution quality','FontSize',style.fontSize, ...
-    'FontName',style.fontName,'FontWeight','bold');
+format_category_axis(ax,optimizer_labels(R.Optimizer),'Final best objective',style);
 
-ax2 = nexttile(t); hold(ax2,'on'); box(ax2,'on'); grid(ax2,'on');
-b = bar(ax2,1:height(R),R.BudgetRuntimeMean_s,0.72,'FaceColor','flat'); b.CData = colors;
-errorbar(ax2,1:height(R),R.BudgetRuntimeMean_s,R.BudgetRuntimeStd_s, ...
-    'k.','LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
-format_category_axis(ax2,optimizer_labels(R.Optimizer), ...
-    'Runtime to 1200 FE (s)',style);
-title(ax2,'(b) Equal-FE computational cost','FontSize',style.fontSize, ...
-    'FontName',style.fontName,'FontWeight','bold');
+ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:height(R),R.BudgetRuntimeMean_s,0.72,'FaceColor','flat'); b.CData = colors;
+errorbar(ax,1:height(R),R.BudgetRuntimeMean_s,R.BudgetRuntimeStd_s,'k.', ...
+    'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
+format_category_axis(ax,optimizer_labels(R.Optimizer),'Runtime to 1200 FE (s)',style);
 idxBO = find(R.Optimizer == "BAYESIAN",1);
 if ~isempty(idxBO)
-    ratio = R.BudgetRuntimeMean_s(idxBO)/min(R.BudgetRuntimeMean_s(R.Optimizer ~= "BAYESIAN"));
-    text(ax2,idxBO,R.BudgetRuntimeMean_s(idxBO)+R.BudgetRuntimeStd_s(idxBO), ...
-        sprintf('  %.1f\\times fastest',ratio),'FontName',style.fontName, ...
-        'FontSize',style.fontSize,'FontWeight','bold','VerticalAlignment','bottom');
+    fastest = min(R.BudgetRuntimeMean_s(R.Optimizer ~= "BAYESIAN"));
+    ratio = R.BudgetRuntimeMean_s(idxBO)/fastest;
+    text(ax,idxBO,R.BudgetRuntimeMean_s(idxBO)+R.BudgetRuntimeStd_s(idxBO), ...
+        sprintf('%.1fx fastest',ratio),'HorizontalAlignment','center', ...
+        'VerticalAlignment','bottom','FontName',style.fontName, ...
+        'FontSize',style.fontSize,'FontWeight','bold');
 end
 export_figure(fig,out,"runtime_1200_summary",saveFigures,style);
 end
 
 
-function plot_runtime_convergence(r,out,saveFigures,style)
+function plot_runtime_convergence_small_multiples(r,out,saveFigures,style)
 files = dir(fullfile(char(r.analysisDirectory),'convergence_*.mat'));
-assert(numel(files) == 1,'Expected one focused-runtime convergence file.');
+assert(numel(files) == 1,'Expected one runtime convergence file.');
 S = load(fullfile(files(1).folder,files(1).name),'curves');
-optimizers = style.optimizerOrder(ismember(style.optimizerOrder,string({S.curves.optimizer})));
-fig = paper_figure(style.figureWidth,style.figureHeight,style); ax = axes(fig);
-hold(ax,'on'); box(ax,'on'); grid(ax,'on'); handles = gobjects(numel(optimizers),1);
+optimizers = style.optimizerOrder(ismember(style.optimizerOrder,upper(string({S.curves.optimizer}))));
+curves = cell(numel(optimizers),1);
 for k = 1:numel(optimizers)
     idx = find(upper(string({S.curves.optimizer})) == optimizers(k),1);
-    curve = S.curves(idx); valid = curve.fe >= 60 & isfinite(curve.mean);
-    x = double(curve.fe(valid)); y = double(curve.mean(valid)); d = double(curve.std(valid));
-    c = optimizer_color(optimizers(k),style);
-    uncertainty_band(ax,x,y,d,c,style);
-    handles(k) = stairs(ax,x,y,'Color',c,'LineWidth',style.lineWidth, ...
-        'DisplayName',optimizer_label(optimizers(k)));
+    curves{k} = S.curves(idx);
 end
-xlim(ax,[60 r.budget]);
-xlabel(ax,'Function evaluations','FontWeight','bold');
-ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
-style_axes(ax,style);
-lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',numel(handles)); style_legend(lgd,style);
-export_figure(fig,out,"runtime_1200_convergence",saveFigures,style);
+plot_curve_small_multiples(curves,optimizer_labels(optimizers), ...
+    colors_for_optimizers(optimizers,style),r.budget,3,2,out, ...
+    "runtime_1200_convergence",saveFigures,style);
 end
 
 
 function plot_comparison_summary(r,out,saveFigures,style)
-R = r.results;
-missions = string(r.missions); optimizers = string(r.optimizers);
+R = r.results; missions = string(r.missions); optimizers = string(r.optimizers);
 specs = { ...
     'BestJMean','BestJStd','Final best objective'; ...
     'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
@@ -229,7 +226,7 @@ legendHandles = gobjects(numel(optimizers),1);
 for q = 1:4
     ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
     [values,errors] = grouped_values(R,missions,optimizers,specs{q,1},specs{q,2});
-    b = bar(ax,1:numel(missions),values,'grouped');
+    b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
     for k = 1:numel(optimizers)
         b(k).FaceColor = optimizer_color(optimizers(k),style);
         errorbar(ax,b(k).XEndPoints,values(:,k),errors(:,k),'k.', ...
@@ -246,27 +243,35 @@ export_figure(fig,out,"comparison_6000_summary",saveFigures,style);
 end
 
 
-function plot_comparison_convergence(r,mission,out,stem,saveFigures,style)
-R = r.results(r.results.Mission == mission,:);
-key = string(R.ComparisonKey(1));
+function plot_optimizer_ranking(r,out,saveFigures,style)
+T = r.overallRanking;
+T = sortrows(T,'OverallRank','ascend');
+colors = colors_for_optimizers(T.Optimizer,style);
+fig = paper_figure(style.figureWidth,style.figureHeight,style);
+t = tiledlayout(fig,1,2,'Padding','loose','TileSpacing','compact');
+ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:height(T),T.MeanObjectiveRank,0.72,'FaceColor','flat'); b.CData = colors;
+format_category_axis(ax,optimizer_labels(T.Optimizer),'Mean objective rank',style);
+yline(ax,1,'k:','HandleVisibility','off');
+ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+b = bar(ax,1:height(T),T.MissionWins,0.72,'FaceColor','flat'); b.CData = colors;
+format_category_axis(ax,optimizer_labels(T.Optimizer),'Target-case wins',style);
+export_figure(fig,out,"comparison_6000_optimizer_ranking",saveFigures,style);
+end
+
+
+function plot_comparison_convergence_small_multiples(r,mission,out,stem,saveFigures,style)
+row = r.results(r.results.Mission == mission,:);
+key = string(row.ComparisonKey(1));
 S = load(fullfile(char(r.analysisDirectory),"convergence_"+key+".mat"),'curves');
-optimizers = string(r.optimizers);
-fig = paper_figure(style.figureWidth,style.figureHeight,style); ax = axes(fig);
-hold(ax,'on'); box(ax,'on'); grid(ax,'on'); handles = gobjects(numel(optimizers),1);
+optimizers = string(r.optimizers); curves = cell(numel(optimizers),1);
 for k = 1:numel(optimizers)
     idx = find(upper(string({S.curves.optimizer})) == optimizers(k),1);
     assert(~isempty(idx),'Missing convergence curve for %s.',optimizers(k));
-    curve = S.curves(idx); valid = curve.fe >= 60 & isfinite(curve.mean);
-    x = double(curve.fe(valid)); y = double(curve.mean(valid)); d = double(curve.std(valid));
-    c = optimizer_color(optimizers(k),style); uncertainty_band(ax,x,y,d,c,style);
-    handles(k) = stairs(ax,x,y,'Color',c,'LineWidth',style.lineWidth, ...
-        'DisplayName',optimizer_label(optimizers(k)));
+    curves{k} = S.curves(idx);
 end
-xlim(ax,[60 r.budget]); xlabel(ax,'Function evaluations','FontWeight','bold');
-ylabel(ax,'Mean best-so-far objective','FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',numel(handles)); style_legend(lgd,style);
-export_figure(fig,out,stem,saveFigures,style);
+plot_curve_small_multiples(curves,optimizer_labels(optimizers), ...
+    colors_for_optimizers(optimizers,style),r.budget,2,2,out,stem,saveFigures,style);
 end
 
 
@@ -306,85 +311,58 @@ export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_baseline_duration_trends(r,out,stem,saveFigures,style)
-R = r.results; measurements = ["ANGLES_ONLY","ANGLES_RANGE"]; periods = [1 3 5];
-specs = { ...
-    'BestJMean','BestJStd','Final best objective'; ...
-    'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
-    'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)'; ...
-    'RuntimeMean_s','RuntimeStd_s','Runtime to 6000 FE (s)'};
+function plot_baseline_duration_metric(r,measurement,valueField,stdField,yLabel,out,stem,saveFigures,style)
+R = r.results; counts = [3 5 7 10]; periods = [1 3 5];
 fig = paper_figure(style.figureWidth,style.panelFigureHeight,style);
 t = tiledlayout(fig,2,2,'Padding','loose','TileSpacing','compact');
-legendHandles = gobjects(2,1);
-for q = 1:4
+colors = lines(numel(counts));
+for k = 1:numel(counts)
     ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-    for m = 1:2
-        values = nan(size(periods)); errors = values;
-        for k = 1:numel(periods)
-            row = R(R.Mission == "LUNAR_GATEWAY" & R.Measurement == measurements(m) & ...
-                R.NumObservers == 3 & R.NPeriods == periods(k),:);
-            assert(height(row) == 1,'Missing Gateway-duration baseline point.');
-            values(k) = row.(specs{q,1}); errors(k) = row.(specs{q,2});
-        end
-        c = style.measurementColors(m,:);
-        h = errorbar(ax,periods,values,errors,'-o','Color',c, ...
-            'LineWidth',style.lineWidth,'MarkerSize',style.markerSize, ...
-            'MarkerFaceColor',c,'CapSize',style.capSize, ...
-            'DisplayName',measurement_label(measurements(m)));
-        if q == 1, legendHandles(m) = h; end
+    rows = R(R.Mission == "LUNAR_GATEWAY" & R.Measurement == measurement & ...
+        R.NumObservers == counts(k),:);
+    values = nan(size(periods)); errors = values;
+    for p = 1:numel(periods)
+        row = rows(rows.NPeriods == periods(p),:);
+        assert(height(row) == 1,'Missing Gateway duration point.');
+        values(p) = row.(valueField); errors(p) = row.(stdField);
     end
-    ax.XTick = periods; xlabel(ax,'Gateway tracking periods','FontWeight','bold');
-    ylabel(ax,specs{q,3},'FontWeight','bold'); style_axes(ax,style);
+    errorbar(ax,periods,values,errors,'-o','Color',colors(k,:), ...
+        'LineWidth',style.lineWidth,'MarkerSize',style.markerSize, ...
+        'MarkerFaceColor',colors(k,:),'CapSize',style.capSize);
+    ax.XTick = periods; xlabel(ax,'Gateway periods','FontWeight','bold');
+    ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
+    title(ax,string(counts(k))+" observers",'FontName',style.fontName, ...
+        'FontSize',style.fontSize,'FontWeight','bold');
 end
-lgd = legend(legendHandles,{'AO','AR'},'Orientation','horizontal','Box','off');
-style_legend(lgd,style); lgd.Layout.Tile = 'north';
 export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_baseline_observer_convergence(r,mission,measurement,out,stem,saveFigures,style)
-counts = [3 5 7 10]; fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on'); colors = lines(4);
-handles = gobjects(4,1);
+function plot_baseline_observer_convergence_small_multiples(r,mission,measurement,out,stem,saveFigures,style)
+counts = [3 5 7 10]; curves = cell(4,1); labels = strings(4,1);
+colors = lines(4);
 for k = 1:4
     row = r.results(r.results.Mission == mission & r.results.Measurement == measurement & ...
         r.results.NumObservers == counts(k) & r.results.NPeriods == 1,:);
     assert(height(row) == 1,'Missing baseline convergence configuration.');
-    curve = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
-    valid = curve.fe >= 60 & isfinite(curve.mean); x = double(curve.fe(valid));
-    y = double(curve.mean(valid)); d = double(curve.std(valid));
-    uncertainty_band(ax,x,y,d,colors(k,:),style);
-    handles(k) = stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth, ...
-        'DisplayName',sprintf('%d observers',counts(k)));
+    curves{k} = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
+    labels(k) = string(counts(k))+" observers";
 end
-xlim(ax,[60 r.budget]); xlabel(ax,'Function evaluations','FontWeight','bold');
-ylabel(ax,'Mean best-so-far objective','FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',2); style_legend(lgd,style);
-export_figure(fig,out,stem,saveFigures,style);
+plot_curve_small_multiples(curves,labels,colors,r.budget,2,2,out,stem,saveFigures,style);
 end
 
 
-function plot_baseline_duration_convergence(r,measurement,out,stem,saveFigures,style)
-periods = [1 3 5]; fig = paper_figure(style.figureWidth,style.figureHeight,style);
-ax = axes(fig); hold(ax,'on'); box(ax,'on'); grid(ax,'on'); colors = lines(3);
-handles = gobjects(3,1);
+function plot_baseline_duration_convergence_small_multiples(r,measurement,out,stem,saveFigures,style)
+periods = [1 3 5]; curves = cell(3,1); labels = strings(3,1); colors = lines(3);
 for k = 1:3
     row = r.results(r.results.Mission == "LUNAR_GATEWAY" & ...
         r.results.Measurement == measurement & r.results.NumObservers == 3 & ...
         r.results.NPeriods == periods(k),:);
     assert(height(row) == 1,'Missing baseline duration convergence configuration.');
-    curve = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
-    valid = curve.fe >= 60 & isfinite(curve.mean); x = double(curve.fe(valid));
-    y = double(curve.mean(valid)); d = double(curve.std(valid));
-    uncertainty_band(ax,x,y,d,colors(k,:),style);
-    handles(k) = stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth, ...
-        'DisplayName',sprintf('%d period%s',periods(k),plural_s(periods(k))));
+    curves{k} = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
+    labels(k) = string(periods(k))+" period"+plural_s(periods(k));
 end
-xlim(ax,[60 r.budget]); xlabel(ax,'Function evaluations','FontWeight','bold');
-ylabel(ax,'Mean best-so-far objective','FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal');
-style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
+plot_curve_small_multiples(curves,labels,colors,r.budget,1,3,out,stem,saveFigures,style);
 end
 
 
@@ -394,8 +372,19 @@ specs = { ...
     'BestJMean','BestJStd','Final best objective'; ...
     'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)'; ...
     'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Effective position sigma (km)'; ...
-    'AvailableObserversMean','AvailableObserversStd','Mean available observers'};
+    'ScreeningMean','ScreeningStd','Rejected measurement opportunities'};
 plot_configuration_panel(r.results,mission,configs,specs,out,stem,saveFigures,style);
+end
+
+
+function plot_screening_convergence_small_multiples(r,mission,out,stem,saveFigures,style)
+configs = ["combined_on","combined_off"]; curves = cell(2,1);
+for k = 1:2
+    row = objective_result(r.results,mission,configs(k));
+    curves{k} = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
+end
+plot_curve_small_multiples(curves,configuration_labels(configs), ...
+    colors_for_configurations(configs,style),r.budget,1,2,out,stem,saveFigures,style);
 end
 
 
@@ -434,27 +423,6 @@ export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function plot_screening_convergence(r,mission,out,stem,saveFigures,style)
-configs = ["combined_on","combined_off"];
-colors = colors_for_configurations(configs,style);
-fig = paper_figure(style.figureWidth,style.figureHeight,style); ax = axes(fig);
-hold(ax,'on'); box(ax,'on'); grid(ax,'on'); handles = gobjects(2,1);
-for k = 1:2
-    row = objective_result(r.results,mission,configs(k));
-    curve = load_ga_curve(r.analysisDirectory,row.ComparisonKey);
-    valid = curve.fe >= 60 & isfinite(curve.mean); x = double(curve.fe(valid));
-    y = double(curve.mean(valid)); d = double(curve.std(valid));
-    uncertainty_band(ax,x,y,d,colors(k,:),style);
-    handles(k) = stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth, ...
-        'DisplayName',configuration_label(configs(k)));
-end
-xlim(ax,[60 r.budget]); xlabel(ax,'Function evaluations','FontWeight','bold');
-ylabel(ax,'Mean best-so-far objective','FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal');
-style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
-end
-
-
 function plot_objective_family_summary(r,mission,out,stem,saveFigures,style)
 F = r.familySelection; configs = ["combined_on","j1_only","j2_only","j3_only"];
 families = ["DRO","NRHO/rectilinear","Halo","Other"];
@@ -479,26 +447,56 @@ export_figure(fig,out,stem,saveFigures,style);
 end
 
 
-function selection = select_objective_geometry_runs(r)
-R = r.results; M = r.runMetrics;
-missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
-configs = ["combined_on","combined_off","j1_only","j2_only","j3_only"];
-n = numel(missions)*numel(configs); missionColumn = strings(n,1);
-panelKey = strings(n,1); panelLabel = strings(n,1); runFile = strings(n,1);
-bestObjective = nan(n,1); seed = nan(n,1); rowOut = 0;
-for mission = missions
-    for config = configs
-        rowOut = rowOut+1; rr = objective_result(R,mission,config);
-        rows = M(M.comparison_key == string(rr.ComparisonKey),:);
-        assert(~isempty(rows),'No run metrics for objective geometry selection.');
-        [bestObjective(rowOut),idx] = min(rows.bestJ);
-        missionColumn(rowOut) = mission; panelKey(rowOut) = config;
-        panelLabel(rowOut) = configuration_label(config);
-        runFile(rowOut) = rows.run_file(idx); seed(rowOut) = rows.seed(idx);
+function plot_curve_small_multiples(curves,labels,colors,budget,nRows,nCols,out,stem,saveFigures,style)
+% One curve per axes avoids unreadable overlap. Each axes shows the across-run
+% mean best-so-far trace and a final-FE +/- sample-standard-deviation bar.
+assert(numel(curves) == numel(labels));
+fig = paper_figure(style.convergenceFigureWidth,style.convergenceFigureHeight,style);
+t = tiledlayout(fig,nRows,nCols,'Padding','loose','TileSpacing','compact');
+allY = zeros(0,1);
+for k = 1:numel(curves)
+    c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean);
+    y = double(c.mean(valid)); allY = [allY;y]; %#ok<AGROW>
+    if any(valid)
+        dEnd = double(c.std(find(valid,1,'last')));
+        if isfinite(dEnd), allY = [allY;y(end)-dEnd;y(end)+dEnd]; end %#ok<AGROW>
     end
 end
-selection = table(missionColumn,panelKey,panelLabel,runFile,bestObjective,seed, ...
-    'VariableNames',{'Mission','PanelKey','PanelLabel','RunFile','BestObjective','Seed'});
+allY = allY(isfinite(allY));
+lo = min(allY); hi = max(allY); span = max(hi-lo,0.05*max(1,abs(hi)));
+yLimits = [lo-0.06*span,hi+0.08*span];
+if yLimits(1) >= 0, yLimits(1) = max(0,yLimits(1)); end
+
+for k = 1:numel(curves)
+    ax = nexttile(t); hold(ax,'on'); box(ax,'on'); grid(ax,'on');
+    c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean);
+    x = double(c.fe(valid)); y = double(c.mean(valid));
+    stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth);
+    if ~isempty(x)
+        dEnd = double(c.std(find(valid,1,'last')));
+        if isfinite(dEnd)
+            errorbar(ax,x(end),y(end),dEnd,'o','Color',colors(k,:), ...
+                'MarkerFaceColor',colors(k,:),'MarkerSize',4.5, ...
+                'LineWidth',1.0,'CapSize',style.capSize);
+        else
+            plot(ax,x(end),y(end),'o','Color',colors(k,:), ...
+                'MarkerFaceColor',colors(k,:),'MarkerSize',4.5);
+        end
+    end
+    xlim(ax,[60 budget]); ylim(ax,yLimits);
+    title(ax,sprintf('(%c) %s',char('a'+k-1),string(labels(k))), ...
+        'FontName',style.fontName,'FontSize',style.fontSize, ...
+        'FontWeight','bold','Interpreter','none');
+    style_axes(ax,style);
+end
+for k = numel(curves)+1:nRows*nCols
+    ax = nexttile(t); axis(ax,'off');
+end
+xlabel(t,'Function evaluations','FontName',style.fontName, ...
+    'FontSize',style.labelFontSize,'FontWeight','bold');
+ylabel(t,'Mean best-so-far objective','FontName',style.fontName, ...
+    'FontSize',style.labelFontSize,'FontWeight','bold');
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 
@@ -583,15 +581,6 @@ end
 end
 
 
-function uncertainty_band(ax,x,y,d,color,style)
-idx = unique(round(linspace(1,numel(x),min(180,numel(x)))));
-x = x(idx); y = y(idx); d = d(idx);
-bandColor = (1-style.alphaBand)*[1 1 1] + style.alphaBand*color;
-fill(ax,[x;flipud(x)],[max(0,y-d);flipud(y+d)],bandColor, ...
-    'EdgeColor','none','HandleVisibility','off');
-end
-
-
 function fig = paper_figure(widthIn,heightIn,style)
 fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
     'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
@@ -610,8 +599,7 @@ end
 
 
 function style_legend(lgd,style)
-lgd.FontName = style.fontName; lgd.FontSize = style.fontSize;
-lgd.FontWeight = 'bold';
+lgd.FontName = style.fontName; lgd.FontSize = style.fontSize; lgd.FontWeight = 'bold';
 end
 
 
@@ -631,16 +619,11 @@ end
 
 
 function labels = optimizer_labels(values)
-values = string(values(:)); labels = strings(size(values));
-for k = 1:numel(values), labels(k) = optimizer_label(values(k)); end
+values = upper(string(values(:))); labels = values; labels(values == "BAYESIAN") = "BO";
 end
 
 function label = optimizer_label(value)
-switch upper(string(value))
-    case "BAYESIAN", label = "BO";
-    case "ABC", label = "ABC";
-    otherwise, label = upper(string(value));
-end
+label = optimizer_labels(value); label = label(1);
 end
 
 function labels = mission_labels(values)
@@ -666,17 +649,17 @@ end
 
 function label = configuration_label(value)
 switch string(value)
-    case "combined_on", label = "J_{111}, screening ON";
-    case "combined_off", label = "J_{111}, screening OFF";
-    case "j1_only", label = "J_{100}";
-    case "j2_only", label = "J_{010}";
-    case "j3_only", label = "J_{001}";
+    case "combined_on", label = "Combined, screening ON";
+    case "combined_off", label = "Combined, screening OFF";
+    case "j1_only", label = "J_1 only";
+    case "j2_only", label = "J_2 only";
+    case "j3_only", label = "J_3 only";
     otherwise, label = string(value);
 end
 end
 
 function code = mission_code(mission)
-switch upper(string(mission))
+switch string(mission)
     case "LUNAR_GATEWAY", code = "lg";
     case "LOW_THRUST_TRANSFER", code = "lt";
     case "GATEWAY_IMPULSE", code = "gi";
@@ -689,9 +672,9 @@ if string(measurement) == "ANGLES_ONLY", code = "ao"; else, code = "ar"; end
 end
 
 function s = plural_s(value)
-if value == 1, s = ''; else, s = 's'; end
+if value == 1, s = ""; else, s = "s"; end
 end
 
-function value = percent_change(reference,newValue)
-value = 100*(double(newValue)-double(reference))/max(abs(double(reference)),eps);
+function value = percent_change(before,after)
+value = 100*(double(after)-double(before))/max(abs(double(before)),eps);
 end
