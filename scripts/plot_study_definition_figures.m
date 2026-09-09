@@ -1002,6 +1002,10 @@ export_publication_eps(figGateway,figureFiles(1)); close(figGateway);
 figTransfer = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
 [ax,plotPosition] = create_centered_3d_axes(figTransfer);
 prepare_axes(ax);
+% The transfer is physically clear of the Moon, but the shared manuscript
+% camera makes the projected path appear to cross the lunar disk. Apply a
+% small local rotation only to this study-definition panel.
+view(ax,-47.5,35);
 endpointColor = [0.70,0.70,0.70];
 hEndpoint = plot3(ax,departureOrbit(:,1),departureOrbit(:,2),departureOrbit(:,3), ...
     '-','Color',endpointColor,'LineWidth',1.0);
