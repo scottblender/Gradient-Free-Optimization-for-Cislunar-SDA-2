@@ -58,6 +58,7 @@ for study = studies
 
         case "comparison"
             [~,tmp] = evalc('run_reviewer2_comparison_pipeline(false)');
+            tmp.results = attach_comparison_keys(tmp.results,tmp.summary);
             reports.comparison = tmp;
             fprintf('\n6000-FE aggregate objective/runtime table:\n');
             disp(tmp.objectiveTable);
@@ -109,6 +110,21 @@ if saveFigures
     fprintf(['Metric/ranking claims use aggregate mean +/- sample standard deviation. ' ...
         'Representative geometry seeds are recorded only for traceability.\n']);
 end
+end
+
+
+function R = attach_comparison_keys(R,S)
+% The comparison aggregate table historically omitted comparison_key even
+% though the convergence MAT files are keyed by it. Attach the validated key
+% to each mission/optimizer row before the centralized renderer runs.
+keys = strings(height(R),1);
+for k = 1:height(R)
+    row = S(S.mission == R.Mission(k) & S.optimizer == R.Optimizer(k),:);
+    assert(height(row) == 1, ...
+        'Missing comparison summary key for %s/%s.',R.Mission(k),R.Optimizer(k));
+    keys(k) = string(row.comparison_key);
+end
+R.ComparisonKey = keys;
 end
 
 
