@@ -1,24 +1,25 @@
 function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,saveFigures)
 %PLOT_REVIEWER2_GEOMETRY_GRID Export representative 3-D result panels.
 %
-% Despite the historical function name, each representative realization is
-% exported as its own full-size panel so it can be assembled as a LaTeX
-% subfigure without shrinking several perspective axes into one MATLAB grid.
-% The construction intentionally matches plot_study_definition_figures.m:
+% Historical name retained for compatibility. Final manuscript trajectories
+% are exported as separate full-size panels rather than compressed MATLAB
+% tiled grids. The construction matches plot_study_definition_figures.m:
 %   7.6 x 7.0 inch canvas
 %   centered inner axes box [0.12 0.20 0.76 0.64]
 %   perspective view(-37.5,30), axis equal/vis3d
 %   8/10/10 percent x/y/z padding
-%   north-outside legend centered above the restored axes box
+%   centered north-outside legend with the axes restored afterward
 %   Times New Roman, 12-point minimum text and 14-point axis labels
 %
-% Statistical claims must use aggregate mean +/- sample standard deviation.
-% These plots use the saved realization nearest each group's mean objective
-% only to show a physically realizable representative constellation.
+% Geometry is qualitative only. The supplied realization should be nearest
+% the 20-run group mean objective; statistical conclusions use group mean
+% +/- sample standard deviation. Earth is omitted. Duplicate periodic orbits
+% are drawn once as solid curves while every selected phase marker is kept.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
+validateattributes(saveFigures,{'logical','numeric'},{'scalar'});
 saveFigures = logical(saveFigures);
-assert(istable(selection),'selection must be a table.');
+assert(istable(selection) && height(selection) > 0,'selection must be a nonempty table.');
 required = ["Mission","PanelKey","PanelLabel","RunFile"];
 assert(all(ismember(required,string(selection.Properties.VariableNames))), ...
     'Geometry selection table is missing required columns.');
@@ -32,37 +33,37 @@ if saveFigures
 end
 
 n = height(selection);
-panels = repmat(struct(),n,1);
+panelCells = cell(n,1);
 numObservers = nan(n,1);
 families = strings(n,1);
 orbitIndices = strings(n,1);
 slotIndices = strings(n,1);
 figureStem = strings(n,1);
 
-% Load first so every panel for the same mission uses exactly the same
-% dynamic limits. This preserves direct geometry comparability while using
-% the same centered construction as the introductory figures.
+% Load all panels first so every comparison within one mission uses the
+% same dynamically determined limits.
 missionLimits = containers.Map('KeyType','char','ValueType','any');
 for mission = unique(string(selection.Mission),'stable')'
     idx = find(string(selection.Mission) == mission);
     allPoints = zeros(0,3);
     for q = 1:numel(idx)
         k = idx(q);
-        panels(k) = load_geometry_panel(string(selection.RunFile(k)));
-        assert(panels(k).mission == mission, ...
+        panelCells{k} = load_geometry_panel(string(selection.RunFile(k)));
+        panel = panelCells{k};
+        assert(panel.mission == mission, ...
             'Selection mission does not match saved run mission.');
-        allPoints = [allPoints;panels(k).allPoints]; %#ok<AGROW>
-        numObservers(k) = height(panels(k).observers);
-        families(k) = strjoin(string(panels(k).observers.orbit_family),';');
-        orbitIndices(k) = strjoin(string(panels(k).observers.orbit_index),';');
-        slotIndices(k) = strjoin(string(panels(k).observers.slot_index),';');
+        allPoints = [allPoints;panel.allPoints]; %#ok<AGROW>
+        numObservers(k) = height(panel.observers);
+        families(k) = strjoin(string(panel.observers.orbit_family),';');
+        orbitIndices(k) = strjoin(string(panel.observers.orbit_index),';');
+        slotIndices(k) = strjoin(string(panel.observers.slot_index),';');
     end
-    missionLimits(char(mission)) = data_limits(allPoints);
+    missionLimits(char(mission)) = common_geometry_limits(allPoints,style);
 end
 
 for k = 1:n
     mission = string(selection.Mission(k));
-    panel = panels(k);
+    panel = panelCells{k};
     fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
     plotPosition = style.geometryPlotPosition;
     ax = axes(fig,'Units','normalized','Position',plotPosition);
@@ -70,8 +71,9 @@ for k = 1:n
 
     prepare_reference_axes(ax,style);
     [legendHandles,legendLabels] = render_geometry_panel(ax,panel,style);
-    baseLimits = missionLimits(char(mission));
-    finalize_reference_axes(ax,baseLimits,style);
+    limits = missionLimits(char(mission));
+    xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    axis(ax,'vis3d');
 
     legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
         'Location','northoutside','Orientation','horizontal');
@@ -95,10 +97,11 @@ end
 details = table(string(selection.Mission),string(selection.PanelKey), ...
     string(selection.PanelLabel),representativeObjective,groupMeanObjective, ...
     groupStdObjective,representativeSeed,string(selection.RunFile), ...
-    numObservers,families,orbitIndices,slotIndices,figureStem, ...
+    numObservers,families,orbitIndices,slotIndices,figureStem,figureStem, ...
     'VariableNames',{'Mission','PanelKey','PanelLabel','RepresentativeObjective', ...
     'GroupMeanObjective','GroupStdObjective','RepresentativeSeed','RunFile', ...
-    'NumObservers','OrbitFamilies','OrbitIndices','SlotIndices','FigureStem'});
+    'NumObservers','OrbitFamilies','OrbitIndices','SlotIndices', ...
+    'FigureStem','GridFigureStem'});
 end
 
 
@@ -106,15 +109,18 @@ function panel = load_geometry_panel(runFile)
 trackingFile = string(fullfile(fileparts(runFile),'tracking_data.mat'));
 assert(isfile(runFile) && isfile(trackingFile), ...
     'Missing selected run/tracking file for geometry panel.');
-S = load(runFile,'runState'); T = load(trackingFile,'tracking');
-r = S.runState; tracking = T.tracking;
+S = load(runFile,'runState');
+T = load(trackingFile,'tracking');
+r = S.runState;
+tracking = T.tracking;
 assert(isfield(r,'observers') && istable(r.observers) && height(r.observers) >= 1, ...
     'Selected run does not contain observer solution data.');
 
 panel.mission = string(r.settings.mission.type);
 panel.truth = double(tracking.truth(:,1:3));
 panel.observers = r.observers;
-panel.mu = double(r.settings.mu); panel.LU = double(r.settings.LU);
+panel.mu = double(r.settings.mu);
+panel.LU = double(r.settings.LU);
 panel.targetColor = reviewer2_target_color(panel.mission);
 panel.moonCenter = [1-panel.mu,0,0];
 panel.moonRadius = 1737.1/panel.LU;
@@ -140,18 +146,22 @@ end
 
 panel.endpointOrbitPoints = zeros(0,3);
 if panel.mission == "LOW_THRUST_TRANSFER"
+    assert(size(tracking.truth,2) >= 6, ...
+        'Low-thrust geometry requires six-component truth states.');
     [departureOrbit,arrivalOrbit] = low_thrust_endpoint_orbits( ...
         tracking.truth(1,1:6),tracking.truth(end,1:6));
     panel.departureOrbit = departureOrbit(:,1:3);
     panel.arrivalOrbit = arrivalOrbit(:,1:3);
     panel.endpointOrbitPoints = [panel.departureOrbit;panel.arrivalOrbit];
 else
-    panel.departureOrbit = zeros(0,3); panel.arrivalOrbit = zeros(0,3);
+    panel.departureOrbit = zeros(0,3);
+    panel.arrivalOrbit = zeros(0,3);
 end
 
 moonExtent = panel.moonCenter + [ ...
-    panel.moonRadius 0 0;-panel.moonRadius 0 0;0 panel.moonRadius 0; ...
-    0 -panel.moonRadius 0;0 0 panel.moonRadius;0 0 -panel.moonRadius];
+    panel.moonRadius 0 0;-panel.moonRadius 0 0; ...
+    0 panel.moonRadius 0;0 -panel.moonRadius 0; ...
+    0 0 panel.moonRadius;0 0 -panel.moonRadius];
 panel.allPoints = [panel.truth;observerPoints;panel.endpointOrbitPoints; ...
     moonExtent;panel.xL1 0 0;panel.xL2 0 0];
 end
@@ -163,20 +173,20 @@ axis(ax,'equal');
 view(ax,style.geometryAzimuth,style.geometryElevation);
 ax.Projection = 'perspective';
 xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
-set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
+set(ax,'FontName',style.fontName,'FontSize',max(style.fontSize,12), ...
     'FontWeight','bold','LineWidth',style.axisLineWidth, ...
     'TickLabelInterpreter','tex','Layer','top');
 ax.XLabel.FontName = style.fontName; ax.YLabel.FontName = style.fontName;
 ax.ZLabel.FontName = style.fontName;
-ax.XLabel.FontSize = style.labelFontSize;
-ax.YLabel.FontSize = style.labelFontSize;
-ax.ZLabel.FontSize = style.labelFontSize;
+ax.XLabel.FontSize = max(style.labelFontSize,14);
+ax.YLabel.FontSize = max(style.labelFontSize,14);
+ax.ZLabel.FontSize = max(style.labelFontSize,14);
 ax.XLabel.FontWeight = 'bold'; ax.YLabel.FontWeight = 'bold';
 ax.ZLabel.FontWeight = 'bold';
 end
 
 
-function [handles,labels] = render_geometry_panel(ax,panel,style)
+function [handles,labels] = render_geometry_panel(ax,panel,~)
 observerColors = lines(max(1,numel(panel.uniqueOrbitKeys)));
 hTarget = plot3(ax,panel.truth(:,1),panel.truth(:,2),panel.truth(:,3),'-', ...
     'Color',panel.targetColor,'LineWidth',2.8,'DisplayName','Target trajectory');
@@ -190,14 +200,12 @@ for u = 1:numel(panel.uniqueOrbitKeys)
 end
 set(hObserver,'HandleVisibility','on','DisplayName','Observer orbits');
 
-% Plot every selected phase marker, even when several observers share the
-% same periodic orbit. The periodic curve itself is drawn only once above.
 for j = 1:height(panel.observers)
     u = find(panel.uniqueOrbitKeys == panel.orbitKeys(j),1,'first');
     p = double(panel.observers.initial_state(j,1:3));
-    plot3(ax,p(1),p(2),p(3),'o','MarkerSize',5.2, ...
+    plot3(ax,p(1),p(2),p(3),'o','MarkerSize',5.5, ...
         'MarkerFaceColor',observerColors(u,:),'MarkerEdgeColor','k', ...
-        'LineWidth',0.7,'HandleVisibility','off');
+        'LineWidth',0.75,'HandleVisibility','off');
 end
 
 hEndpoint = gobjects(0); hStart = gobjects(0); hEnd = gobjects(0);
@@ -242,17 +250,12 @@ end
 end
 
 
-function finalize_reference_axes(ax,baseLimits,style)
-xlim(ax,pad_axis_limits(baseLimits(1,:),style.geometryXPadding));
-ylim(ax,pad_axis_limits(baseLimits(2,:),style.geometryYPadding));
-zlim(ax,pad_axis_limits(baseLimits(3,:),style.geometryZPadding));
-axis(ax,'vis3d');
-end
-
-
 function format_case_legend(lgd,mission,style)
-lgd.Box = 'on'; lgd.FontName = style.fontName; lgd.FontSize = style.fontSize;
-lgd.FontWeight = 'bold'; lgd.ItemTokenSize = [16 9];
+lgd.Box = 'on';
+lgd.FontName = style.fontName;
+lgd.FontSize = max(style.fontSize,12);
+lgd.FontWeight = 'bold';
+lgd.ItemTokenSize = [16 9];
 if mission == "LOW_THRUST_TRANSFER", lgd.NumColumns = 4; else, lgd.NumColumns = 5; end
 end
 
@@ -263,31 +266,27 @@ pos = lgd.Position;
 pos(1) = 0.5-pos(3)/2;
 legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
 pos(2) = min(legendBottom,0.98-pos(4));
-lgd.Position = pos; lgd.AutoUpdate = 'off';
-% Match the introductory figures: creating/moving a perspective legend can
-% shift the axes, so restore the exact centered inner box after the legend.
+lgd.Position = pos;
+lgd.AutoUpdate = 'off';
 ax.PositionConstraint = 'innerposition';
 ax.Position = plotPosition;
 drawnow;
 end
 
 
-function limits = data_limits(points)
+function limits = common_geometry_limits(points,style)
 assert(~isempty(points) && size(points,2) == 3,'Geometry points are empty.');
+padding = [style.geometryXPadding style.geometryYPadding style.geometryZPadding];
 limits = zeros(3,2);
 for k = 1:3
     v = points(:,k); v = v(isfinite(v));
-    limits(k,:) = [min(v),max(v)];
+    assert(~isempty(v),'Geometry coordinate data are empty.');
+    lo = min(v); hi = max(v); span = hi-lo;
+    if span <= 100*eps(max(1,max(abs(v))))
+        span = max(0.02,0.05*max(1,abs(mean(v))));
+    end
+    limits(k,:) = [lo-padding(k)*span,hi+padding(k)*span];
 end
-end
-
-
-function limits = pad_axis_limits(limits,fraction)
-span = limits(2)-limits(1);
-if span <= 100*eps(max(1,max(abs(limits))))
-    span = max(0.02,0.05*max(1,abs(mean(limits))));
-end
-limits = limits+[-fraction*span,fraction*span];
 end
 
 
@@ -361,13 +360,15 @@ fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
     'PaperUnits','inches','PaperPosition',[0 0 widthIn heightIn], ...
     'PaperSize',[widthIn heightIn],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
-movegui(fig,'center');
 end
 
 
 function export_figure(fig,figureDir,stem,saveFigures,dpi)
 enforce_minimum_font_size(fig,12); drawnow;
-if ~saveFigures, return; end
+if ~saveFigures
+    close(fig);
+    return;
+end
 base = fullfile(char(figureDir),char(stem));
 set(fig,'Renderer','painters','PaperPositionMode','manual');
 print(fig,[base '.eps'],'-depsc2','-painters','-r600');
