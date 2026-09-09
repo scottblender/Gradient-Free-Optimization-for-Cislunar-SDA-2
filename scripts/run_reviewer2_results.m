@@ -8,12 +8,13 @@ function reports = run_reviewer2_results(studies,saveFigures)
 % only to visualize one realizable discrete constellation near the group mean.
 %
 % Final processed outputs are moved out of the raw study trees and saved as:
-%   results/runtime_1200_<timestamp>/
-%   results/comparison_<timestamp>/
-%   results/baseline_<timestamp>/
-%   results/objective_screening_<timestamp>/
+%   COMPILED_REVIEWER_2_RESULTS/runtime_1200_<timestamp>/
+%   COMPILED_REVIEWER_2_RESULTS/comparison_<timestamp>/
+%   COMPILED_REVIEWER_2_RESULTS/baseline_<timestamp>/
+%   COMPILED_REVIEWER_2_RESULTS/objective_screening_<timestamp>/
 % CSVs, convergence MAT files, manuscript EPS/PNG figures, and the figure
-% manifest all live directly in those folders.
+% manifest all live directly in those folders. Raw optimization results stay
+% under results/ and are never modified by this runner.
 
 if nargin < 1 || isempty(studies), studies = "all"; end
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -33,14 +34,17 @@ else
 end
 
 paths = setup_project();
+compiledRoot = fullfile(paths.root,'COMPILED_REVIEWER_2_RESULTS');
+if ~isfolder(compiledRoot), mkdir(compiledRoot); end
 reports = struct();
 fprintf('\n=== Reviewer 2 results processing ===\n');
 fprintf('Selected studies: %s\n',strjoin(cellstr(studies),', '));
 fprintf('Save curated paper figures: %s\n',string(saveFigures));
+fprintf('Compiled output root: %s\n',compiledRoot);
 fprintf('Reported performance statistics: 20-run mean +/- sample standard deviation\n\n');
 
 % Historical per-pipeline preview routines are hidden. Only the centralized
-% final renderer is intended for manuscript inspection.
+% curated renderer is intended for manuscript inspection.
 originalFigureVisible = get(groot,'defaultFigureVisible');
 visibilityCleanup = onCleanup(@() set(groot,'defaultFigureVisible',originalFigureVisible)); %#ok<NASGU>
 set(groot,'defaultFigureVisible','off');
@@ -51,7 +55,7 @@ for study = studies
     switch study
         case "runtime"
             [~,tmp] = evalc('run_reviewer2_runtime_pipeline(false)');
-            tmp = relocate_analysis(tmp,paths.results,"runtime_1200");
+            tmp = relocate_analysis(tmp,compiledRoot,"runtime_1200");
             reports.runtime = tmp;
             fprintf('\n1200-FE aggregate objective/runtime table:\n');
             disp(tmp.formattedTable);
@@ -62,7 +66,7 @@ for study = studies
 
         case "comparison"
             [~,tmp] = evalc('run_reviewer2_comparison_pipeline(false)');
-            tmp = relocate_analysis(tmp,paths.results,"comparison");
+            tmp = relocate_analysis(tmp,compiledRoot,"comparison");
             tmp.results = attach_comparison_keys(tmp.results,tmp.summary);
             reports.comparison = tmp;
             fprintf('\n6000-FE aggregate objective/runtime table:\n');
@@ -76,7 +80,7 @@ for study = studies
 
         case "baseline"
             [~,tmp] = evalc('run_reviewer2_baseline_pipeline(false)');
-            tmp = relocate_analysis(tmp,paths.results,"baseline");
+            tmp = relocate_analysis(tmp,compiledRoot,"baseline");
             reports.baseline = tmp;
             fprintf('\nBaseline aggregate table:\n');
             disp(tmp.formattedTable);
@@ -85,7 +89,7 @@ for study = studies
 
         case "objective_screening"
             [~,tmp] = evalc('run_reviewer2_objective_screening_pipeline(false)');
-            tmp = relocate_analysis(tmp,paths.results,"objective_screening");
+            tmp = relocate_analysis(tmp,compiledRoot,"objective_screening");
             reports.objective_screening = tmp;
             fprintf('\nGA objective/screening aggregate results:\n');
             disp(format_objective_screening_for_console(tmp.results));
@@ -112,17 +116,18 @@ end
 fprintf('\nAll selected result processors completed successfully.\n');
 fprintf(['Metric/ranking claims use aggregate mean +/- sample standard deviation. ' ...
     'Representative geometry seeds are recorded only for traceability.\n']);
-fprintf(['For local baseline Monte Carlo validation, run ' ...
+fprintf(['Trajectory figures are emitted only for comparison and baseline. ' ...
+    'For local baseline Monte Carlo validation, run ' ...
     'run_reviewer2_baseline_monte_carlo separately.\n']);
 end
 
 
-function tmp = relocate_analysis(tmp,resultsRoot,studyName)
+function tmp = relocate_analysis(tmp,compiledRoot,studyName)
 source = string(tmp.analysisDirectory);
 assert(isfolder(source),'Pipeline analysis directory does not exist: %s',source);
 stamp = string(datetime('now','Format','yyyyMMdd_HHmmss_SSS'));
-target = string(fullfile(resultsRoot,studyName+"_"+stamp));
-assert(~isfolder(target),'Timestamped results folder already exists: %s',target);
+target = string(fullfile(compiledRoot,studyName+"_"+stamp));
+assert(~isfolder(target),'Timestamped compiled-results folder already exists: %s',target);
 [ok,msg] = movefile(char(source),char(target));
 assert(ok,'Could not move processed analysis to %s: %s',target,msg);
 tmp.analysisDirectory = target;
@@ -154,8 +159,8 @@ T = table(string(R.Mission),string(R.Configuration),R.NRuns, ...
     compose('%.5g +/- %.3g',R.RMSEPosMean_km,R.RMSEPosStd_km), ...
     compose('%.5g +/- %.3g',R.EffectiveSigmaPosMean_km,R.EffectiveSigmaPosStd_km), ...
     compose('%.5g +/- %.3g',R.MeanStabilityMean,R.MeanStabilityStd), ...
-    compose('%.4f +/- %.3f',R.CoverageMean,R.CoverageStd), ...
+    compose('%.5g +/- %.3g',R.ScreeningMean,R.ScreeningStd), ...
     'VariableNames',{'Mission','Configuration','Runs','Objective', ...
     'RMSEPosition_km','EffectiveSigmaPosition_km','MeanStability', ...
-    'CoverageFraction'});
+    'RejectedMeasurementOpportunities'});
 end
