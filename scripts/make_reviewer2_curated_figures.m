@@ -38,7 +38,7 @@ if isfield(reports,'runtime')
     plot_runtime_metric(r,'BestJMean','BestJStd','Final best objective', ...
         "runtime_1200_objective",out,saveFigures,style,false,baseline);
     manifest = add_manifest(manifest,"runtime","runtime_1200_objective", ...
-        "Equal-1200-FE final objective with matched long-run AO GA baseline.");
+        "Equal-1200-FE final objective with matched 6000-FE GA reference.");
 
     plot_runtime_metric(r,'BudgetRuntimeMean_s','BudgetRuntimeStd_s', ...
         'Runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
@@ -60,7 +60,7 @@ if isfield(reports,'comparison')
     plot_comparison_metric(r,'BestJMean','BestJStd','Final best objective', ...
         "comparison_6000_objective",out,saveFigures,style,refs);
     manifest = add_manifest(manifest,"comparison","comparison_6000_objective", ...
-        "Case-wise optimizer objective with matched AO GA baseline references.");
+        "Case-wise optimizer objective with matched 6000-FE GA references.");
 
     specs = { ...
         'RMSEPosMean_km','RMSEPosStd_km','Position RMSE (km)','comparison_6000_position_rmse'; ...
@@ -114,7 +114,7 @@ if isfield(reports,'baseline')
             plot_baseline_observer_metric(r,mission,observerSpecs{q,1}, ...
                 observerSpecs{q,2},observerSpecs{q,3},out,stem,saveFigures,style);
             manifest = add_manifest(manifest,"baseline",stem, ...
-                "AO/AR observer-count trend using mean +/- sample std.");
+                "Angles-only / angles-plus-range observer-count trend using mean +/- sample std.");
         end
         for meas = ["ANGLES_ONLY","ANGLES_RANGE"]
             stem = "baseline_convergence_observers_"+mission_code(mission)+ ...
@@ -150,14 +150,14 @@ if isfield(reports,'baseline')
     plot_family_grouped_all_cases(familyData,"Observers", ...
         "baseline_orbit_family_selection",out,saveFigures,style);
     manifest = add_manifest(manifest,"baseline","baseline_orbit_family_selection", ...
-        "AO/one-period 3/5/7/10-observer selections across all five orbit families.");
+        "Angles-only, one-period 3/5/7/10-observer selections across all five orbit families.");
 
     selection = select_reviewer2_representative_runs(r,"baseline");
     writetable(selection,fullfile(char(r.analysisDirectory), ...
         'baseline_6000_geometry_representative_runs.csv'));
     details = plot_reviewer2_geometry_grid(selection,out,"baseline_geometry",saveFigures);
     manifest = add_geometry_manifest(manifest,"baseline",details, ...
-        "Representative AO geometry nearest the mean objective for each observer count.");
+        "Representative angles-only geometry nearest the mean objective for each observer count.");
 end
 
 %% GA screening/objective sensitivity
@@ -283,20 +283,15 @@ format_category_axis(ax,optimizer_labels(R.Optimizer),yLabel,style);
 legendHandles = b; legendLabels = optimizer_labels(R.Optimizer);
 if ~isempty(baseline)
     hBase = plot(ax,[0.55 height(R)+0.45],[baseline.Mean baseline.Mean],'--', ...
-        'Color',[0.30 0.30 0.30],'LineWidth',1.5,'DisplayName','Baseline AO');
-    hErr = errorbar(ax,0.72,baseline.Mean,baseline.Std,'Color',[0.30 0.30 0.30], ...
-        'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
-    hErr.LineStyle = 'none'; hErr.Marker = 'none';
-    legendHandles = [legendHandles;hBase]; legendLabels = [legendLabels;"Baseline AO"];
+        'Color',[0.30 0.30 0.30],'LineWidth',1.5, ...
+        'DisplayName','6000-FE GA reference');
+    legendHandles = [legendHandles;hBase];
+    legendLabels = [legendLabels;"6000-FE GA reference"];
 end
+% Keep the BO bar uncluttered. The runtime scale and standard-deviation bars
+% already show the computational penalty without a ratio callout.
 if annotateBO
-    idxBO = find(R.Optimizer == "BAYESIAN",1);
-    if ~isempty(idxBO)
-        fastest = min(values(R.Optimizer ~= "BAYESIAN"));
-        text(ax,idxBO,values(idxBO)+errors(idxBO),sprintf('%.1fx fastest',values(idxBO)/fastest), ...
-            'HorizontalAlignment','center','VerticalAlignment','bottom', ...
-            'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
-    end
+    % Retained as an input for compatibility with the dedicated renderer.
 end
 lgd = legend(ax,legendHandles,cellstr(legendLabels),'Location','northoutside', ...
     'Orientation','horizontal','NumColumns',min(numel(legendLabels),6),'Box','off');
@@ -337,14 +332,12 @@ if ~isempty(baselineRefs)
         if height(row) ~= 1, continue; end
         h = plot(ax,[m-0.46 m+0.46],[row.Mean row.Mean],'--', ...
             'Color',[0.30 0.30 0.30],'LineWidth',1.5,'HandleVisibility','off');
-        hErr = errorbar(ax,m,row.Mean,row.Std,'Color',[0.30 0.30 0.30], ...
-            'LineWidth',1.0,'CapSize',style.capSize,'HandleVisibility','off');
-        hErr.LineStyle = 'none'; hErr.Marker = 'none';
         if ~isgraphics(hBase), hBase = h; end
     end
     if isgraphics(hBase)
-        set(hBase,'HandleVisibility','on','DisplayName','Baseline AO');
-        legendHandles = [legendHandles;hBase]; legendLabels = [legendLabels;"Baseline AO"];
+        set(hBase,'HandleVisibility','on','DisplayName','6000-FE GA reference');
+        legendHandles = [legendHandles;hBase];
+        legendLabels = [legendLabels;"6000-FE GA reference"];
     end
 end
 lgd = legend(ax,legendHandles,cellstr(legendLabels),'Location','northoutside', ...
@@ -395,7 +388,8 @@ for m = 1:2
 end
 ax.XTick = counts; xlabel(ax,'Number of observers','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,{'AO','AR'},'Location','northoutside','Orientation','horizontal','Box','off');
+lgd = legend(ax,handles,{'Angles only','Angles + range'}, ...
+    'Location','northoutside','Orientation','horizontal','Box','off');
 style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
 end
 
