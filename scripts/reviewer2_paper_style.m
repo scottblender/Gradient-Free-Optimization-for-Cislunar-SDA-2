@@ -1,9 +1,10 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% All manuscript camera settings live here so perspective changes do not
-% require editing individual plotters. The legacy geometryAzimuth/
-% geometryElevation fields remain the default/fallback camera.
+% All manuscript camera settings and export-size classes live here so
+% perspective or LaTeX-alignment changes do not require editing individual
+% plotters. The legacy geometryAzimuth/geometryElevation and figureWidth/
+% figureHeight fields remain compatibility aliases.
 
 style.fontName = 'Times New Roman';
 style.fontSize = 12;
@@ -15,16 +16,33 @@ style.capSize = 7;
 style.alphaBand = 0.16;
 style.exportDpi = 300;
 
-% Standalone journal-sized 2-D figures.
-style.figureWidth = 6.5;
-style.figureHeight = 4.6;
+% -------------------------------------------------------------------------
+% Export-size classes. Figures intended to line up in LaTeX share exactly
+% the same outer paper size within each class.
+% -------------------------------------------------------------------------
+style.metricFigureWidth = 6.5;
+style.metricFigureHeight = 4.6;
+style.figureWidth = style.metricFigureWidth;
+style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
-style.convergenceFigureWidth = 6.5;
-style.convergenceFigureHeight = 4.6;
+style.convergenceFigureWidth = style.metricFigureWidth;
+style.convergenceFigureHeight = style.metricFigureHeight;
 
-% Shared 3-D layout and fallback camera.
 style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
+style.orbitFamilyFigureWidth = style.geometryFigureWidth;
+style.orbitFamilyFigureHeight = style.geometryFigureHeight;
+
+style.slotPhaseFigureWidth = style.metricFigureWidth;
+style.slotPhaseFigureHeight = style.metricFigureHeight;
+style.visibilityFigureWidth = 7.2;
+style.visibilityFigureHeight = 5.1;
+style.measurementFigureWidth = 4.45;
+style.measurementFigureHeight = 4.55;
+style.monteCarloFigureWidth = 4.8;
+style.monteCarloFigureHeight = 4.2;
+
+% Shared 3-D layout and fallback camera.
 style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
