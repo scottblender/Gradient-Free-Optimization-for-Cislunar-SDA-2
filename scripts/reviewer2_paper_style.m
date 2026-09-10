@@ -32,9 +32,11 @@ style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
 style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
+% The two slot-definition panels are intended to be paired in LaTeX, so
+% the phase panel uses the same outer dimensions as the slot-orbit panel.
+style.slotPhaseFigureWidth = style.geometryFigureWidth;
+style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
-style.slotPhaseFigureWidth = style.metricFigureWidth;
-style.slotPhaseFigureHeight = style.metricFigureHeight;
 style.visibilityFigureWidth = 7.2;
 style.visibilityFigureHeight = 5.1;
 style.measurementFigureWidth = 4.45;
