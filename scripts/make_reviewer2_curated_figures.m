@@ -12,11 +12,13 @@ function manifest = make_reviewer2_curated_figures(reports,saveFigures)
 %   * orbit-family summaries use NHO, SHO, NNRHO, SNRHO, and DRO;
 %   * 3-D trajectory figures are produced only for comparison and baseline;
 %   * result trajectories use the established introduction-figure renderer;
-%   * all 2-D figures are standalone for LaTeX subfigure/subcaption assembly;
+%   * all 2-D metric, bar, and convergence figures use the same manuscript
+%     export size for reliable LaTeX subfigure alignment;
 %   * convergence figures show only the 20-run mean best-so-far curves;
 %     run-to-run variability remains in metric summaries/tables;
 %   * all result axes use concise labels that state when a plotted quantity
 %     is a 20-run mean;
+%   * final paper figures contain no MATLAB figure titles;
 %   * all final axes have grid lines off and the surrounding axes box off.
 
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -275,7 +277,7 @@ R = r.runtimeResults;
 order = style.optimizerOrder(ismember(style.optimizerOrder,R.Optimizer));
 R = sort_to_order(R,'Optimizer',order);
 colors = colors_for_optimizers(R.Optimizer,style);
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
 b = bar(ax,1:height(R),values,0.72,'FaceColor','flat'); b.CData = colors;
@@ -316,7 +318,7 @@ end
 function plot_comparison_metric(r,valueField,stdField,yLabel,stem,out,saveFigures,style,baselineRefs)
 R = r.results; missions = string(r.missions); optimizers = string(r.optimizers);
 [values,errors] = grouped_values(R,missions,optimizers,valueField,stdField);
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
 for k = 1:numel(optimizers)
@@ -375,7 +377,7 @@ end
 %% Baseline figures
 function plot_baseline_observer_metric(r,mission,valueField,stdField,yLabel,out,stem,saveFigures,style)
 R = r.results; measurements = ["ANGLES_ONLY","ANGLES_RANGE"]; counts = [3 5 7 10];
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off'); handles = gobjects(2,1);
 for m = 1:2
     values = nan(size(counts)); errors = values;
@@ -398,7 +400,7 @@ end
 
 function plot_baseline_duration_metric(r,measurement,valueField,stdField,yLabel,out,stem,saveFigures,style)
 R = r.results; counts = [3 5 7 10]; periods = [1 3 5]; colors = lines(numel(counts));
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off'); handles = gobjects(numel(counts),1);
 for k = 1:numel(counts)
     values = nan(size(periods)); errors = values;
@@ -452,7 +454,7 @@ for m = 1:3
         values(m,c) = row.(valueField); errors(m,c) = row.(stdField);
     end
 end
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:3,values,'grouped'); drawnow;
 for c = 1:2
@@ -589,7 +591,7 @@ for m = 1:3
         tickLabels(end+1,1) = rows.GroupLabel(1); %#ok<AGROW>
     end
 end
-fig = paper_figure(style.figureWidth,style.figureHeight+0.35,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,x,V,'stacked','BarWidth',0.82); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
@@ -614,7 +616,7 @@ for g = 1:4
     assert(height(rows) == 5,'Objective family figure requires all five families.');
     for f = 1:5, V(g,f) = 100*rows.Fraction(rows.Family == families(f)); end
 end
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 b = bar(ax,1:4,V,'stacked','BarWidth',0.78); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
