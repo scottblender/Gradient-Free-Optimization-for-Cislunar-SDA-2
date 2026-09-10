@@ -4,8 +4,9 @@ function details = plot_reviewer2_baseline_monte_carlo(samples,summary,outDir,sa
 % Each baseline configuration is written as its own EPS/PNG so the paper can
 % assemble panels with subfigure/subcaption. The boxplot contains all local
 % design samples, including sample 1 (the optimized GA reference), and the
-% optimized objective is shown as a red horizontal line. Final axes use clear
-% labels, no grid lines, and no surrounding axes box.
+% optimized objective is shown as a red horizontal line. All Monte Carlo
+% figures use the shared manuscript export size and contain no figure titles.
+% Final axes use clear labels, no grid lines, and no surrounding axes box.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -30,9 +31,11 @@ for k = 1:height(summary)
         samples.NPeriods == s.NPeriods,:);
     assert(~isempty(rows),'Missing Monte Carlo sample rows for plotted case.');
 
-    fig = figure('Color','w','Units','inches','Position',[1 1 4.8 4.2], ...
-        'PaperUnits','inches','PaperSize',[4.8 4.2], ...
-        'PaperPosition',[0 0 4.8 4.2],'PaperPositionMode','manual', ...
+    widthIn = style.monteCarloFigureWidth;
+    heightIn = style.monteCarloFigureHeight;
+    fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
+        'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
+        'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
         'Renderer','painters','InvertHardcopy','off');
     movegui(fig,'center');
     ax = axes(fig,'Units','normalized','Position',[0.18 0.18 0.76 0.74]);
