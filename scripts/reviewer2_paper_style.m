@@ -78,7 +78,7 @@ style.orbitFamilyProjections.dro_family = 'orthographic';
 % offset slightly so its projected path does not appear to cross the Moon.
 % -------------------------------------------------------------------------
 style.maneuverViews.LUNAR_GATEWAY = [-37.5 30];
-style.maneuverViews.LOW_THRUST_TRANSFER = [-47.5 35];
+style.maneuverViews.LOW_THRUST_TRANSFER = [-37.5 35];
 style.maneuverViews.GATEWAY_IMPULSE = [-37.5 30];
 
 style.maneuverProjections.LUNAR_GATEWAY = 'perspective';
