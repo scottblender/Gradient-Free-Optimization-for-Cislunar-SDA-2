@@ -12,9 +12,10 @@ function reports = run_reviewer2_results(studies,saveFigures)
 %   COMPILED_REVIEWER_2_RESULTS/comparison_<timestamp>/
 %   COMPILED_REVIEWER_2_RESULTS/baseline_<timestamp>/
 %   COMPILED_REVIEWER_2_RESULTS/objective_screening_<timestamp>/
-% CSVs, convergence MAT files, manuscript EPS/PNG figures, and the figure
-% manifest all live directly in those folders. Raw optimization results stay
-% under results/ and are never modified by this runner.
+% Numerical CSV/MAT products and figure manifests remain at each timestamped
+% study root. All manuscript EPS/PNG exports are collected into the single
+% figures/ subdirectory beneath that root. Raw optimization results stay under
+% results/ and are never modified by this runner.
 
 if nargin < 1 || isempty(studies), studies = "all"; end
 if nargin < 2 || isempty(saveFigures), saveFigures = true; end
@@ -99,7 +100,9 @@ for study = studies
             disp(tmp.componentWinners);
     end
     close all force;
-    fprintf('Output: %s\n',reports.(study_field(study)).analysisDirectory);
+    report = reports.(study_field(study));
+    fprintf('Analysis: %s\n',report.analysisDirectory);
+    fprintf('Figures:  %s\n',report.figureDirectory);
     fprintf('<<< %s complete in %.1f s\n',upper(strrep(study,'_',' ')),toc(started));
 end
 
@@ -117,6 +120,7 @@ fprintf('\nAll selected result processors completed successfully.\n');
 fprintf(['Metric/ranking claims use aggregate mean +/- sample standard deviation. ' ...
     'Representative geometry seeds are recorded only for traceability.\n']);
 fprintf(['Trajectory figures are emitted only for comparison and baseline. ' ...
+    'All manuscript EPS/PNG files are stored in each study''s figures/ folder. ' ...
     'For local baseline Monte Carlo validation, run ' ...
     'run_reviewer2_baseline_monte_carlo separately.\n']);
 end
@@ -131,7 +135,8 @@ assert(~isfolder(target),'Timestamped compiled-results folder already exists: %s
 [ok,msg] = movefile(char(source),char(target));
 assert(ok,'Could not move processed analysis to %s: %s',target,msg);
 tmp.analysisDirectory = target;
-tmp.figureDirectory = "";
+tmp.figureDirectory = string(fullfile(char(target),'figures'));
+if ~isfolder(tmp.figureDirectory), mkdir(tmp.figureDirectory); end
 end
 
 
