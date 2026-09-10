@@ -11,8 +11,8 @@ function manifest = make_reviewer2_runtime_figures(r,baselineResults,saveFigures
 % intentionally shows only the 20-run mean best-so-far history. Run-to-run
 % variability is reported in the metric summaries/tables rather than as
 % terminal error bars on the convergence figure.
-% All final axes use clear statistical labels, no grid lines, and no
-% surrounding axes box.
+% All runtime metric and convergence figures use the shared manuscript
+% metric export size, contain no MATLAB titles, and use no grid/axes box.
 
 if nargin < 2 || isempty(baselineResults), baselineResults = table(); end
 if nargin < 3 || isempty(saveFigures), saveFigures = true; end
@@ -49,7 +49,7 @@ order = style.optimizerOrder(ismember(style.optimizerOrder,R.Optimizer));
 R = sort_to_order(R,'Optimizer',order);
 colors = colors_for_optimizers(R.Optimizer,style);
 
-fig = paper_figure(style.figureWidth,style.figureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
 b = bar(ax,1:height(R),values,0.72,'FaceColor','flat');
@@ -105,7 +105,7 @@ end
 
 
 function plot_curve_overlay(curves,labels,colors,budget,out,stem,saveFigures,style)
-fig = paper_figure(style.convergenceFigureWidth,style.convergenceFigureHeight,style);
+fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 handles = gobjects(numel(curves),1);
 allY = zeros(0,1);
