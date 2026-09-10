@@ -6,7 +6,9 @@ function details = plot_reviewer2_baseline_monte_carlo(samples,summary,outDir,sa
 % design samples, including sample 1 (the optimized GA reference), and the
 % optimized objective is shown as a red horizontal line. All Monte Carlo
 % figures use the shared manuscript export size and contain no figure titles.
-% Final axes use clear labels, no grid lines, and no surrounding axes box.
+% Figure files are stored together in the run's figures/ subdirectory while
+% CSV/data products remain at the Monte Carlo analysis root. Final axes use
+% clear labels, no grid lines, and no surrounding axes box.
 
 if nargin < 4 || isempty(saveFigures), saveFigures = true; end
 saveFigures = logical(saveFigures);
@@ -20,7 +22,8 @@ assert(all(ismember(requiredSummary,string(summary.Properties.VariableNames))));
 
 style = reviewer2_paper_style();
 outDir = string(outDir);
-if saveFigures && ~isfolder(outDir), mkdir(outDir); end
+figureDir = string(fullfile(char(outDir),'figures'));
+if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
 
 figureStem = strings(height(summary),1);
 for k = 1:height(summary)
@@ -74,7 +77,7 @@ for k = 1:height(summary)
     enforce_minimum_font_size(fig,12);
     drawnow;
     if saveFigures
-        base = fullfile(char(outDir),char(stem));
+        base = fullfile(char(figureDir),char(stem));
         print(fig,[base '.eps'],'-depsc2','-painters','-r600');
         exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
         close(fig);
@@ -86,6 +89,7 @@ details = summary(:,intersect(summary.Properties.VariableNames, ...
     'ReferenceObjective','MedianObjective','FractionNeighborsAtOrAboveReference', ...
     'ImprovedNeighborCount','StrictLocalMinimumPass'},'stable'));
 details.FigureStem = figureStem;
+details.FigureDirectory = repmat(figureDir,height(details),1);
 end
 
 
