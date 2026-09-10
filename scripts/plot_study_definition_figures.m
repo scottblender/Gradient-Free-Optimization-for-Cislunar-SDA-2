@@ -4,7 +4,8 @@ function outputs = plot_study_definition_figures(inspectFigures)
 % Study-definition figures use the same manuscript styling as the final
 % Reviewer-2 figures: Times New Roman, 12-point axis/legend text, 14-point
 % axis labels, no grid lines, no surrounding axes box, box-free legends,
-% and camera perspectives defined centrally in reviewer2_paper_style.
+% no embedded figure titles, and export sizes/camera perspectives defined
+% centrally in reviewer2_paper_style.
 
 if nargin<1 || isempty(inspectFigures), inspectFigures = true; end
 
@@ -165,7 +166,8 @@ writetable(orbitMetrics,metricFile);
 
 % Preserve the original family-trajectory presentation while using the
 % rebuilt catalog directly. Each family figure gets its camera from the
-% central reviewer2_paper_style configuration.
+% central reviewer2_paper_style configuration, and every family figure uses
+% the same outer export size for LaTeX alignment.
 familyGroups = { ...
     ["NHL1","NHL2"], ...
     ["SHL1","SHL2"], ...
@@ -198,11 +200,11 @@ for groupIndex = 1:numel(familyGroups)
     familyView = style.orbitFamilyViews.(familyViewKey);
     familyProjection = style.orbitFamilyProjections.(familyViewKey);
 
+    fig = publication_figure( ...
+        style.orbitFamilyFigureWidth,style.orbitFamilyFigureHeight);
     if numel(group)==2
-        fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
         [ax,plotPosition] = create_centered_3d_axes(fig);
     else
-        fig = publication_figure(6.5,5.4);
         ax = axes(fig);
         plotPosition = [];
     end
@@ -461,7 +463,8 @@ export_publication_eps(figGeometry,geometryFile);
 close(figGeometry);
 
 % Figure 2: the exact normalized phase grid and excluded endpoint.
-figPhase = publication_figure(7.2,3.8);
+figPhase = publication_figure( ...
+    style.slotPhaseFigureWidth,style.slotPhaseFigureHeight);
 ax = axes(figPhase);
 hold(ax,'on');
 box(ax,'off');
@@ -547,11 +550,13 @@ if nargin<1 || isempty(inspectFigure), inspectFigure = true; end
 projectDir = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectDir);
 projectPaths = setup_project();
+style = reviewer2_paper_style();
 
 outputDir = fullfile(projectPaths.results,'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
 
-fig = publication_figure(7.2,5.1);
+fig = publication_figure( ...
+    style.visibilityFigureWidth,style.visibilityFigureHeight);
 
 cObserver = [0.90,0.12,0.10];
 cTarget = [0.00,0.39,0.72];
@@ -698,7 +703,7 @@ draw_leader_arrow(ax,marginArrowStart,ptMargin,cExclusion);
 
 xlim(ax,[-3.20,3.25]);
 ylim(ax,[-2.10,3.50]);
-set(findall(fig,'Type','text'),'FontName',reviewer2_paper_style().fontName);
+set(findall(fig,'Type','text'),'FontName',style.fontName);
 
 figureFile = fullfile(outputDir,'visibility_keepout_geometry.eps');
 inspect_before_export(fig,inspectFigure,'unified visibility / keepout geometry');
@@ -736,8 +741,9 @@ rhoXY = hypot(rho(1),rho(2));
 alpha = atan2(rho(2),rho(1));
 delta = asin(rho(3)/norm(rho));
 
-% ---------------- (a) Right ascension ----------------
-figRa = publication_figure(4.45,4.55);
+% ---------------- Right ascension ----------------
+figRa = publication_figure( ...
+    style.measurementFigureWidth,style.measurementFigureHeight);
 ax1 = axes(figRa,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax1,'on');
 box(ax1,'off');
@@ -773,8 +779,6 @@ text(ax1,rhoXYLabelX,rhoXYLabelY,'\rho_{xy}', ...
 text(ax1,1.52*cos(alpha/2),1.52*sin(alpha/2)+0.06,'\alpha', ...
     'Color',cAngle,'FontWeight','bold','FontSize',18);
 
-title(ax1,'(a) Right ascension, \alpha', ...
-    'FontSize',16,'FontWeight','bold');
 xlim(ax1,[-0.72,4.65]);
 ylim(ax1,[-0.72,3.85]);
 set(findall(figRa,'Type','text'),'FontName',style.fontName);
@@ -786,8 +790,9 @@ inspect_before_export(figRa,inspectFigure, ...
 export_publication_eps(figRa,raFigureFile);
 close(figRa);
 
-% ---------------- (b) Declination ----------------
-figDec = publication_figure(4.45,4.55);
+% ---------------- Declination ----------------
+figDec = publication_figure( ...
+    style.measurementFigureWidth,style.measurementFigureHeight);
 ax2 = axes(figDec,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax2,'on');
 box(ax2,'off');
@@ -827,8 +832,6 @@ text(ax2,rhoLabelX,rhoLabelY,'\rho', ...
 text(ax2,1.56*cos(delta/2),1.56*sin(delta/2)+0.06,'\delta', ...
     'Color',cAngle,'FontWeight','bold','FontSize',18);
 
-title(ax2,'(b) Declination, \delta', ...
-    'FontSize',16,'FontWeight','bold');
 xlim(ax2,[-0.72,4.75]);
 ylim(ax2,[-0.72,3.60]);
 set(findall(figDec,'Type','text'),'FontName',style.fontName);
