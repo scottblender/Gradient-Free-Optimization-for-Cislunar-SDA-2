@@ -38,8 +38,10 @@ style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
+% The keep-out schematic needs extra vertical room so the equal-axis
+% geometry and callouts use more of the EPS at the same manuscript width.
 style.visibilityFigureWidth = style.metricFigureWidth;
-style.visibilityFigureHeight = style.metricFigureHeight;
+style.visibilityFigureHeight = 6.4;
 style.measurementFigureWidth = style.metricFigureWidth;
 style.measurementFigureHeight = style.metricFigureHeight;
 style.monteCarloFigureWidth = style.metricFigureWidth;
@@ -66,6 +68,10 @@ style.geometryLegendGap = 0.012; % live-figure compatibility only
 % Non-trajectory numeric plots need enough ticks for quantitative reading.
 style.max2DXTicks = 8;
 style.max2DYTicks = 7;
+
+% Slot-definition visibility. Selected/adjacent slots keep their distinct
+% colors; neutral candidate slots use this filled marker color in export.
+style.slotCandidateFillColor = [0.72 0.72 0.72];
 
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
