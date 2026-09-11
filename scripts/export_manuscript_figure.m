@@ -18,10 +18,9 @@ set(fig,'PaperPosition',[0 0 paper]);
 abbreviate_manuscript_text(fig);
 
 % Repeated optimizer labels in the orbit-family selection summary are dense
-% at the final manuscript font. Spread those category centers slightly while
-% preserving the larger gaps between mission blocks. This is intentionally
-% limited to repeated GA/PSO/ABC/ACO/BO categorical axes.
-spread_repeated_optimizer_groups(fig);
+% at the final manuscript font. Move the actual bar centers and their ticks,
+% not just the labels, so the additional spacing is visible in the export.
+spread_repeated_optimizer_groups(fig,style);
 
 fontObjects = findall(fig,'-property','FontSize');
 for k = 1:numel(fontObjects)
@@ -103,8 +102,8 @@ for k = 1:numel(textObjects)
 end
 end
 
-function spread_repeated_optimizer_groups(fig)
-%SPREAD_REPEATED_OPTIMIZER_GROUPS Add modest spacing inside mission blocks.
+function spread_repeated_optimizer_groups(fig,style)
+%SPREAD_REPEATED_OPTIMIZER_GROUPS Add visible spacing inside mission blocks.
 axesObjects = findall(fig,'Type','axes');
 allowed = ["GA","PSO","ABC","ACO","BO"];
 for k = 1:numel(axesObjects)
@@ -136,13 +135,13 @@ for k = 1:numel(axesObjects)
     if numel(oldTicks) < 2 || any(diff(oldTicks) <= 0), continue; end
     baseWithin = median(diff(oldTicks(1:groupSize)));
     if ~isfinite(baseWithin) || baseWithin <= 0, continue; end
-    withinSpacing = 1.15*baseWithin;
+    withinSpacing = style.familyOptimizerSpacingFactor*baseWithin;
     if numGroups > 1
         oldGap = oldTicks(groupSize+1)-oldTicks(groupSize);
     else
-        oldGap = 1.5*withinSpacing;
+        oldGap = style.familyMissionGapFactor*withinSpacing;
     end
-    groupGap = max(oldGap,1.45*withinSpacing);
+    groupGap = max(oldGap,style.familyMissionGapFactor*withinSpacing);
 
     newTicks = zeros(size(oldTicks));
     groupCentersOld = zeros(numGroups,1);
@@ -158,9 +157,12 @@ for k = 1:numel(axesObjects)
         groupCentersNew(g) = mean(newTicks(idx));
     end
 
-    bars = findall(ax,'Type','Bar');
+    % Bar chart classes expose BarWidth even when their Type string differs
+    % between MATLAB releases. Use that property instead of Type='Bar'.
+    bars = findall(ax,'-property','BarWidth');
     movedBar = false;
     for b = 1:numel(bars)
+        if ~isprop(bars(b),'XData'), continue; end
         xData = double(bars(b).XData(:).');
         if numel(xData) == numel(oldTicks) && ...
                 max(abs(xData-oldTicks)) <= 100*eps(max(1,max(abs(oldTicks))))
@@ -168,24 +170,26 @@ for k = 1:numel(axesObjects)
             movedBar = true;
         end
     end
-    if ~movedBar, continue; end
+    assert(movedBar,'Manuscript:OptimizerSpacing', ...
+        ['Repeated optimizer-family labels were detected, but the stacked ' ...
+         'bars could not be moved with their tick positions.']);
 
     ax.XTick = newTicks;
+    xPadding = 0.60*withinSpacing;
+    xlim(ax,[newTicks(1)-xPadding,newTicks(end)+xPadding]);
+
     textObjects = findall(ax,'Type','text');
     missionLabels = ["LG","LT","GI"];
-    missionIndex = 0;
     for t = 1:numel(textObjects)
         value = string(textObjects(t).String);
         if isscalar(value) && any(value == missionLabels)
-            missionIndex = missionIndex+1;
-            if missionIndex <= numGroups
-                pos = textObjects(t).Position;
-                [~,nearest] = min(abs(groupCentersOld-pos(1)));
-                pos(1) = groupCentersNew(nearest);
-                textObjects(t).Position = pos;
-            end
+            pos = textObjects(t).Position;
+            [~,nearest] = min(abs(groupCentersOld-pos(1)));
+            pos(1) = groupCentersNew(nearest);
+            textObjects(t).Position = pos;
         end
     end
+    setappdata(ax,'ManuscriptOptimizerSpacingApplied',true);
     drawnow;
 end
 end
