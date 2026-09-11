@@ -4,9 +4,9 @@ paths = setup_project(); %#ok<NASGU>
 style = reviewer2_paper_style();
 folder = tempname; mkdir(folder);
 cleanup = onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
-boxes = strings(3,1); imageSizes = zeros(3,2);
+boxes = strings(4,1); imageSizes = zeros(4,2);
 cameraViewAngleBefore = NaN;
-for k = 1:3
+for k = 1:4
     fig = figure('Visible','off','Units','inches', ...
         'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
         'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight]);
@@ -18,6 +18,18 @@ for k = 1:3
         xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
         axis(ax,'equal'); view(ax,-37.5,30);
         cameraViewAngleBefore=ax.CameraViewAngle;
+    elseif k==4
+        x=[1:4 6:9 11:14];
+        V=repmat([20 55 20 3 2],12,1);
+        bar(ax,x,V,'stacked','BarWidth',0.82);
+        ax.XTick=x;
+        ax.XTickLabel=repmat({'GA','PSO','ABC','ACO'},1,3);
+        text(ax,mean(x(1:4)),104,'LG','HorizontalAlignment','center');
+        text(ax,mean(x(5:8)),104,'LT','HorizontalAlignment','center');
+        text(ax,mean(x(9:12)),104,'GI','HorizontalAlignment','center');
+        ylim(ax,[0 108]);
+        xlabel(ax,'Optimizer'); ylabel(ax,'Observer selections (%)');
+        setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
     else
         plot(ax,1:10,k*(1:10)); xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)');
     end
@@ -41,7 +53,7 @@ for k = 1:3
     end
     if k==1
         text(ax,0,0,0,'label','FontSize',8);
-    else
+    elseif k~=4
         text(ax,5,5*k,repmat('label ',1,k),'FontSize',8);
     end
     file = fullfile(folder,sprintf('panel%d.eps',k));
@@ -57,8 +69,18 @@ for k = 1:3
             numel(ax.YTick)<=style.max3DTicks && ...
             numel(ax.ZTick)<=style.max3DTicks, ...
             '3-D automatic tick labels were not reduced enough for manuscript export.');
+    elseif k==4
+        ticks=ax.XTick;
+        within=diff(ticks(1:4));
+        assert(all(within>1.10), ...
+            'Repeated optimizer labels were not given additional within-group spacing.');
+        assert(ticks(5)-ticks(4)>max(within), ...
+            'Mission-block gap should remain larger than optimizer spacing.');
+        bars=findall(ax,'Type','Bar');
+        assert(~isempty(bars) && isequal(double(bars(1).XData(:).'),double(ticks(:).')), ...
+            'Family-selection bars did not move with the optimizer tick labels.');
     end
-    if k>=2
+    if k==2 || k==3
         lgd=ax.Legend; lp=lgd.Position; ap=ax.Position;
         assert(lp(2)>ap(2)+ap(4),'Legend overlaps the plot rectangle.');
         assert(lp(1)>=0 && lp(1)+lp(3)<=1.01,'Legend extends outside canvas.');
@@ -111,5 +133,5 @@ assert(style.geometryFigureWidth==style.measurementFigureWidth && ...
 assert(style.visibilityFigureWidth==style.metricFigureWidth && ...
     style.visibilityFigureHeight>style.metricFigureHeight, ...
     'Keep-out schematic should retain manuscript width but use a taller canvas.');
-fprintf('Manuscript EPS canvas, contained 3-D geometry, sparse 3-D ticks, compact legend spacing, abbreviation, legend, and font checks passed.\n');
+fprintf('Manuscript EPS canvas, contained 3-D geometry, sparse 3-D ticks, compact legend spacing, optimizer spacing, abbreviation, legend, and font checks passed.\n');
 end
