@@ -75,10 +75,11 @@ for k=1:numel(axesObjects)
         lgd.Units='normalized'; lgd.Box='off';
         lgd.FontWeight=style.fontWeight;
         lgd.Orientation='horizontal';
+        lgd.Location='northoutside';
 
-        % Do not reset Location to northoutside here. The plotters already
-        % establish the intended manual legend placement; resetting Location
-        % during export was the source of the visible reversion.
+        % Keep legend wrapping and typography centralized here. MATLAB first
+        % establishes the correct northoutside geometry; final vertical
+        % adjustment is applied only after the axes layout has settled.
         count=numel(lgd.String);
         if count<=2
             columns=count;
@@ -125,9 +126,6 @@ for k=1:numel(axesObjects)
                  'two-row wrapping and compact swatches; exporting centered.']);
         end
         legendHeight=pos(4)+style.legendTopPadding;
-        pos(1)=max(0.002,(1-pos(3))/2);
-        lgd.Position=pos;
-        lgd.Location='none';
     end
     if isappdata(ax,'ManuscriptAxesPosition')
         base=getappdata(ax,'ManuscriptAxesPosition');
@@ -149,20 +147,24 @@ for k=1:numel(axesObjects)
         ax.Position=[left bottom width height];
     end
 
-    % Final legend placement is measured directly from the axes rectangle.
-    % Keep Location='none' so print/export cannot snap the legend back to
-    % MATLAB's automatic northoutside position after this manual placement.
+    % Let MATLAB compute northoutside from the final axes position, then
+    % nudge that correct placement downward by a small shared offset. Freeze
+    % the resulting Position only after the automatic geometry is established
+    % so print/export cannot snap it back to another northoutside solution.
     if ~isempty(lgd) && isvalid(lgd)
+        lgd.Location='northoutside';
         drawnow;
         pos=lgd.Position;
-        desiredBottom=ax.Position(2)+ax.Position(4)+style.legendAxesGap;
-        maximumBottom=0.99-pos(4);
         pos(1)=max(0.002,(1-pos(3))/2);
-        pos(2)=min(desiredBottom,maximumBottom);
-        lgd.Position=pos;
+        pos(2)=pos(2)+style.legendNorthOutsideYOffset;
+        minimumBottom=ax.Position(2)+ax.Position(4)+style.legendMinimumGap;
+        maximumBottom=0.99-pos(4);
+        pos(2)=min(max(pos(2),minimumBottom),maximumBottom);
         lgd.Location='none';
+        lgd.Position=pos;
         setappdata(ax,'ManuscriptFinalLegendGap', ...
             lgd.Position(2)-(ax.Position(2)+ax.Position(4)));
+        setappdata(ax,'ManuscriptNorthOutsideAdjusted',true);
     end
 
     % Do not camera-zoom 3-D plots at export time. MATLAB already frames the
