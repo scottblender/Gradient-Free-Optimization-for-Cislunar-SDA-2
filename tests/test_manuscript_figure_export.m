@@ -49,7 +49,8 @@ png = imfinfo(strrep(metricFile,'.eps','.png')); imageSizes(1,:)=[png.Width png.
 clear closeFigure;
 
 % -------------------------------------------------------------------------
-% Geometry figure: export must preserve plotter-selected trajectory ticks.
+% Geometry figure: remove only a symmetric center-zero tick that can overlap
+% after 3-D projection; nonsymmetric trajectory tick sets remain untouched.
 % -------------------------------------------------------------------------
 fig = figure('Visible','off','Units','inches', ...
     'Position',[1 1 style.geometryFigureWidth style.geometryFigureHeight], ...
@@ -61,12 +62,15 @@ h1=plot3(ax,0.95+0.12*cos(t),0.04*sin(t),0.18*sin(t),'-','LineWidth',1.5); hold(
 h2=plot3(ax,0.96+0.10*cos(t),0.03*sin(t),0.15*sin(t),'-','LineWidth',1.5);
 xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
 view(ax,-37.5,30); axis(ax,'equal');
-ax.YTick=[-0.05 0 0.05]; originalYTicks=ax.YTick;
+ax.XTick=[0.85 0.95 1.05]; originalXTicks=ax.XTick;
+ax.YTick=[-0.05 0 0.05];
 lgd=legend(ax,[h1,h2],{'L1','L2'},'Location','northoutside','Orientation','horizontal');
 geometryFile = fullfile(folder,'geometry.eps');
 export_manuscript_figure(fig,geometryFile);
-assert(isequal(ax.YTick,originalYTicks), ...
-    'Trajectory/geometry ticks should not be rewritten by the metric tick policy.');
+assert(isequal(ax.YTick,[-0.05 0.05]), ...
+    'Symmetric trajectory ticks should drop the overlapping center zero.');
+assert(isequal(ax.XTick,originalXTicks), ...
+    'Nonsymmetric trajectory ticks should remain unchanged.');
 assert(isappdata(ax,'ManuscriptNorthOutsideReference'));
 northPosition = getappdata(ax,'ManuscriptNorthOutsideReference');
 assert(lgd.Position(2)<=northPosition(2)+1e-6, ...
@@ -120,8 +124,8 @@ assert(style.fontSize*style.manuscriptPanelWidth/style.metricFigureWidth >= ...
     style.minimumPrintedFontSize,'Configured manuscript font is too small after placement.');
 assert(style.legendNorthOutsideYOffset<0 && style.legendMinimumGap>0);
 fprintf(['Centralized manuscript formatter checks passed: readable fonts, adjusted ' ...
-    'northoutside legends, metric ticks, filled slot candidates, taller keepout ' ...
-    'schematic, preserved trajectory ticks, and EPS fit.\n']);
+    'northoutside legends, metric ticks, compact symmetric trajectory ticks, ' ...
+    'filled slot candidates, taller keepout schematic, and EPS fit.\n']);
 end
 
 
