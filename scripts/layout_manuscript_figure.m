@@ -98,6 +98,20 @@ for k=1:numel(axesObjects)
             'Labels leave insufficient plotting space; shorten labels before export.');
         ax.Position=[left bottom width height];
     end
+
+    % Perspective 3-D trajectory/orbit panels can still look visually small
+    % even when the axes rectangle is large because MATLAB leaves generous
+    % camera framing around equal-axis geometry. Zoom only non-top-down views
+    % after final layout so the physical trajectory occupies more of the EPS
+    % while preserving data limits, equal-axis scaling, and outer paper size.
+    viewAngles=view(ax);
+    isThreeDimensional=abs(viewAngles(1))>1e-9 || abs(viewAngles(2)-90)>1e-9;
+    if isThreeDimensional && isfield(style,'geometryCameraZoom') && ...
+            style.geometryCameraZoom>1 && ...
+            ~isappdata(ax,'ManuscriptGeometryZoomApplied')
+        camzoom(ax,style.geometryCameraZoom);
+        setappdata(ax,'ManuscriptGeometryZoomApplied',true);
+    end
 end
 drawnow;
 end
