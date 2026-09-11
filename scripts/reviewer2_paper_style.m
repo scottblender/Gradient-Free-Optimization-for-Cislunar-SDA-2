@@ -1,18 +1,18 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% The figure geometry intentionally follows the last known-good manuscript
-% layout. Readability is improved with a moderate font increase and shorter
-% labels rather than oversized text or export-time reformatting.
+% The figure geometry follows the last known-good manuscript layout. The
+% manuscript pass increases readability with moderate fonts, compact labels,
+% tighter 3-D framing, and explicit margins rather than export-time reflow.
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
 
 % Typography: larger than the original 12/14 pt manuscript figures, but
-% small enough that tick labels and axis labels remain inside the EPS canvas.
+% compact enough that tick labels and axis labels remain inside the EPS canvas.
 style.fontSize = 16;
 style.labelFontSize = 18;
-style.legendFontSize = 15;
+style.legendFontSize = 14;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -21,15 +21,15 @@ style.alphaBand = 0.16;
 style.exportDpi = 300;
 
 % Dense categorical figures retain enough margin for labels while using more
-% of the available canvas than the previous oversized-font layout.
+% of the available canvas than the oversized-font layout.
 style.manuscriptPanelWidth = 3.3;
 style.metricPlotPosition = [0.16 0.18 0.80 0.62];
 style.legendMaxColumns = 8;  % prefer a single row; wrap only when necessary
 style.groupedBarWidth = 0.64;
-style.categoryLabelAngle = 18;
+style.categoryLabelAngle = 30;
 
 % -------------------------------------------------------------------------
-% Export-size classes. These return to the working original proportions.
+% Export-size classes. These retain the working original proportions.
 % -------------------------------------------------------------------------
 style.metricFigureWidth = 6.5;
 style.metricFigureHeight = 4.6;
@@ -50,22 +50,22 @@ style.slotPhaseFigureHeight = style.geometryFigureHeight;
 style.visibilityFigureWidth = 7.2;
 style.visibilityFigureHeight = 5.1;
 
-% RA and Dec remain matched, but use a compact manuscript panel rather than
-% the oversized metric canvas introduced during the failed formatting pass.
+% RA and Dec remain matched and use a compact manuscript panel.
 style.measurementFigureWidth = 5.2;
 style.measurementFigureHeight = 4.8;
 style.monteCarloFigureWidth = 4.8;
 style.monteCarloFigureHeight = 4.2;
 
-% Shared 3-D layout restored from the known-good manuscript geometry.
-style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
-style.geometryLegendGap = 0.012;
+% Shared 3-D layout. Increase the plot rectangle and tighten axis padding so
+% trajectories occupy more of the EPS while preserving room for labels.
+style.geometryPlotPosition = [0.10 0.16 0.82 0.70];
+style.geometryLegendGap = 0.006;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
-style.geometryXPadding = 0.08;
-style.geometryYPadding = 0.10;
-style.geometryZPadding = 0.10;
+style.geometryXPadding = 0.04;
+style.geometryYPadding = 0.05;
+style.geometryZPadding = 0.05;
 
 % Orbit-family study-definition cameras.
 style.orbitFamilyViews.northern_halo = [-37.5 30];
