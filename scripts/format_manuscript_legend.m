@@ -3,15 +3,21 @@ function format_manuscript_legend(ax,lgd,style,plotPosition)
 %
 % Two-dimensional result plots keep MATLAB's working north-outside layout so
 % axes labels remain inside the canvas. Three-dimensional trajectory plots use
-% the original manuscript behavior: place the legend immediately above the
-% fixed plot box, then restore the axes position. No export-time reformatting.
+% a dedicated centered legend immediately above the centered fixed plot box.
+% No export-time reformatting is performed.
 
 labels = string(lgd.String);
 labels = contextual_legend_labels(labels);
 labels = abbreviate_manuscript_text(labels);
 lgd.String = cellstr(labels);
 lgd.FontName = style.fontName;
-if isfield(style,'legendFontSize')
+
+% MATLAB reports [0 90] for ordinary 2-D axes. Perspective/3-D axes get a
+% slightly larger dedicated legend font; 2-D figures retain their compact font.
+is3D = abs(ax.View(2)-90) > 1e-8;
+if is3D && isfield(style,'geometryLegendFontSize')
+    lgd.FontSize = style.geometryLegendFontSize;
+elseif isfield(style,'legendFontSize')
     lgd.FontSize = style.legendFontSize;
 else
     lgd.FontSize = style.fontSize;
@@ -46,20 +52,21 @@ if isNorthOutside
     end
 end
 
-% MATLAB reports [0 90] for ordinary 2-D axes. Only perspective/3-D axes
-% receive the fixed manuscript geometry treatment.
-is3D = abs(ax.View(2)-90) > 1e-8;
 if is3D && isNorthOutside
     lgd.Units = 'normalized';
     drawnow;
     pos = lgd.Position;
-    pos(1) = max(0.01,0.5-pos(3)/2);
+
+    % Center the legend exactly in the exported canvas, independent of the
+    % legend width, then place it immediately above the centered 3-D plot box.
+    pos(1) = 0.5-pos(3)/2;
     legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
     pos(2) = min(legendBottom,0.98-pos(4));
     lgd.Position = pos;
     lgd.AutoUpdate = 'off';
 
-    % Restore the manuscript plot box after MATLAB creates/moves the legend.
+    % Restore the centered manuscript plot box after MATLAB creates/moves the
+    % legend. This prevents northoutside from shifting the 3-D axes off-center.
     ax.Units = 'normalized';
     ax.PositionConstraint = 'innerposition';
     ax.Position = plotPosition;
