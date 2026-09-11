@@ -127,59 +127,19 @@ run_reviewer2_baseline_pipeline
 run_reviewer2_objective_screening_pipeline
 ```
 
-For all manuscript figures, run the single root-level entry point:
+For the paper, use the central runner:
 
 ```matlab
-output = run_manuscript_figures;
-% Inspect only the paired measurement diagrams (no catalog/results needed):
-output = run_manuscript_figures("definitions",'DefinitionSections',"measurement");
-% Regenerate selected results from cached processed reports:
-output = run_manuscript_figures(["runtime","comparison"]);
-% Reprocess raw runs after adding/changing results:
-output = run_manuscript_figures("results",'Reprocess',true);
+setup_project;
+reports = run_reviewer2_results;
 ```
 
-Selectors are `definitions`, `runtime`, `comparison`, `baseline`,
-`objective_screening`, and `monte_carlo`; `all` includes all six. Definition
-subsections are `catalog`, `slots`, `visibility`, `measurement`, and `cases`.
-`Inspect=true` enables definition previews. Old runners remain callable for
-backward compatibility; they are implementation helpers, not additional steps.
-The first result request processes saved runs and caches reports; later requests
-rerender those reports. Use `Reprocess=true` when the input results change.
-Definition generation may propagate target trajectories; it does not run the
-constellation optimizers. Monte Carlo selects the newest saved sample directory
-(or `MonteCarloDirectory=folder`) and only replots it. Missing MC samples are
-reported and skipped; new MC evaluations must be requested explicitly using the
-validation runner described below.
-
-Every invocation collects final EPS files, PNG previews, a figure manifest, and
-`manuscript_tables.txt` / `manuscript_tables.tex` together in `MANUSCRIPT_OUTPUT/`.
-The table printer uses this same folder when run separately. Matching output names
-are overwritten on reruns; unselected figures are retained. Both entry points accept
-`OutputDirectory` to use another shared folder. Per-study processing intermediates
-and numerical source data retain their existing organization.
-
-### Print all manuscript tables
+Or process selected studies:
 
 ```matlab
-tables = print_manuscript_tables;
-% Refresh summaries from saved raw runs when necessary (no new optimization):
-tables = print_manuscript_tables('Reprocess',true);
-% Pin a study to a particular processed directory for reproducibility:
-tables = print_manuscript_tables('Directories',struct('baseline',folder));
+reports = run_reviewer2_results("comparison");
+reports = run_reviewer2_results(["runtime","comparison"]);
 ```
-
-The printer follows all 13 table labels in the supplied clean manuscript:
-catalog parameter/geometric ranges, weights, algorithms, EKF/settings, target
-ICs and LT reproduction, configurations, AO/AR baselines, 1200-FE and 6000-FE
-comparisons, screening, and objective components. It prints copyable LaTeX rows,
-mean +/- sample SD, and actual solver-call ranges in manuscript column order.
-It reads processed CSVs and saved target/run data without running optimizations.
-The four fixed descriptive/configuration tables are explicitly identified as
-manuscript settings, stored in `scripts/templates/manuscript_configuration_tables.tex`;
-update that template if the study settings change. Every data-derived table prints
-its source path; missing data are reported per table. The target table reports
-missing converged LT values separately and never substitutes the initial guess.
 
 `run_reviewer2_results` executes the scientific processors with historical previews hidden, moves each new analysis out of the raw-study tree, and calls `make_reviewer2_final_figures`, which routes through the curated manuscript renderer. Final CSVs, convergence MAT files, EPS figures, PNG figures, and the figure manifest are saved directly under:
 
@@ -197,15 +157,15 @@ The raw optimization runs remain under `results/RUNTIME_COMPARISON_1200/`, `resu
 Final Reviewer 2 figures use:
 
 - Times New Roman;
-- 22 pt bold axes/legends, set when the plot is constructed;
-- 24 pt bold axis labels;
+- 12 pt minimum axis, tick, annotation, and legend text;
+- 14 pt axis labels;
 - one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
 - directly overlaid comparable convergence curves on one axes;
 - convergence figures show only the 20-run mean best-so-far curves; run-to-run variability is retained in the processed tables and metric figures;
 - no grid lines and no surrounding axes box;
 - 20-run mean +/- sample standard deviation for quantitative comparisons;
 - objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
-- matched canvas sizes within geometry, measurement, and metric panel groups;
+- the same 7.6 x 7.0 inch centered 3-D layout used by the introductory tracking-case figures;
 - solid observer-orbit lines, duplicate periodic orbits drawn once, no Earth, and low-thrust endpoint-orbit context.
 
 The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in numerical tables rather than being repeated as a bar figure, and coverage-fraction figures are omitted. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
@@ -312,71 +272,3 @@ test_gateway_impulse_case;
 | Baseline Monte Carlo | `COMPILED_REVIEWER_2_RESULTS/baseline_monte_carlo_<timestamp>/` |
 
 Historical runs must be interpreted using the mission, visibility, noise, slot-definition, and stopping settings with which they were generated. Do not mix runs generated under different scientific configurations.
-
-### EPS placement and validation
-
-EPS files use the restored September 10 print path and per-figure layouts.
-Use equal LaTeX widths for paired panels. The runner copies completed outputs;
-it does not enlarge fonts or reflow figures while exporting.
-
-### Serial/parallel convergence and export cleanup
-
-```matlab
-setup_project;
-results = test_parallel_speed(3); % Run serial + parallel LG GA, 6000 FE each
-run_manuscript_figures("parallel"); % Export saved histories only
-run_manuscript_figures(0);          % All manuscript figures; keep old exports
-run_manuscript_figures(1);          % All manuscript figures; clear exports first
-% Clear final exports and regenerate only the parallel comparison:
-run_manuscript_figures("parallel",'ClearDirectory',1);
-```
-
-The benchmark saves completed runs, callback FE/objective/time histories, CSVs,
-and a timing summary beneath `MANUSCRIPT_OUTPUT/parallel_speed_lunar_gateway_<timestamp>/`.
-The master runner automatically includes the latest complete LG 6000-FE benchmark;
-use `ParallelSpeedDirectory` to select a particular saved benchmark. Missing tests
-are reported and skipped; figure generation never starts new optimizations.
-Old 120-FE timing tests cannot supply the new histories and must be rerun.
-
-Two separate EPS/PNG figures show mean best-so-far objective against FE and actual
-optimization elapsed time. Callback time excludes pool startup and post-search
-validation. Timing repetitions reuse seeds 0/1001 and alternate serial/parallel
-execution order; they are not independent stochastic trials. Time curves use
-previous-observation steps over each mode's common recorded time interval, without
-extrapolating a completed run or inventing time-zero objective values.
-
-Both figures and a copy of the numeric timing summary are exported directly to
-`MANUSCRIPT_OUTPUT/`. The numeric first argument is `0` to retain final exports
-(default), or `1` to clear final EPS/PNG files and generated table/summary files.
-Benchmark subdirectories and numerical source data are preserved. When selecting
-only one section with cleanup enabled, only that section's figures are regenerated.
-
-### Formatting, final plot, EPS export
-
-Formatting is applied by the plotters during construction using
-`reviewer2_paper_style`: bold Times New Roman text, larger labels, reserved
-margins, and legends with at most three columns. RA/Dec use the same canvas,
-axis lengths, limits, and label positions. DRO shares the orbit-family canvas
-and plotting rectangle. Each output remains a separate EPS for LaTeX assembly.
-
-The occlusion geometry retains its existing canvas, fonts, geometry, and callouts.
-
-The final plot is then passed to the working September 10 EPS print path.
-Export functions do not resize fonts, rearrange legends, move axes, change
-clipping/cameras, or rewrite bounding boxes. `format_manuscript_legend` is called
-only during plot construction; the EPS writer never invokes it.
-
-```matlab
-run_manuscript_figures("definitions");
-run_manuscript_figures(1); % Clear generated final exports and regenerate all
-```
-
-The master runner, table printer, saved parallel benchmark, and common output
-parent are retained. `test_manuscript_figure_export` checks that the completed
-styled scene is unchanged by EPS/PNG writing; it requires MATLAB graphics.
-
-During construction, symmetric three-tick 3-D axes such as `[-0.05 0 0.05]`
-retain only the two endpoint ticks. Data limits and 2-D zero baselines are
-unchanged. Grouped bars use width 0.64, fixed outside padding, and 25-degree
-rotation for long category labels; bar centers and error-bar coordinates stay
-aligned. These settings are not applied during EPS export.

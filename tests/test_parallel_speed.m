@@ -4,7 +4,7 @@ function results = test_parallel_speed(nRepeats, missionType)
 % test_parallel_speed(3,"LOW_THRUST_TRANSFER") % optional other target
 % Repetitions use the same seeds: timing repetitions, not independent trials.
 % Saved histories include actual callback times, excluding pool startup.
-% Use run_manuscript_figures("parallel") to export the saved LG comparison.
+% Use plot_parallel_speed to export the saved LG comparison.
 if nargin < 1 || isempty(nRepeats), nRepeats = 2; end
 if nargin < 2 || isempty(missionType), missionType = "LUNAR_GATEWAY"; end
 validateattributes(nRepeats,{'numeric'},{'scalar','integer','positive','finite'});

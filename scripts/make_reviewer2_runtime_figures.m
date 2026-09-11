@@ -52,7 +52,7 @@ colors = colors_for_optimizers(R.Optimizer,style);
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
-b = bar(ax,1:height(R),values,style.groupedBarWidth,'FaceColor','flat');
+b = bar(ax,1:height(R),values,0.72,'FaceColor','flat');
 b.CData = colors;
 errorbar(ax,1:height(R),values,errors,'k.','LineWidth',1.0, ...
     'CapSize',style.capSize,'HandleVisibility','off');
@@ -73,7 +73,7 @@ if ~isempty(baseline)
         'DisplayName','6000-FE GA reference');
     lgd = legend(ax,hBase,{'6000-FE GA reference'},'Location','northoutside', ...
         'Orientation','horizontal','Box','off');
-    style_legend(lgd,ax,style);
+    style_legend(lgd,style);
 end
 
 % The runtime bars and their standard-deviation error bars communicate the
@@ -129,7 +129,7 @@ ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
 style_axes(ax,style);
 lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
     'NumColumns',min(numel(handles),5),'Box','off');
-style_legend(lgd,ax,style);
+style_legend(lgd,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -182,26 +182,23 @@ end
 
 
 function style_axes(ax,style)
-set(ax,'Units','normalized','Position',style.metricPlotPosition);
 set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
     'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top', ...
     'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontSize = style.labelFontSize;
 ax.YLabel.FontSize = style.labelFontSize;
-wrap_manuscript_label(ax.XLabel); wrap_manuscript_label(ax.YLabel);
-space_manuscript_bars(ax,style);
 end
 
 
-function style_legend(lgd,ax,style)
+function style_legend(lgd,style)
 lgd.FontName = style.fontName;
 lgd.FontSize = style.fontSize;
 lgd.FontWeight = 'bold';
-format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
 end
 
 
 function export_figure(fig,out,stem,saveFigures,style)
+enforce_minimum_font_size(fig,12);
 drawnow;
 if ~saveFigures, return; end
 base = fullfile(char(out),char(stem));

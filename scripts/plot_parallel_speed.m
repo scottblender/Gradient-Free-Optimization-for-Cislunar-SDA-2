@@ -1,5 +1,25 @@
 function files = plot_parallel_speed(sourceFile,outputDirectory)
 %PLOT_PARALLEL_SPEED Export saved LG GA convergence; never run optimizations.
+% plot_parallel_speed                       % latest completed LG benchmark
+% plot_parallel_speed(sourceFile,folder)    % selected benchmark and destination
+paths=setup_project();
+if nargin<2 || isempty(outputDirectory)
+    outputDirectory=fullfile(paths.root,'MANUSCRIPT_OUTPUT');
+end
+if ~isfolder(outputDirectory), mkdir(outputDirectory); end
+if nargin<1 || isempty(sourceFile)
+    candidates=dir(fullfile(paths.root,'MANUSCRIPT_OUTPUT', ...
+        'parallel_speed_lunar_gateway_*','parallel_speed_convergence.mat'));
+    [~,order]=sort([candidates.datenum],'descend'); sourceFile='';
+    for idx=order
+        file=fullfile(candidates(idx).folder,candidates(idx).name);
+        saved=load(file,'benchmark');
+        if saved.benchmark.complete && saved.benchmark.budget==6000
+            sourceFile=file; break;
+        end
+    end
+    assert(~isempty(sourceFile),'Run test_parallel_speed first: no complete LG benchmark found.');
+end
 S=load(sourceFile,'benchmark'); B=S.benchmark;
 assert(B.complete && B.mission=="LUNAR_GATEWAY" && B.budget==6000, ...
     'A completed LG 6000-FE benchmark is required. Rerun test_parallel_speed.');
@@ -9,12 +29,13 @@ style=reviewer2_paper_style(); files=strings(2,1);
 for kind=1:2
     fig=figure('Visible','off','Color','w','Units','inches', ...
         'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
-        'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight]);
+        'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight], ...
+        'PaperPosition',[0 0 style.metricFigureWidth style.metricFigureHeight], ...
+        'PaperPositionMode','manual','Renderer','painters','InvertHardcopy','off');
     cleanup=onCleanup(@() close(fig)); %#ok<NASGU>
     ax=axes(fig); hold(ax,'on');
     set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
         'LineWidth',style.axisLineWidth,'Box','off','FontWeight','bold');
-    setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
     for m=1:2
         indices=find(R.Mode==modes(m));
         assert(numel(indices)==B.nRepeats && numel(unique(R.Repeat(indices)))==B.nRepeats, ...
@@ -50,17 +71,20 @@ for kind=1:2
         stem='parallel_speed_lg_convergence_time';
     end
     ylabel(ax,'Mean best-so-far objective');
-    lgd=legend(ax,'Location','northoutside','Orientation','horizontal','Box','off', ...
+    legend(ax,'Location','northoutside','Orientation','horizontal','Box','off', ...
         'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
-    wrap_manuscript_label(ax.YLabel);
-    format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
-    export_manuscript_figure(fig,files(kind));
+    drawnow;
+    print(fig,char(files(kind)),'-depsc2','-painters','-r600');
+    print(fig,char(replace(files(kind),'.eps','.png')),'-dpng', ...
+        sprintf('-r%d',style.exportDpi));
     clear cleanup;
 end
 % Keep the numeric printout beside the final figures as well as in the raw run.
 writetable(R,fullfile(outputDirectory,'parallel_speed_results.csv'));
 sourceDir=fileparts(sourceFile);
 summaryFile=fullfile(sourceDir,'parallel_speed_summary.txt');
-if isfile(summaryFile), copyfile(summaryFile,fullfile(outputDirectory,'parallel_speed_summary.txt')); end
+if isfile(summaryFile) && ~strcmp(string(sourceDir),string(outputDirectory))
+    copyfile(summaryFile,fullfile(outputDirectory,'parallel_speed_summary.txt'));
+end
 end
