@@ -211,7 +211,8 @@ for groupIndex = 1:numel(familyGroups)
     if numel(group)==2
         [ax,plotPosition] = create_centered_3d_axes(fig);
     else
-        [ax,plotPosition] = create_centered_3d_axes(fig);
+        ax = axes(fig);
+        plotPosition = [];
     end
 
     hold(ax,'on');
@@ -244,9 +245,8 @@ for groupIndex = 1:numel(familyGroups)
             for plotted = 1:numel(selectedRows)
                 state = T.state{selectedRows(plotted)};
                 step = max(1,round(size(state,1)/maxPointsPerOrbit));
-                samples=unique([1:step:size(state,1),size(state,1)]);
-                handle = plot3(ax,state(samples,1), ...
-                    state(samples,2),state(samples,3),'-', ...
+                handle = plot3(ax,state(1:step:end,1), ...
+                    state(1:step:end,2),state(1:step:end,3),'-', ...
                     'Color',colors(member,:),'LineWidth',0.85);
                 if plotted==1
                     familyHandles(member) = handle;
@@ -349,7 +349,7 @@ for groupIndex = 1:numel(familyGroups)
         finalize_centered_3d_axes(ax,legendHandle,plotPosition);
     else
         ax.Units = 'normalized';
-        ax.Position = plotPosition;
+        ax.Position = [0.12,0.13,0.80,0.80];
         ax.LooseInset = max(ax.TightInset,0.015);
     end
 
@@ -494,10 +494,10 @@ plot(ax,phase([selectedSlot,selectedSlot]),[0,0.16],':k');
 plot(ax,phase([nextSlot,nextSlot]),[0,0.16],':k');
 text(ax,mean(phase([selectedSlot,nextSlot])),0.20, ...
     '\Delta t/T=1/50','HorizontalAlignment','center', ...
-    'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
+    'FontName',style.fontName,'FontSize',16,'FontWeight','bold');
 text(ax,0.99,-0.025,{'t=T','not stored'}, ...
     'HorizontalAlignment','right','VerticalAlignment','top', ...
-    'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
+    'FontName',style.fontName,'FontSize',15,'FontWeight','bold');
 
 xlabel(ax,'Normalized epoch, t/T');
 yticks(ax,[]);
@@ -642,13 +642,13 @@ draw_angle_arc_2d(ax,observer,0,thetaB,2.10,cTarget,2.1);
 
 % Object labels.
 text(ax,observer(1)-0.02,observer(2)-0.46,'Observer', ...
-    'Color',cObserver,'FontWeight','bold','FontSize',style.fontSize, ...
+    'Color',cObserver,'FontWeight','bold','FontSize',17, ...
     'HorizontalAlignment','center');
 text(ax,target(1)+0.18,target(2)-0.02,'Target', ...
-    'Color',cTarget,'FontWeight','bold','FontSize',style.fontSize, ...
+    'Color',cTarget,'FontWeight','bold','FontSize',17, ...
     'HorizontalAlignment','left');
 text(ax,body(1),body(2)-1.16,'Body b', ...
-    'FontWeight','bold','FontSize',style.fontSize, ...
+    'FontWeight','bold','FontSize',17, ...
     'HorizontalAlignment','center','BackgroundColor','w', ...
     'Margin',0.8);
 
@@ -688,7 +688,7 @@ ptOccRegion = observer + ...
 occCallout = observer + [1.65,-1.28];
 text(ax,occCallout(1),occCallout(2), ...
     {'physical';'occultation'}, ...
-    'Color',cOcc,'FontSize',style.fontSize,'FontAngle','italic', ...
+    'Color',cOcc,'FontSize',15,'FontAngle','italic', ...
     'FontWeight','bold','HorizontalAlignment','center', ...
     'VerticalAlignment','middle');
 occArrowStart = occCallout + [0,0.28];
@@ -700,7 +700,7 @@ ptMargin = observer + ...
 marginCallout = observer + [2.92,2.08];
 text(ax,marginCallout(1),marginCallout(2), ...
     {'effective';'exclusion margin'}, ...
-    'Color',cExclusion,'FontSize',style.fontSize,'FontAngle','italic', ...
+    'Color',cExclusion,'FontSize',15,'FontAngle','italic', ...
     'FontWeight','bold','HorizontalAlignment','center', ...
     'VerticalAlignment','middle','BackgroundColor','w', ...
     'Margin',0.8);
@@ -750,7 +750,7 @@ delta = asin(rho(3)/norm(rho));
 % ---------------- Right ascension ----------------
 figRa = publication_figure( ...
     style.measurementFigureWidth,style.measurementFigureHeight);
-ax1 = axes(figRa,'Units','normalized','Position',style.schematicPlotPosition);
+ax1 = axes(figRa,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax1,'on');
 box(ax1,'off');
 grid(ax1,'off');
@@ -758,8 +758,8 @@ axis(ax1,'equal');
 axis(ax1,'off');
 
 projection = rho(1:2);
-quiver(ax1,0,0,style.measurementAxisLength(1),0,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
-quiver(ax1,0,0,0,style.measurementAxisLength(2),0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
+quiver(ax1,0,0,4.25,0,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
+quiver(ax1,0,0,0,3.45,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
 plot(ax1,[0,projection(1)],[0,projection(2)],'-k','LineWidth',2.2);
 plot(ax1,0,0,'o','MarkerSize',10,'MarkerFaceColor',cObserver,'MarkerEdgeColor','k');
 plot(ax1,projection(1),projection(2),'o','MarkerSize',9,'MarkerFaceColor',cTarget,'MarkerEdgeColor','k');
@@ -769,24 +769,24 @@ alphaRadius = 1.20;
 plot(ax1,alphaRadius*cos(alphaSamples),alphaRadius*sin(alphaSamples), ...
     '-','Color',cAngle,'LineWidth',2.0);
 
-text(ax1,4.40,-0.08,'x','FontWeight','bold','FontSize',style.fontSize);
+text(ax1,4.40,-0.08,'x','FontWeight','bold','FontSize',17);
 text(ax1,-0.10,3.74,'y', ...
-    'FontWeight','bold','FontSize',style.fontSize, ...
+    'FontWeight','bold','FontSize',17, ...
     'HorizontalAlignment','center','VerticalAlignment','bottom');
 text(ax1,0,-0.43,'Observer','Color',cObserver, ...
-    'FontWeight','bold','FontSize',style.fontSize,'HorizontalAlignment','center');
+    'FontWeight','bold','FontSize',15,'HorizontalAlignment','center');
 text(ax1,projection(1),projection(2)+0.28,'Target projection', ...
-    'Color',cTarget,'FontWeight','bold','FontSize',style.fontSize, ...
+    'Color',cTarget,'FontWeight','bold','FontSize',15, ...
     'HorizontalAlignment','center','VerticalAlignment','bottom');
 rhoXYLabelX = 1.68;
 rhoXYLabelY = projection(2)/projection(1)*rhoXYLabelX+0.55;
 text(ax1,rhoXYLabelX,rhoXYLabelY,'\rho_{xy}', ...
-    'Color',cProjection,'FontWeight','bold','FontSize',style.fontSize);
+    'Color',cProjection,'FontWeight','bold','FontSize',16);
 text(ax1,1.52*cos(alpha/2),1.52*sin(alpha/2)+0.06,'\alpha', ...
-    'Color',cAngle,'FontWeight','bold','FontSize',style.fontSize);
+    'Color',cAngle,'FontWeight','bold','FontSize',18);
 
-xlim(ax1,style.measurementXLim);
-ylim(ax1,style.measurementYLim);
+xlim(ax1,[-0.72,4.65]);
+ylim(ax1,[-0.72,3.85]);
 set(findall(figRa,'Type','text'),'FontName',style.fontName);
 
 raFigureFile = fullfile(outputDir, ...
@@ -799,7 +799,7 @@ close(figRa);
 % ---------------- Declination ----------------
 figDec = publication_figure( ...
     style.measurementFigureWidth,style.measurementFigureHeight);
-ax2 = axes(figDec,'Units','normalized','Position',style.schematicPlotPosition);
+ax2 = axes(figDec,'Units','normalized','Position',[0.10,0.12,0.82,0.80]);
 hold(ax2,'on');
 box(ax2,'off');
 grid(ax2,'off');
@@ -807,8 +807,8 @@ axis(ax2,'equal');
 axis(ax2,'off');
 
 target = [rhoXY,rho(3)];
-quiver(ax2,0,0,style.measurementAxisLength(1),0,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
-quiver(ax2,0,0,0,style.measurementAxisLength(2),0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
+quiver(ax2,0,0,4.35,0,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
+quiver(ax2,0,0,0,3.25,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
 plot(ax2,[0,target(1)],[0,target(2)],'-k','LineWidth',2.2);
 plot(ax2,[target(1),target(1)],[0,target(2)],'--', ...
     'Color',cProjection,'LineWidth',1.5);
@@ -822,25 +822,24 @@ plot(ax2,deltaRadius*cos(deltaSamples),deltaRadius*sin(deltaSamples), ...
 
 % rho_xy is the horizontal coordinate in this panel and therefore
 % labels the horizontal axis at its positive arrow tip.
-text(ax2,4.40,-0.08,'\rho_{xy}', ...
-    'Color','k','FontWeight','bold','FontSize',style.fontSize, ...
+text(ax2,4.48,-0.08,'\rho_{xy}', ...
+    'Color','k','FontWeight','bold','FontSize',16, ...
     'HorizontalAlignment','left','VerticalAlignment','middle');
-text(ax2,-0.10,3.74,'z','FontWeight','bold','FontSize',style.labelFontSize, ...
-    'HorizontalAlignment','center','VerticalAlignment','bottom');
+text(ax2,-0.12,3.42,'z','FontWeight','bold','FontSize',17);
 text(ax2,0,-0.43,'Observer','Color',cObserver, ...
-    'FontWeight','bold','FontSize',style.fontSize,'HorizontalAlignment','center');
+    'FontWeight','bold','FontSize',15,'HorizontalAlignment','center');
 text(ax2,target(1),target(2)+0.28,'Target', ...
-    'Color',cTarget,'FontWeight','bold','FontSize',style.fontSize, ...
+    'Color',cTarget,'FontWeight','bold','FontSize',15, ...
     'HorizontalAlignment','center','VerticalAlignment','bottom');
 rhoLabelX = 2.02;
 rhoLabelY = target(2)/target(1)*rhoLabelX+0.55;
 text(ax2,rhoLabelX,rhoLabelY,'\rho', ...
-    'FontWeight','bold','FontSize',style.fontSize);
+    'FontWeight','bold','FontSize',16);
 text(ax2,1.56*cos(delta/2),1.56*sin(delta/2)+0.06,'\delta', ...
-    'Color',cAngle,'FontWeight','bold','FontSize',style.fontSize);
+    'Color',cAngle,'FontWeight','bold','FontSize',18);
 
-xlim(ax2,style.measurementXLim);
-ylim(ax2,style.measurementYLim);
+xlim(ax2,[-0.72,4.75]);
+ylim(ax2,[-0.72,3.60]);
 set(findall(figDec,'Type','text'),'FontName',style.fontName);
 
 decFigureFile = fullfile(outputDir, ...
@@ -1265,7 +1264,7 @@ legendHandle.FontName = style.fontName;
 legendHandle.FontSize = style.fontSize;
 legendHandle.FontWeight = 'bold';
 legendHandle.ItemTokenSize = itemTokenSize;
-legendHandle.NumColumns = min(numColumns,style.legendMaxColumns);
+legendHandle.NumColumns = numColumns;
 end
 
 
@@ -1410,17 +1409,19 @@ end
 
 
 function export_publication_eps(fig,fileName)
-prepare_manuscript_figure(fig);
-export_manuscript_figure(fig,fileName);
+
+drawnow;
+set(fig,'Renderer','painters','PaperPositionMode','manual');
+print(fig,char(fileName),'-depsc2','-painters','-r600');
+[folder,stem] = fileparts(char(fileName));
+print(fig,fullfile(folder,[stem '.png']),'-dpng','-r300');
 fprintf('Saved vector EPS: %s\n',fileName);
 end
 
 
 function inspect_before_export(fig,inspectFigure,description)
 
-style = reviewer2_paper_style();
-enforce_minimum_font_size(fig,style.fontSize);
-prepare_manuscript_figure(fig);
+enforce_minimum_font_size(fig,12);
 
 if inspectFigure
     figure(fig);

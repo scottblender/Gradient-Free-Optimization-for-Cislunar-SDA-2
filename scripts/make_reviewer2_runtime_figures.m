@@ -182,9 +182,7 @@ end
 
 
 function style_axes(ax,style)
-setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
-set(ax,'Units','normalized','Position',style.metricPlotPosition, ...
-    'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
+set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
     'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top', ...
     'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontSize = style.labelFontSize;
@@ -196,14 +194,16 @@ function style_legend(lgd,style)
 lgd.FontName = style.fontName;
 lgd.FontSize = style.fontSize;
 lgd.FontWeight = 'bold';
-lgd.NumColumns = min(lgd.NumColumns,style.legendMaxColumns);
 end
 
 
 function export_figure(fig,out,stem,saveFigures,style)
+enforce_minimum_font_size(fig,12);
+drawnow;
 if ~saveFigures, return; end
-prepare_manuscript_figure(fig);
-export_manuscript_figure(fig,fullfile(char(out),char(stem)));
+base = fullfile(char(out),char(stem));
+print(fig,[base '.eps'],'-depsc2','-painters','-r600');
+exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
 close(fig);
 end
 

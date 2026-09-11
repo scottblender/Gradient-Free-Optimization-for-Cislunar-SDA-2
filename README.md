@@ -197,15 +197,15 @@ The raw optimization runs remain under `results/RUNTIME_COMPARISON_1200/`, `resu
 Final Reviewer 2 figures use:
 
 - Times New Roman;
-- 22 pt minimum export text (approximately 10 pt when placed at 3 inches);
-- 24 pt axis labels;
+- the September 10 typography: 12 pt axes/legends;
+- 14 pt axis labels;
 - one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
 - directly overlaid comparable convergence curves on one axes;
 - convergence figures show only the 20-run mean best-so-far curves; run-to-run variability is retained in the processed tables and metric figures;
 - no grid lines and no surrounding axes box;
 - 20-run mean +/- sample standard deviation for quantitative comparisons;
 - objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
-- the same 6.5 x 5.2 inch canvas for every paired panel and centered 3-D layout used by the introductory tracking-case figures;
+- the September 10 canvas sizes and centered 3-D layouts;
 - solid observer-orbit lines, duplicate periodic orbits drawn once, no Earth, and low-thrust endpoint-orbit context.
 
 The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in numerical tables rather than being repeated as a bar figure, and coverage-fraction figures are omitted. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
@@ -315,26 +315,9 @@ Historical runs must be interpreted using the mission, visibility, noise, slot-d
 
 ### EPS placement and validation
 
-All final renderers call `export_manuscript_figure`, which uses the painters
-vector renderer, a white opaque background, and a fixed EPS bounding box.
-PNG previews use the same full canvas rather than a separate tight crop.
-RA/Dec share axis lengths, data limits, and panel positions; DRO shares the
-orbit-family canvas and axes box while retaining its top-down camera.
-Font sizes, all panel dimensions, and camera settings remain centralized in
-`scripts/reviewer2_paper_style.m`. Unsupported transparency is rejected explicitly.
-
-Place side-by-side EPS panels using equal `subfigure` widths and only
-`\includegraphics[width=\linewidth]{...}`. Avoid unequal widths, per-image
-`trim`, or different height caps: those undo the matched canvas scaling. The
-style targets two panels across, about 3 inches per panel; four across would
-halve the printed font size. Split 12-panel geometry grids across figures or
-use two columns when readable axes are required. Fonts cannot stay 10 pt if
-the same image is arbitrarily reduced to a quarter-page width.
-
-Run `setup_project; test_manuscript_figure_export` in MATLAB for a data-free EPS
-canvas/font regression check. `test_manuscript_table_formatting` checks result
-row formatting with synthetic processed data. Full publication figures require
-the local catalog and completed study data.
+EPS files use the restored September 10 print path and per-figure layouts.
+Use equal LaTeX widths for paired panels. The runner copies completed outputs;
+it does not enlarge fonts or reflow figures while exporting.
 
 ### Serial/parallel convergence and export cleanup
 
@@ -368,28 +351,22 @@ Both figures and a copy of the numeric timing summary are exported directly to
 Benchmark subdirectories and numerical source data are preserved. When selecting
 only one section with cleanup enabled, only that section's figures are regenerated.
 
-Final layout now measures legends and axis-label margins after applying export
-fonts, fits legend columns to the available width, wraps long plain-text axis
-labels, and reduces automatic numeric tick density. Paired exports keep the same
-physical canvas. Run `test_manuscript_figure_export` and
-`test_parallel_speed_figures` in MATLAB to check export sizing and legend spacing.
+### Restored September 10 export path
 
-### Geometry export repair
+The plotters and style constants are restored from commit `1d18c2d`, the last
+September 10 version. Fonts, legends, ticks, camera settings, axes positioning,
+and clipping are established by those plotters. There is no final formatting
+pass, forced full-page bounding box, or `-loose` export option. EPS uses the
+original `print(...,'-depsc2','-painters','-r600')` path.
 
-`prepare_manuscript_figure` applies bold Times New Roman text, at most three
-legend columns, sparse 3-D ticks, and reserved label margins before a figure is
-previewed or exported. Perspective trajectory lines have clipping disabled;
-trajectory samples, camera direction, projection, and data aspect ratio are
-preserved. Orbit decimation now retains the recorded endpoint rather than
-silently omitting it. No artificial closing segment is added.
-
-`export_manuscript_figure` then prints that completed scene using painters and
-`-loose` for the full paper canvas; it does not rewrite EPS bounding boxes or
-reflow the plot. Geometry panels share the 7.6-by-7.0-inch canvas. For regenerated
-definition figures without deleting unrelated final figures:
+The master runner, definition section selection, numeric clear option, table
+printer, saved parallel benchmark, and common output parent are retained.
+The old typography is intentional: export-time enlargement has been removed.
 
 ```matlab
-run_manuscript_figures("definitions");
-% Optional MATLAB graphics regression, no orbit catalog or optimization needed:
-test_manuscript_figure_export;
+run_manuscript_figures("definitions"); % Regenerate definition EPS files
+run_manuscript_figures(1);             % Clear final exports and regenerate all
 ```
+
+`test_manuscript_figure_export` verifies that writing EPS/PNG leaves figure
+properties unchanged. This graphics test requires MATLAB.

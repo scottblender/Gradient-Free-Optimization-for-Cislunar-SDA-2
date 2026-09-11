@@ -1,18 +1,18 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% This file is the single source of manuscript styling constants. Plotters
-% apply these values while constructing figures; the EPS exporter must not
-% resize/reflow figures after generation.
+% All manuscript camera settings and export-size classes live here so
+% perspective or LaTeX-alignment changes do not require editing individual
+% plotters. The legacy geometryAzimuth/geometryElevation and figureWidth/
+% figureHeight fields remain compatibility aliases.
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
-% At the intended paired-panel placement, these export sizes retain
-% approximately 10-point manuscript text.
+% Compatibility for the newer runner/parallel plot; legacy layouts are unchanged.
 style.manuscriptPanelWidth = 3.3;
-style.minimumPrintedFontSize = 10;
-style.fontSize = 22;
-style.labelFontSize = 24;
+style.metricPlotPosition = [0.13 0.16 0.775 0.70];
+style.fontSize = 12;
+style.labelFontSize = 14;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -21,67 +21,36 @@ style.alphaBand = 0.16;
 style.exportDpi = 300;
 
 % -------------------------------------------------------------------------
-% Export-size classes.
+% Export-size classes. Figures intended to line up in LaTeX share exactly
+% the same outer paper size within each class.
 % -------------------------------------------------------------------------
-% Quantitative figures get enough vertical room for labels and an outside
-% legend without crowding the axes.
-style.metricFigureWidth = 7.25;
-style.metricFigureHeight = 5.8;
+style.metricFigureWidth = 6.5;
+style.metricFigureHeight = 4.6;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
-style.panelFigureHeight = 6.8; % compatibility alias
+style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = style.metricFigureWidth;
 style.convergenceFigureHeight = style.metricFigureHeight;
 
-% Restore the larger pre-runner 3-D canvas that exported correctly before
-% the shared-export rewrite. This also gives the north-outside legend room
-% to remain horizontal rather than wrapping into multiple rows.
 style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
 style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
+% The two slot-definition panels are intended to be paired in LaTeX, so
+% the phase panel uses the same outer dimensions as the slot-orbit panel.
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
-% The keep-out schematic needs additional room so the geometry itself can be
-% larger while retaining all callouts inside the exported page.
-style.visibilityFigureWidth = 7.6;
-style.visibilityFigureHeight = 6.4;
-style.measurementFigureWidth = style.metricFigureWidth;
-style.measurementFigureHeight = style.metricFigureHeight;
-style.monteCarloFigureWidth = style.metricFigureWidth;
-style.monteCarloFigureHeight = style.metricFigureHeight;
+style.visibilityFigureWidth = 7.2;
+style.visibilityFigureHeight = 5.1;
+style.measurementFigureWidth = 4.45;
+style.measurementFigureHeight = 4.55;
+style.monteCarloFigureWidth = 4.8;
+style.monteCarloFigureHeight = 4.2;
 
-% -------------------------------------------------------------------------
-% Shared layouts.
-% -------------------------------------------------------------------------
-style.geometryPlotPosition = [0.17 0.23 0.66 0.49];
-style.metricPlotPosition = [0.16 0.18 0.79 0.60];
-style.schematicPlotPosition = [0.05 0.06 0.90 0.88];
-style.measurementXLim = [-0.95 5.10];
-style.measurementYLim = [-0.80 4.20];
-style.measurementAxisLength = [4.25 3.45];
-
-% Legends are created at northoutside by each plotter, then moved only by
-% the plotter's own centered-layout helper. Five/six-item geometry legends
-% wrap into at most three columns so bold labels do not touch.
-style.legendMaxColumns = 3;
-style.geometryLegendGap = 0.008;
-
-% Desired tick density. Non-trajectory quantitative renderers may use these
-% limits; 3-D geometry plots should remain sparse to prevent projected-label
-% collisions.
-style.max2DXTicks = 8;
-style.max2DYTicks = 7;
-style.max3DXTicks = 3;
-style.max3DYTicks = 2;
-style.max3DZTicks = 3;
-
-% Slot-definition visibility. The neutral candidate markers are intended to
-% be filled with this gray while the excluded endpoint remains hollow.
-style.slotCandidateFillColor = [0.72 0.72 0.72];
-
-% Shared 3-D fallback camera and padding.
+% Shared 3-D layout and fallback camera.
+style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
+style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
@@ -91,6 +60,8 @@ style.geometryZPadding = 0.10;
 
 % -------------------------------------------------------------------------
 % Camera controls: orbit-family study-definition figures.
+% Each view is [azimuth elevation] in degrees. Edit these values here only.
+% DRO preserves the current top-down orthographic presentation by default.
 % -------------------------------------------------------------------------
 style.orbitFamilyViews.northern_halo = [-37.5 30];
 style.orbitFamilyViews.southern_halo = [-37.5 30];
@@ -106,6 +77,9 @@ style.orbitFamilyProjections.dro_family = 'orthographic';
 
 % -------------------------------------------------------------------------
 % Camera controls: target/maneuver trajectory figures.
+% These settings are used by both the study-definition tracking cases and
+% the baseline/comparison trajectory results. Low thrust is intentionally
+% offset slightly so its projected path does not appear to cross the Moon.
 % -------------------------------------------------------------------------
 style.maneuverViews.LUNAR_GATEWAY = [-37.5 30];
 style.maneuverViews.LOW_THRUST_TRANSFER = [-37.5 35];

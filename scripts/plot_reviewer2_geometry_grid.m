@@ -4,7 +4,7 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 % Historical name retained for compatibility. Final manuscript trajectories
 % are exported as separate full-size panels rather than compressed MATLAB
 % tiled grids. The construction matches plot_study_definition_figures.m:
-%   shared manuscript-size canvas
+%   7.6 x 7.0 inch canvas
 %   centered inner axes box [0.12 0.20 0.76 0.64]
 %   maneuver-specific camera from reviewer2_paper_style, axis equal/vis3d
 %   8/10/10 percent x/y/z padding
@@ -282,7 +282,7 @@ end
 function format_case_legend(lgd,mission,style)
 lgd.Box = 'off';
 lgd.FontName = style.fontName;
-lgd.FontSize = style.fontSize;
+lgd.FontSize = max(style.fontSize,12);
 lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [16 9];
 if mission == "LOW_THRUST_TRANSFER"
@@ -292,7 +292,6 @@ elseif mission == "GATEWAY_IMPULSE"
 else
     lgd.NumColumns = 5;
 end
-lgd.NumColumns = min(lgd.NumColumns,style.legendMaxColumns);
 end
 
 
@@ -418,9 +417,15 @@ end
 
 
 function export_figure(fig,figureDir,stem,saveFigures,dpi)
-if ~saveFigures, return; end
-prepare_manuscript_figure(fig);
-export_manuscript_figure(fig,fullfile(char(figureDir),char(stem)));
+drawnow;
+if ~saveFigures
+    close(fig);
+    return;
+end
+base = fullfile(char(figureDir),char(stem));
+set(fig,'Renderer','painters','PaperPositionMode','manual');
+print(fig,[base '.eps'],'-depsc2','-painters','-r600');
+exportgraphics(fig,[base '.png'],'Resolution',dpi);
 close(fig);
 end
 

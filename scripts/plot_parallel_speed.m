@@ -13,7 +13,7 @@ for kind=1:2
     cleanup=onCleanup(@() close(fig)); %#ok<NASGU>
     ax=axes(fig); hold(ax,'on');
     set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
-        'LineWidth',style.axisLineWidth,'Box','off');
+        'LineWidth',style.axisLineWidth,'Box','off','FontWeight','bold');
     setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
     for m=1:2
         indices=find(R.Mode==modes(m));
@@ -50,9 +50,9 @@ for kind=1:2
         stem='parallel_speed_lg_convergence_time';
     end
     ylabel(ax,'Mean best-so-far objective');
-    legend(ax,'Location','northoutside','Orientation','horizontal','Box','off');
+    legend(ax,'Location','northoutside','Orientation','horizontal','Box','off', ...
+        'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
-    prepare_manuscript_figure(fig);
     export_manuscript_figure(fig,files(kind));
     clear cleanup;
 end
