@@ -69,6 +69,10 @@ style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
 style.geometryLegendGap = 0.004;
 style.legendTopPadding = 0.015;
+% Perspective projection can collapse several numeric ticks into the same
+% screen-space corner. Limit automatic 3-D ticks so manuscript labels stay
+% separated without reducing font size or shrinking the trajectory.
+style.max3DTicks = 3;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
