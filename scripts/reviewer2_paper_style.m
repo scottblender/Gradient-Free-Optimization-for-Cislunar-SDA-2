@@ -69,10 +69,21 @@ style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
 style.geometryLegendGap = 0.004;
 style.legendTopPadding = 0.015;
-% Perspective projection can collapse several numeric ticks into the same
-% screen-space corner. Limit automatic 3-D ticks so manuscript labels stay
-% separated without reducing font size or shrinking the trajectory.
-style.max3DTicks = 3;
+
+% Perspective projection can collapse numeric tick labels into the same
+% screen-space corner. The y axis is especially short for the manuscript
+% camera, so it uses only its two endpoint ticks. Apply these limits to both
+% automatic and plotter-generated/manual ticks during final export layout.
+style.max3DXTicks = 3;
+style.max3DYTicks = 2;
+style.max3DZTicks = 3;
+style.max3DTicks = 3; % compatibility alias for older tests/helpers
+
+% Repeated optimizer names in the all-case family-selection summary need a
+% little additional horizontal separation at the final manuscript font.
+style.familyOptimizerSpacingFactor = 1.22;
+style.familyMissionGapFactor = 1.75;
+
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
