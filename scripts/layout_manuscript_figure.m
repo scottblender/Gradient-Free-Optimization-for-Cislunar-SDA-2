@@ -150,14 +150,16 @@ for k=1:numel(axesObjects)
         ax.Position=[left bottom width height];
     end
 
-    % Place the legend immediately above the final axes/tick-label envelope
-    % instead of pinning it to the top of the paper. This removes unused
-    % vertical whitespace while retaining a small, explicit separation.
+    % Reapply one shared legend-gap rule after the final axes layout. The old
+    % exporter added an extra +0.010 normalized offset here, which silently
+    % moved legends back upward after plotters had already positioned them.
+    % Keep enough room for projected tick labels, but otherwise preserve the
+    % moderate geometryLegendGap used by the plotters themselves.
     if ~isempty(lgd) && isvalid(lgd)
         drawnow;
         pos=lgd.Position;
         inset=ax.TightInset;
-        topClearance=max(0.015,inset(4)+0.010);
+        topClearance=max(style.legendMinimumTopClearance,inset(4));
         desiredBottom=ax.Position(2)+ax.Position(4)+topClearance+style.geometryLegendGap;
         pos(1)=max(0.002,(1-pos(3))/2);
         pos(2)=min(desiredBottom,0.99-pos(4));
