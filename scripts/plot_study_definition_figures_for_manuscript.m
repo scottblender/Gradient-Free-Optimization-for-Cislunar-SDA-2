@@ -2,8 +2,9 @@ function outputs = plot_study_definition_figures_for_manuscript( ...
     inspectFigures,sections,outputDirectory)
 %PLOT_STUDY_DEFINITION_FIGURES_FOR_MANUSCRIPT Route definitions to one output.
 % Manuscript-specific figures are generated in their final styled state before
-% export. Legacy study-definition products are still supported for the other
-% sections, but no persistent copy is left in results/study_definition_figures.
+% export. Legacy study-definition products are still supported for catalog,
+% measurement, and case sections, but no persistent copy is left in the old
+% results/study_definition_figures directory.
 
 if nargin<1 || isempty(inspectFigures), inspectFigures = false; end
 if nargin<2 || isempty(sections), sections = "all"; end
@@ -25,15 +26,14 @@ legacyDirectory = fullfile(paths.results,'study_definition_figures');
 if isfolder(legacyDirectory), rmdir(legacyDirectory,'s'); end
 outputs = struct();
 
-% The visibility schematic has its own manuscript generator because its final
-% geometry size is part of figure generation, not an export-time transform.
-legacySections = requested(requested~="visibility");
+% Slot and visibility figures have manuscript-specific generators so marker
+% fill and geometry sizing are completed during generation, never at export.
+legacySections = requested(~ismember(requested,["slots","visibility"]));
 if ~isempty(legacySections)
     transcript = evalc('legacyOutputs = plot_study_definition_figures(inspectFigures,legacySections);'); %#ok<NASGU>
     legacyOutputs = relocate_output_paths(legacyOutputs,legacyDirectory,outputDirectory);
     outputs = merge_struct(outputs,legacyOutputs);
 
-    % Move side products not explicitly referenced in the return structure.
     if isfolder(legacyDirectory)
         listing = dir(fullfile(legacyDirectory,'**','*'));
         listing = listing(~[listing.isdir]);
@@ -43,6 +43,9 @@ if ~isempty(legacySections)
     end
 end
 
+if ismember("slots",requested)
+    outputs.slots = plot_slot_definition_manuscript(inspectFigures,outputDirectory);
+end
 if ismember("visibility",requested)
     outputs.visibilityGeometry = plot_visibility_keepout_manuscript( ...
         inspectFigures,outputDirectory);
