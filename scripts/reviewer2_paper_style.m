@@ -65,11 +65,11 @@ style.categoryLabelAngle = 30;
 % -------------------------------------------------------------------------
 % Standard 3-D layout.
 % The axes are exactly centered horizontally. The legend intentionally sits
-% slightly inside the otherwise-unused top portion of the 3-D axes box so it
-% stays visually close to the trajectories without reducing the data region.
+% inside the otherwise-unused top portion of the 3-D axes box so it stays
+% visually close to the trajectories without reducing the data region.
 % -------------------------------------------------------------------------
 style.geometryPlotPosition = [0.10 0.14 0.80 0.70];
-style.geometryLegendGap = -0.02;
+style.geometryLegendGap = -0.04;
 style.geometryLegendItemTokenSize = [16 8];
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
