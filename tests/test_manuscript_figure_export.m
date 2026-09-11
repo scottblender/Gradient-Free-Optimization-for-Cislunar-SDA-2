@@ -68,7 +68,9 @@ export_manuscript_figure(fig,geometryFile);
 assert(isequal(ax.YTick,originalYTicks), ...
     'Trajectory/geometry ticks should not be rewritten by the metric tick policy.');
 assert(isappdata(ax,'ManuscriptNorthOutsideReference'));
-assert(lgd.Position(2)<=getappdata(ax,'ManuscriptNorthOutsideReference')(2)+1e-6); %#ok<NBRAK>
+northPosition = getappdata(ax,'ManuscriptNorthOutsideReference');
+assert(lgd.Position(2)<=northPosition(2)+1e-6, ...
+    'Geometry legend was not moved downward from northoutside.');
 check_fonts(fig,style);
 check_canvas(fig);
 epsText = fileread(geometryFile);
