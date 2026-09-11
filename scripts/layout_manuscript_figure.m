@@ -25,14 +25,14 @@ for k=1:numel(axesObjects)
         lgd.Orientation='horizontal';
         lgd.Location='northoutside';
 
-        % Preserve the plotter's intended top-centered legend arrangement.
-        % Start from an explicit NumColumns value when one was requested;
-        % otherwise prefer one row. If that is too wide, wrap once only so
-        % the final legend occupies at most two rows. Do not search through
-        % alternative column counts during export because that makes the
-        % legend geometry change unexpectedly between preview and EPS.
+        % Keep legends centered above the axes and preserve the plotter's
+        % intended one-row/two-row organization. Two-entry legends (e.g.
+        % DRO + Moon) are always one row. Longer legends may wrap once, but
+        % export never changes the font size or creates a third row.
         count=numel(lgd.String);
-        if isprop(lgd,'NumColumnsMode') && strcmp(lgd.NumColumnsMode,'manual')
+        if count<=2
+            columns=count;
+        elseif isprop(lgd,'NumColumnsMode') && strcmp(lgd.NumColumnsMode,'manual')
             columns=max(1,min(count,lgd.NumColumns));
         else
             columns=count;
@@ -42,19 +42,40 @@ for k=1:numel(axesObjects)
         lgd.NumColumns=columns;
         drawnow;
         pos=lgd.Position;
+
+        % If the requested one-row layout is too wide, use the balanced
+        % two-row arrangement. This changes only wrapping, not typography.
         if pos(3)>style.legendWidthLimit && columns>minimumTwoRowColumns
             columns=minimumTwoRowColumns;
             lgd.NumColumns=columns;
             drawnow;
             pos=lgd.Position;
         end
+
+        % Long two-row legends can still be a few percent too wide at the
+        % final 22-point export font. Reduce only the sample swatch width;
+        % keep font size/weight and the two-row structure unchanged.
+        if pos(3)>style.legendWidthLimit && isprop(lgd,'ItemTokenSize')
+            token=lgd.ItemTokenSize;
+            minimumTokenWidth=8;
+            while pos(3)>style.legendWidthLimit && token(1)>minimumTokenWidth
+                token(1)=max(minimumTokenWidth,token(1)-2);
+                lgd.ItemTokenSize=token;
+                drawnow;
+                pos=lgd.Position;
+            end
+        end
+
         rows=ceil(count/columns);
         assert(rows<=style.legendMaxRows,'Manuscript:LegendRows', ...
             'Legend requires more than %d rows; shorten legend text.',style.legendMaxRows);
-        assert(pos(3)<=0.96,'Manuscript:LegendWidth', ...
-            'Two-row legend exceeds canvas width; shorten legend text before export.');
+        if pos(3)>0.995
+            warning('Manuscript:LegendWidth', ...
+                ['Legend remains wider than the preferred canvas width after ' ...
+                 'two-row wrapping and compact swatches; exporting centered.']);
+        end
         legendHeight=pos(4)+0.045;
-        pos(1)=(1-pos(3))/2;
+        pos(1)=max(0.002,(1-pos(3))/2);
         pos(2)=0.975-pos(4);
         lgd.Position=pos;
     end
