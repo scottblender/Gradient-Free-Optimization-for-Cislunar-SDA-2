@@ -63,14 +63,16 @@ style.measurementXLim = [-0.95 5.10];
 style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
 
-% Legends remain centered above the axes. Their final vertical placement is
-% measured directly from the axes rectangle using one explicit gap. Keep the
-% gap modest: 0.004 was too tight, while 0.020 left excess white space.
+% Legends use MATLAB's northoutside placement as the reference layout, then
+% the master formatter nudges the final legend slightly downward. This keeps
+% the correct MATLAB placement semantics while reducing excess white space.
 style.legendMaxColumns = 6;
 style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
-style.legendAxesGap = 0.010;
-style.geometryLegendGap = style.legendAxesGap; % compatibility for plotters
+style.legendNorthOutsideYOffset = -0.020;
+style.legendMinimumGap = 0.008;
+style.legendAxesGap = style.legendMinimumGap; % compatibility alias
+style.geometryLegendGap = style.legendMinimumGap; % compatibility for plotters
 style.legendTopPadding = 0.015;
 
 % Perspective projection can collapse numeric tick labels into the same
