@@ -8,12 +8,15 @@ style = reviewer2_paper_style();
 if isempty(folder), folder = pwd; end
 if ~isfolder(folder), mkdir(folder); end
 base = fullfile(folder,stem);
+finalEps = [base '.eps'];
+finalPng = [base '.png'];
 
 set(fig,'PaperUnits','inches','PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off','Color','w');
 paper = get(fig,'PaperSize');
 set(fig,'PaperPosition',[0 0 paper]);
 
+% All manuscript changes happen before either output file is written.
 format_manuscript_figure(fig,style);
 assert_canvas_fit(fig,stem);
 
@@ -28,12 +31,34 @@ for property = ["FaceAlpha","EdgeAlpha"]
     end
 end
 
+% The figure is now final. Force MATLAB to complete all deferred 3-D camera,
+% legend, tick, and renderer updates before print sees the figure. Nothing
+% below this point changes axes, cameras, legends, ticks, or plotted data.
+set(fig,'Renderer','painters');
 drawnow;
-print(fig,[base '.eps'],'-depsc2','-painters','-loose');
+refresh(fig);
+drawnow;
+
+% Remove old products only after the final figure has passed every check.
+% This prevents a failed export from being mistaken for a newly generated EPS.
+if isfile(finalEps), delete(finalEps); end
+if isfile(finalPng), delete(finalPng); end
+
+% Export to temporary files first. The fixed PaperPosition is authoritative,
+% so -loose is deliberately avoided; it can trigger an additional bounding-
+% box/layout pass after the manuscript formatter has already finalized 3-D axes.
+tempBase = tempname(folder);
+tempEps = [tempBase '.eps'];
+tempPng = [tempBase '.png'];
+tempCleanup = onCleanup(@() cleanup_temporary_exports(tempEps,tempPng));
+print(fig,tempEps,'-depsc2','-painters');
+print(fig,tempPng,'-dpng',sprintf('-r%d',style.exportDpi));
+assert(isfile(tempEps) && dir(tempEps).bytes>0,'EPS export failed: %s',base);
+assert(isfile(tempPng) && dir(tempPng).bytes>0,'PNG export failed: %s',base);
 
 % Normalize the EPS bounding boxes to the physical paper rectangle so every
 % paired panel scales identically in LaTeX and no export grows unexpectedly.
-epsText = fileread([base '.eps']);
+epsText = fileread(tempEps);
 assert(startsWith(epsText,'%!PS-Adobe'),'Invalid EPS output: %s',base);
 widthPt = 72*paper(1); heightPt = 72*paper(2);
 box = sprintf('%%%%BoundingBox: 0 0 %d %d',ceil(widthPt),ceil(heightPt));
@@ -45,18 +70,28 @@ else
     firstNewline = find(epsText==newline,1);
     epsText = [epsText(1:firstNewline) hires newline epsText(firstNewline+1:end)];
 end
-fid = fopen([base '.eps'],'w');
+fid = fopen(tempEps,'w');
 assert(fid~=-1,'Cannot write EPS: %s',base);
-cleanup = onCleanup(@() fclose(fid));
+fileCleanup = onCleanup(@() fclose(fid));
 fwrite(fid,epsText,'char');
-clear cleanup;
+clear fileCleanup;
 
-% print uses PaperPosition for PNG too; exportgraphics would tightly crop.
-print(fig,[base '.png'],'-dpng',sprintf('-r%d',style.exportDpi));
+[ok,message] = movefile(tempEps,finalEps,'f');
+assert(ok,'Could not finalize EPS %s: %s',finalEps,message);
+[ok,message] = movefile(tempPng,finalPng,'f');
+assert(ok,'Could not finalize PNG %s: %s',finalPng,message);
+clear tempCleanup;
+
 metadata = struct('stem',stem,'widthInches',paper(1), ...
     'heightInches',paper(2),'minimumFontPoints',style.fontSize, ...
     'placementWidthInches',style.manuscriptPanelWidth, ...
     'minimumPrintedFontPoints',style.fontSize*style.manuscriptPanelWidth/paper(1));
+end
+
+
+function cleanup_temporary_exports(epsFile,pngFile)
+if isfile(epsFile), delete(epsFile); end
+if isfile(pngFile), delete(pngFile); end
 end
 
 
