@@ -127,19 +127,57 @@ run_reviewer2_baseline_pipeline
 run_reviewer2_objective_screening_pipeline
 ```
 
-For the paper, use the central runner:
+For all manuscript figures, run the single root-level entry point:
 
 ```matlab
-setup_project;
-reports = run_reviewer2_results;
+output = run_manuscript_figures;
+% Inspect only the paired measurement diagrams (no catalog/results needed):
+output = run_manuscript_figures("definitions",'DefinitionSections',"measurement");
+% Regenerate selected results from cached processed reports:
+output = run_manuscript_figures(["runtime","comparison"]);
+% Reprocess raw runs after adding/changing results:
+output = run_manuscript_figures("results",'Reprocess',true);
 ```
 
-Or process selected studies:
+Selectors are `definitions`, `runtime`, `comparison`, `baseline`,
+`objective_screening`, and `monte_carlo`; `all` includes all six. Definition
+subsections are `catalog`, `slots`, `visibility`, `measurement`, and `cases`.
+`Inspect=true` enables definition previews. Old runners remain callable for
+backward compatibility; they are implementation helpers, not additional steps.
+The first result request processes saved runs and caches reports; later requests
+rerender those reports. Use `Reprocess=true` when the input results change.
+Definition generation may propagate target trajectories; it does not run the
+constellation optimizers. Monte Carlo selects the newest saved sample directory
+(or `MonteCarloDirectory=folder`) and only replots it. Missing MC samples are
+reported and skipped; new MC evaluations must be requested explicitly using the
+validation runner described below.
+
+Every invocation collects the selected EPS and PNG files into
+`COMPILED_REVIEWER_2_RESULTS/manuscript_figures_<timestamp>/`, with a CSV manifest
+of source files and canvas dimensions. No existing publication collection is
+overwritten. Per-study numerical outputs retain their existing organization.
+
+### Print all manuscript tables
 
 ```matlab
-reports = run_reviewer2_results("comparison");
-reports = run_reviewer2_results(["runtime","comparison"]);
+tables = print_manuscript_tables;
+% Refresh summaries from saved raw runs when necessary (no new optimization):
+tables = print_manuscript_tables('Reprocess',true);
+% Pin a study to a particular processed directory for reproducibility:
+tables = print_manuscript_tables('Directories',struct('baseline',folder));
 ```
+
+The printer follows all 13 table labels in the supplied clean manuscript:
+catalog parameter/geometric ranges, weights, algorithms, EKF/settings, target
+ICs and LT reproduction, configurations, AO/AR baselines, 1200-FE and 6000-FE
+comparisons, screening, and objective components. It prints copyable LaTeX rows,
+mean +/- sample SD, and actual solver-call ranges in manuscript column order.
+It reads processed CSVs and saved target/run data without running optimizations.
+The four fixed descriptive/configuration tables are explicitly identified as
+manuscript settings, stored in `scripts/templates/manuscript_configuration_tables.tex`;
+update that template if the study settings change. Every data-derived table prints
+its source path; missing data are reported per table. The target table reports
+missing converged LT values separately and never substitutes the initial guess.
 
 `run_reviewer2_results` executes the scientific processors with historical previews hidden, moves each new analysis out of the raw-study tree, and calls `make_reviewer2_final_figures`, which routes through the curated manuscript renderer. Final CSVs, convergence MAT files, EPS figures, PNG figures, and the figure manifest are saved directly under:
 
@@ -157,15 +195,15 @@ The raw optimization runs remain under `results/RUNTIME_COMPARISON_1200/`, `resu
 Final Reviewer 2 figures use:
 
 - Times New Roman;
-- 12 pt minimum axis, tick, annotation, and legend text;
-- 14 pt axis labels;
+- 22 pt minimum export text (approximately 10 pt when placed at 3 inches);
+- 24 pt axis labels;
 - one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
 - directly overlaid comparable convergence curves on one axes;
 - convergence figures show only the 20-run mean best-so-far curves; run-to-run variability is retained in the processed tables and metric figures;
 - no grid lines and no surrounding axes box;
 - 20-run mean +/- sample standard deviation for quantitative comparisons;
 - objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
-- the same 7.6 x 7.0 inch centered 3-D layout used by the introductory tracking-case figures;
+- the same 6.5 x 5.2 inch canvas for every paired panel and centered 3-D layout used by the introductory tracking-case figures;
 - solid observer-orbit lines, duplicate periodic orbits drawn once, no Earth, and low-thrust endpoint-orbit context.
 
 The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in numerical tables rather than being repeated as a bar figure, and coverage-fraction figures are omitted. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
@@ -272,3 +310,26 @@ test_gateway_impulse_case;
 | Baseline Monte Carlo | `COMPILED_REVIEWER_2_RESULTS/baseline_monte_carlo_<timestamp>/` |
 
 Historical runs must be interpreted using the mission, visibility, noise, slot-definition, and stopping settings with which they were generated. Do not mix runs generated under different scientific configurations.
+
+### EPS placement and validation
+
+All final renderers call `export_manuscript_figure`, which uses the painters
+vector renderer, a white opaque background, and a fixed EPS bounding box.
+PNG previews use the same full canvas rather than a separate tight crop.
+RA/Dec share axis lengths, data limits, and panel positions; DRO shares the
+orbit-family canvas and axes box while retaining its top-down camera.
+Font sizes, all panel dimensions, and camera settings remain centralized in
+`scripts/reviewer2_paper_style.m`. Unsupported transparency is rejected explicitly.
+
+Place side-by-side EPS panels using equal `subfigure` widths and only
+`\includegraphics[width=\linewidth]{...}`. Avoid unequal widths, per-image
+`trim`, or different height caps: those undo the matched canvas scaling. The
+style targets two panels across, about 3 inches per panel; four across would
+halve the printed font size. Split 12-panel geometry grids across figures or
+use two columns when readable axes are required. Fonts cannot stay 10 pt if
+the same image is arbitrarily reduced to a quarter-page width.
+
+Run `setup_project; test_manuscript_figure_export` in MATLAB for a data-free EPS
+canvas/font regression check. `test_manuscript_table_formatting` checks result
+row formatting with synthetic processed data. Full publication figures require
+the local catalog and completed study data.

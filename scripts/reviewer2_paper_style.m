@@ -7,8 +7,11 @@ function style = reviewer2_paper_style()
 % figureHeight fields remain compatibility aliases.
 
 style.fontName = 'Times New Roman';
-style.fontSize = 12;
-style.labelFontSize = 14;
+% A 6.5-inch EPS placed at 3 inches retains approximately 10-point text.
+style.manuscriptPanelWidth = 3.0;
+style.minimumPrintedFontSize = 10;
+style.fontSize = 22;
+style.labelFontSize = 24;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -21,15 +24,15 @@ style.exportDpi = 300;
 % the same outer paper size within each class.
 % -------------------------------------------------------------------------
 style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 4.6;
+style.metricFigureHeight = 5.2;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = style.metricFigureWidth;
 style.convergenceFigureHeight = style.metricFigureHeight;
 
-style.geometryFigureWidth = 7.6;
-style.geometryFigureHeight = 7.0;
+style.geometryFigureWidth = style.metricFigureWidth;
+style.geometryFigureHeight = style.metricFigureHeight;
 style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
 % The two slot-definition panels are intended to be paired in LaTeX, so
@@ -37,15 +40,21 @@ style.orbitFamilyFigureHeight = style.geometryFigureHeight;
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
-style.visibilityFigureWidth = 7.2;
-style.visibilityFigureHeight = 5.1;
-style.measurementFigureWidth = 4.45;
-style.measurementFigureHeight = 4.55;
-style.monteCarloFigureWidth = 4.8;
-style.monteCarloFigureHeight = 4.2;
+style.visibilityFigureWidth = style.metricFigureWidth;
+style.visibilityFigureHeight = style.metricFigureHeight;
+style.measurementFigureWidth = style.metricFigureWidth;
+style.measurementFigureHeight = style.metricFigureHeight;
+style.monteCarloFigureWidth = style.metricFigureWidth;
+style.monteCarloFigureHeight = style.metricFigureHeight;
 
 % Shared 3-D layout and fallback camera.
-style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
+style.geometryPlotPosition = [0.15 0.18 0.72 0.60];
+style.metricPlotPosition = [0.18 0.22 0.77 0.55];
+style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
+style.measurementXLim = [-0.95 5.10];
+style.measurementYLim = [-0.80 4.20];
+style.measurementAxisLength = [4.25 3.45];
+style.legendMaxColumns = 2;
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;

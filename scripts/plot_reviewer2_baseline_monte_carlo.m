@@ -74,12 +74,11 @@ for k = 1:height(summary)
     end
     figureStem(k) = stem;
 
-    enforce_minimum_font_size(fig,12);
+    enforce_minimum_font_size(fig,style.fontSize);
     drawnow;
     if saveFigures
         base = fullfile(char(figureDir),char(stem));
-        print(fig,[base '.eps'],'-depsc2','-painters','-r600');
-        exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
+        export_manuscript_figure(fig,base);
         close(fig);
     end
 end
