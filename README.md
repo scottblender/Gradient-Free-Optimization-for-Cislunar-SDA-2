@@ -152,10 +152,12 @@ constellation optimizers. Monte Carlo selects the newest saved sample directory
 reported and skipped; new MC evaluations must be requested explicitly using the
 validation runner described below.
 
-Every invocation collects the selected EPS and PNG files into
-`COMPILED_REVIEWER_2_RESULTS/manuscript_figures_<timestamp>/`, with a CSV manifest
-of source files and canvas dimensions. No existing publication collection is
-overwritten. Per-study numerical outputs retain their existing organization.
+Every invocation collects final EPS files, PNG previews, a figure manifest, and
+`manuscript_tables.txt` / `manuscript_tables.tex` together in `MANUSCRIPT_OUTPUT/`.
+The table printer uses this same folder when run separately. Matching output names
+are overwritten on reruns; unselected figures are retained. Both entry points accept
+`OutputDirectory` to use another shared folder. Per-study processing intermediates
+and numerical source data retain their existing organization.
 
 ### Print all manuscript tables
 

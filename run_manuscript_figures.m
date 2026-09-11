@@ -10,6 +10,7 @@ function output = run_manuscript_figures(sections,varargin)
 if nargin < 1 || isempty(sections), sections = "all"; end
 paths = setup_project();
 p = inputParser;
+addParameter(p,'OutputDirectory',fullfile(paths.root,'MANUSCRIPT_OUTPUT'));
 addParameter(p,'Inspect',false,@(x) isscalar(x) && (islogical(x)||isnumeric(x)));
 addParameter(p,'Reprocess',false,@(x) isscalar(x) && (islogical(x)||isnumeric(x)));
 addParameter(p,'DefinitionSections',"all");
@@ -24,9 +25,8 @@ assert(all(ismember(sections,["definitions",resultSections,"monte_carlo"])), ...
 sections = unique(sections,'stable');
 compiled = fullfile(paths.root,'COMPILED_REVIEWER_2_RESULTS');
 if ~isfolder(compiled), mkdir(compiled); end
-stamp = string(datetime('now','Format','yyyyMMdd_HHmmss_SSS'));
-output.directory = string(fullfile(compiled,"manuscript_figures_"+stamp));
-mkdir(output.directory);
+output.directory = string(opts.OutputDirectory);
+if ~isfolder(output.directory), mkdir(output.directory); end
 sources = strings(0,1);
 if ismember("definitions",sections)
     output.definitions = plot_study_definition_figures(logical(opts.Inspect),opts.DefinitionSections);
@@ -95,6 +95,7 @@ output.manifest = table(stems,sources,repmat(style.metricFigureWidth,numel(stems
     'VariableNames',{'FigureStem','SourceEPS','WidthInches','HeightInches'});
 writetable(output.manifest,fullfile(output.directory,'figure_manifest.csv'));
 fprintf('\nManuscript EPS/PNG files: %s\n',output.directory);
+output.tables = print_manuscript_tables('OutputDirectory',output.directory);
 fprintf('Place paired panels at equal widths, approximately %.1f inches each.\n',style.manuscriptPanelWidth);
 end
 

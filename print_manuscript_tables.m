@@ -14,7 +14,30 @@ paths = setup_project();
 addParameter(p,'CompiledRoot',fullfile(paths.root,'COMPILED_REVIEWER_2_RESULTS'));
 addParameter(p,'Directories',struct());
 addParameter(p,'Reprocess',false);
+addParameter(p,'OutputDirectory',fullfile(paths.root,'MANUSCRIPT_OUTPUT'));
+addParameter(p,'CaptureOutput',true);
 parse(p,varargin{:}); opts = p.Results;
+if opts.CaptureOutput
+    if ~isfolder(opts.OutputDirectory), mkdir(opts.OutputDirectory); end
+    transcript = evalc('output = print_manuscript_tables(varargin{:},''CaptureOutput'',false);');
+    fprintf('%s',transcript);
+    txt = fullfile(opts.OutputDirectory,'manuscript_tables.txt');
+    tex = fullfile(opts.OutputDirectory,'manuscript_tables.tex');
+    write_text(txt,transcript);
+    % Keep complete fixed tables and dynamic rows as LaTeX. Other messages
+    % become comments, so source paths/diagnostics cannot break compilation.
+    lines = splitlines(string(transcript)); inTable = false;
+    for line = 1:numel(lines)
+        if startsWith(strtrim(lines(line)),"\begin{table}"), inTable = true; end
+        keep = inTable || (contains(lines(line)," & ") && endsWith(strtrim(lines(line)),"\\"));
+        if ~keep, lines(line) = "% " + lines(line); end
+        if startsWith(strtrim(lines(line)),"\end{table}"), inTable = false; end
+    end
+    write_text(tex,strjoin(lines,newline));
+    output.textFile = string(txt); output.latexFile = string(tex);
+    fprintf('Table printouts saved in: %s\n',opts.OutputDirectory);
+    return;
+end
 if opts.Reprocess
     reports = run_reviewer2_results("all",false);
     for field = ["runtime","comparison","baseline","objective_screening"]
@@ -245,4 +268,10 @@ catch exception
     fprintf(2,'Converged LT values unavailable: %s\n',exception.message);
     rows(end+1,:)=["Converged duration / costates","UNAVAILABLE (see diagnostic)","","",""];
 end
+end
+
+function write_text(file,content)
+fid = fopen(file,'w'); assert(fid>=0,'Cannot write %s.',file);
+cleanup = onCleanup(@() fclose(fid)); %#ok<NASGU>
+fprintf(fid,'%s',content);
 end
