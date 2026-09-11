@@ -50,11 +50,13 @@ style.manuscriptPanelWidth = 3.3;
 
 % -------------------------------------------------------------------------
 % Standard 2-D layout.
-% The plot top is deliberately below the legend row so long vertical y-axis
-% labels cannot collide with the legend. format_manuscript_legend restores
-% this rectangle after MATLAB creates the legend.
+% The inner plot box is centered horizontally so the left/right whitespace is
+% visually balanced on every EPS export. A 13% margin on each side retains
+% enough room for large y tick labels and vertical axis labels without the
+% severe left-heavy whitespace of the previous [0.15 ... 0.82 ...] layout.
+% The plot top remains below the centered legend row so labels do not collide.
 % -------------------------------------------------------------------------
-style.metricPlotPosition = [0.15 0.17 0.82 0.56];
+style.metricPlotPosition = [0.13 0.17 0.74 0.56];
 style.legend2DGap = 0.08;
 style.legendMaxColumns = 8;
 style.legendMaxWidth = 0.96;
