@@ -83,6 +83,39 @@ png = imfinfo(strrep(geometryFile,'.eps','.png')); imageSizes(2,:)=[png.Width pn
 clear closeFigure;
 
 % -------------------------------------------------------------------------
+% Low-thrust geometry legend: the real comparison panel has eight entries.
+% At full manuscript font size it must fit the fixed EPS canvas without
+% changing the font size or creating more than two legend rows.
+% -------------------------------------------------------------------------
+fig = figure('Visible','off','Units','inches', ...
+    'Position',[1 1 style.geometryFigureWidth style.geometryFigureHeight], ...
+    'PaperUnits','inches','PaperSize',[style.geometryFigureWidth style.geometryFigureHeight]);
+closeFigure = onCleanup(@() close(fig));
+ax = axes(fig,'Units','normalized','Position',style.geometryPlotPosition); hold(ax,'on');
+t = linspace(0,2*pi,80);
+h = gobjects(8,1);
+for k = 1:8
+    h(k)=plot3(ax,0.95+0.04*k/8*cos(t),0.02*sin(t),0.05*sin(t+k/10), ...
+        'LineWidth',1.2);
+end
+xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
+view(ax,-37.5,35); axis(ax,'equal');
+lgd = legend(ax,h,{'Endpoint orbits','Target trajectory','Observer orbits', ...
+    'Start','End','Moon','L1','L2'},'Location','northoutside', ...
+    'Orientation','horizontal','NumColumns',4);
+longLegendFile = fullfile(folder,'long_geometry_legend.eps');
+export_manuscript_figure(fig,longLegendFile);
+labels = string(lgd.String);
+assert(any(labels=="Endpoints") && any(labels=="Target") && ...
+    any(labels=="Obs. orbits"), ...
+    'Standard long trajectory legend labels were not compacted.');
+assert(ceil(numel(labels)/lgd.NumColumns)<=style.legendMaxRows, ...
+    'Long trajectory legend requires too many rows.');
+check_fonts(fig,style);
+check_canvas(fig);
+clear closeFigure;
+
+% -------------------------------------------------------------------------
 % Slot demonstration: candidate markers become filled but excluded endpoint
 % remains hollow so the slot convention is still visually unambiguous.
 % -------------------------------------------------------------------------
@@ -125,7 +158,8 @@ assert(style.fontSize*style.manuscriptPanelWidth/style.metricFigureWidth >= ...
 assert(style.legendNorthOutsideYOffset<0 && style.legendMinimumGap>0);
 fprintf(['Centralized manuscript formatter checks passed: readable fonts, adjusted ' ...
     'northoutside legends, metric ticks, compact symmetric trajectory ticks, ' ...
-    'filled slot candidates, taller keepout schematic, and EPS fit.\n']);
+    'long trajectory legend fit, filled slot candidates, taller keepout schematic, ' ...
+    'and EPS fit.\n']);
 end
 
 
