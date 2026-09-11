@@ -99,19 +99,10 @@ for k=1:numel(axesObjects)
         ax.Position=[left bottom width height];
     end
 
-    % Perspective 3-D trajectory/orbit panels can still look visually small
-    % even when the axes rectangle is large because MATLAB leaves generous
-    % camera framing around equal-axis geometry. Zoom only non-top-down views
-    % after final layout so the physical trajectory occupies more of the EPS
-    % while preserving data limits, equal-axis scaling, and outer paper size.
-    viewAngles=view(ax);
-    isThreeDimensional=abs(viewAngles(1))>1e-9 || abs(viewAngles(2)-90)>1e-9;
-    if isThreeDimensional && isfield(style,'geometryCameraZoom') && ...
-            style.geometryCameraZoom>1 && ...
-            ~isappdata(ax,'ManuscriptGeometryZoomApplied')
-        camzoom(ax,style.geometryCameraZoom);
-        setappdata(ax,'ManuscriptGeometryZoomApplied',true);
-    end
+    % Do not camera-zoom 3-D plots at export time. MATLAB already frames the
+    % current data limits inside the final axes box; an additional camzoom can
+    % push projected trajectories or markers outside the fixed EPS rectangle.
+    % Figure size is increased through the shared axes rectangle instead.
 end
 drawnow;
 end
