@@ -62,12 +62,13 @@ style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
 style.measurementXLim = [-0.95 5.10];
 style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
-% Legends remain centered above the axes. Preserve the plotter-requested
-% column count when it fits; export may wrap only to a second row if needed.
+% Legends remain centered above the axes. Keep them close to the plot so
+% trajectory/orbit geometry can use more of the fixed export canvas.
 style.legendMaxColumns = 6;
 style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
-style.geometryLegendGap = 0.012;
+style.geometryLegendGap = 0.004;
+style.legendTopPadding = 0.015;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
