@@ -7,13 +7,28 @@ for k=1:numel(axesObjects)
     if strcmp(ax.Visible,'off'), continue; end % hand-positioned schematics
     ax.Units='normalized';
     wrap_label(ax.XLabel,30); wrap_label(ax.YLabel,25);
-    % Automatic numeric axes need fewer ticks at manuscript font sizes.
+
+    % Perspective 3-D axes need substantially fewer numeric ticks than 2-D
+    % plots because projected labels can collapse into the same screen-space
+    % corner. Keep automatic tick placement, but subsample the resulting nice
+    % values before final layout. Manual ticks supplied by a plotter are left
+    % untouched so intentional labels are preserved.
+    viewAngles=view(ax);
+    isThreeDimensional=abs(viewAngles(1))>1e-9 || abs(viewAngles(2)-90)>1e-9;
     for axisName=["X","Y","Z"]
         ticks=ax.(axisName+"Tick");
-        if strcmp(ax.(axisName+"TickMode"),'auto') && numel(ticks)>6
-            ax.(axisName+"Tick")=ticks(unique(round(linspace(1,numel(ticks),5))));
+        if strcmp(ax.(axisName+"TickMode"),'auto')
+            if isThreeDimensional && isfield(style,'max3DTicks') && ...
+                    numel(ticks)>style.max3DTicks
+                keep=unique(round(linspace(1,numel(ticks),style.max3DTicks)));
+                ax.(axisName+"Tick")=ticks(keep);
+            elseif ~isThreeDimensional && numel(ticks)>6
+                keep=unique(round(linspace(1,numel(ticks),5)));
+                ax.(axisName+"Tick")=ticks(keep);
+            end
         end
     end
+
     labels=string(ax.XTickLabel);
     if numel(labels)>4 && any(isnan(str2double(labels)))
         ax.XTickLabelRotation=35;
