@@ -1,10 +1,9 @@
 function outputs = plot_study_definition_figures_for_manuscript( ...
     inspectFigures,sections,outputDirectory)
 %PLOT_STUDY_DEFINITION_FIGURES_FOR_MANUSCRIPT Route definitions to one output.
-% The legacy generator still uses its historical staging path internally,
-% but manuscript runs never leave a second copy there. The staging folder is
-% cleared before generation, every generated product is moved to the selected
-% MANUSCRIPT_OUTPUT directory, and the staging folder is removed afterward.
+% Manuscript-specific figures are generated in their final styled state before
+% export. Legacy study-definition products are still supported for the other
+% sections, but no persistent copy is left in results/study_definition_figures.
 
 if nargin<1 || isempty(inspectFigures), inspectFigures = false; end
 if nargin<2 || isempty(sections), sections = "all"; end
@@ -16,32 +15,52 @@ end
 outputDirectory = char(string(outputDirectory));
 if ~isfolder(outputDirectory), mkdir(outputDirectory); end
 
+requested = lower(string(sections(:)'));
+available = ["catalog","slots","visibility","measurement","cases"];
+if isequal(requested,"all"), requested = available; end
+assert(all(ismember(requested,available)),'Unknown definition figure section.');
+requested = unique(requested,'stable');
+
 legacyDirectory = fullfile(paths.results,'study_definition_figures');
+if isfolder(legacyDirectory), rmdir(legacyDirectory,'s'); end
+outputs = struct();
 
-% This directory is obsolete for the manuscript workflow. Remove stale
-% products before generation so a manuscript run cannot leave old duplicates.
-if isfolder(legacyDirectory)
-    rmdir(legacyDirectory,'s');
-end
+% The visibility schematic has its own manuscript generator because its final
+% geometry size is part of figure generation, not an export-time transform.
+legacySections = requested(requested~="visibility");
+if ~isempty(legacySections)
+    transcript = evalc('legacyOutputs = plot_study_definition_figures(inspectFigures,legacySections);'); %#ok<NASGU>
+    legacyOutputs = relocate_output_paths(legacyOutputs,legacyDirectory,outputDirectory);
+    outputs = merge_struct(outputs,legacyOutputs);
 
-% Suppress legacy path messages while the underlying generator runs.
-transcript = evalc('outputs = plot_study_definition_figures(inspectFigures,sections);'); %#ok<NASGU>
-outputs = relocate_output_paths(outputs,legacyDirectory,outputDirectory);
-
-% Move any generated side products not explicitly referenced in the returned
-% structure, then remove the staging directory completely.
-if isfolder(legacyDirectory)
-    listing = dir(fullfile(legacyDirectory,'**','*'));
-    listing = listing(~[listing.isdir]);
-    for k = 1:numel(listing)
-        move_one_file(fullfile(listing(k).folder,listing(k).name),outputDirectory);
+    % Move side products not explicitly referenced in the return structure.
+    if isfolder(legacyDirectory)
+        listing = dir(fullfile(legacyDirectory,'**','*'));
+        listing = listing(~[listing.isdir]);
+        for k = 1:numel(listing)
+            move_one_file(fullfile(listing(k).folder,listing(k).name),outputDirectory);
+        end
     end
-    if isfolder(legacyDirectory), rmdir(legacyDirectory,'s'); end
 end
+
+if ismember("visibility",requested)
+    outputs.visibilityGeometry = plot_visibility_keepout_manuscript( ...
+        inspectFigures,outputDirectory);
+end
+
+if isfolder(legacyDirectory), rmdir(legacyDirectory,'s'); end
 assert(~isfolder(legacyDirectory), ...
     'Legacy study-definition output directory should not remain after manuscript generation.');
 
 fprintf('Study-definition manuscript files: %s\n',outputDirectory);
+end
+
+
+function target = merge_struct(target,source)
+fields = fieldnames(source);
+for k = 1:numel(fields)
+    target.(fields{k}) = source.(fields{k});
+end
 end
 
 
@@ -88,8 +107,6 @@ if ~strcmpi(source,destination)
     assert(ok,'Could not move manuscript definition file %s: %s',source,message);
 end
 
-% EPS export creates a matching PNG preview. Move the sidecar too when it is
-% still present beside the EPS.
 if strcmpi(extension,'.eps')
     sourcePng = fullfile(fileparts(source),[name '.png']);
     destinationPng = fullfile(outputDirectory,[name '.png']);
