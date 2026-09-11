@@ -14,6 +14,8 @@ style = reviewer2_paper_style();
 fig = manuscript_figure(style.visibilityFigureWidth,style.visibilityFigureHeight,style);
 ax = axes(fig,'Units','normalized','Position',style.visibilityPlotPosition);
 hold(ax,'on'); box(ax,'off'); grid(ax,'off'); axis(ax,'equal'); axis(ax,'off');
+set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
+    'FontWeight',style.fontWeight);
 
 cObserver = [0.90,0.12,0.10];
 cTarget = [0.00,0.39,0.72];
@@ -72,11 +74,19 @@ draw_angle_arc(ax,observer,0,thetaKeepout,1.48,cExclusion,2.1);
 draw_angle_arc(ax,observer,0,thetaB,2.10,cTarget,2.1);
 
 text(ax,observer(1)-0.02,observer(2)-0.46,'Observer', ...
-    'Color',cObserver,'HorizontalAlignment','center');
-text(ax,target(1)+0.18,target(2)-0.02,'Target', ...
-    'Color',cTarget,'HorizontalAlignment','left');
+    'Color',cObserver,'HorizontalAlignment','center', ...
+    'FontName',style.fontName,'FontSize',style.fontSize, ...
+    'FontWeight',style.fontWeight);
+% Keep the label inside the fixed manuscript canvas without widening the
+% data limits (which would make the entire schematic smaller again).
+text(ax,target(1)-0.12,target(2)+0.18,'Target', ...
+    'Color',cTarget,'HorizontalAlignment','right','VerticalAlignment','bottom', ...
+    'FontName',style.fontName,'FontSize',style.fontSize, ...
+    'FontWeight',style.fontWeight);
 text(ax,body(1),body(2)-1.16,'Body b', ...
-    'HorizontalAlignment','center','BackgroundColor','w','Margin',0.8);
+    'HorizontalAlignment','center','BackgroundColor','w','Margin',0.8, ...
+    'FontName',style.fontName,'FontSize',style.fontSize, ...
+    'FontWeight',style.fontWeight);
 
 occArcPoint = observer + 0.95*[cos(0.5*thetaOcc),sin(0.5*thetaOcc)];
 keepoutArcPoint = observer + 1.48*[cos(0.5*thetaKeepout),sin(0.5*thetaKeepout)];
@@ -94,7 +104,8 @@ ptOccRegion = observer + 2.45*[cos(-0.55*thetaOcc),sin(-0.55*thetaOcc)];
 occCallout = observer + [1.65,-1.28];
 text(ax,occCallout(1),occCallout(2),{'physical';'occultation'}, ...
     'Color',cOcc,'FontAngle','italic','HorizontalAlignment','center', ...
-    'VerticalAlignment','middle');
+    'VerticalAlignment','middle','FontName',style.fontName, ...
+    'FontSize',style.fontSize,'FontWeight',style.fontWeight);
 draw_leader_arrow(ax,occCallout+[0,0.28],ptOccRegion,cOcc);
 
 ptMargin = observer + 2.70*[cos(0.5*(thetaOcc+thetaKeepout)), ...
@@ -102,7 +113,9 @@ ptMargin = observer + 2.70*[cos(0.5*(thetaOcc+thetaKeepout)), ...
 marginCallout = observer + [2.92,2.08];
 text(ax,marginCallout(1),marginCallout(2),{'effective';'exclusion margin'}, ...
     'Color',cExclusion,'FontAngle','italic','HorizontalAlignment','center', ...
-    'VerticalAlignment','middle','BackgroundColor','w','Margin',0.8);
+    'VerticalAlignment','middle','BackgroundColor','w','Margin',0.8, ...
+    'FontName',style.fontName,'FontSize',style.fontSize, ...
+    'FontWeight',style.fontWeight);
 draw_leader_arrow(ax,marginCallout+[0,-0.30],ptMargin,cExclusion);
 
 % These tighter limits are the important sizing change: the physical
@@ -110,6 +123,10 @@ draw_leader_arrow(ax,marginCallout+[0,-0.30],ptMargin,cExclusion);
 xlim(ax,style.visibilityXLim);
 ylim(ax,style.visibilityYLim);
 ax.Position = style.visibilityPlotPosition;
+
+% Finalize all actual manuscript text during generation. The exporter only
+% validates this state and never restyles it.
+finalize_visibility_text(fig,style);
 drawnow;
 
 if inspectFigure
@@ -138,6 +155,16 @@ set(fig,'DefaultAxesFontName',style.fontName, ...
     'DefaultTextFontName',style.fontName, ...
     'DefaultTextFontSize',style.fontSize, ...
     'DefaultTextFontWeight',style.fontWeight);
+end
+
+
+function finalize_visibility_text(fig,style)
+objects = findall(fig,'Type','text');
+for k = 1:numel(objects)
+    objects(k).FontName = style.fontName;
+    objects(k).FontSize = style.fontSize;
+    objects(k).FontWeight = style.fontWeight;
+end
 end
 
 
