@@ -150,20 +150,20 @@ for k=1:numel(axesObjects)
         ax.Position=[left bottom width height];
     end
 
-    % Reapply one shared legend-gap rule after the final axes layout. The old
-    % exporter added an extra +0.010 normalized offset here, which silently
-    % moved legends back upward after plotters had already positioned them.
-    % Keep enough room for projected tick labels, but otherwise preserve the
-    % moderate geometryLegendGap used by the plotters themselves.
+    % Final legend placement is measured directly from the axes rectangle.
+    % TightInset is already accounted for when sizing the axes above; adding
+    % it again here made the legend appear unchanged even when the requested
+    % gap was reduced. Use one explicit axes-to-legend gap instead.
     if ~isempty(lgd) && isvalid(lgd)
         drawnow;
         pos=lgd.Position;
-        inset=ax.TightInset;
-        topClearance=max(style.legendMinimumTopClearance,inset(4));
-        desiredBottom=ax.Position(2)+ax.Position(4)+topClearance+style.geometryLegendGap;
+        desiredBottom=ax.Position(2)+ax.Position(4)+style.legendAxesGap;
+        maximumBottom=0.99-pos(4);
         pos(1)=max(0.002,(1-pos(3))/2);
-        pos(2)=min(desiredBottom,0.99-pos(4));
+        pos(2)=min(desiredBottom,maximumBottom);
         lgd.Position=pos;
+        setappdata(ax,'ManuscriptFinalLegendGap', ...
+            lgd.Position(2)-(ax.Position(2)+ax.Position(4)));
     end
 
     % Do not camera-zoom 3-D plots at export time. MATLAB already frames the
