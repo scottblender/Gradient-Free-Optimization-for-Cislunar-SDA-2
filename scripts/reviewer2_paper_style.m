@@ -13,6 +13,7 @@ style.fontWeight = 'bold';
 style.fontSize = 16;
 style.labelFontSize = 18;
 style.legendFontSize = 14;
+style.geometryLegendFontSize = 15; % slightly larger only for 3-D geometry legends
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -56,9 +57,10 @@ style.measurementFigureHeight = 4.8;
 style.monteCarloFigureWidth = 4.8;
 style.monteCarloFigureHeight = 4.2;
 
-% Shared 3-D layout. Increase the plot rectangle and tighten axis padding so
-% trajectories occupy more of the EPS while preserving room for labels.
-style.geometryPlotPosition = [0.10 0.16 0.82 0.70];
+% Shared 3-D layout. The x-position and width are exactly symmetric about
+% the exported canvas center (0.09 + 0.82/2 = 0.50). Tight axis padding keeps
+% the trajectories large without changing camera geometry or EPS export.
+style.geometryPlotPosition = [0.09 0.16 0.82 0.70];
 style.geometryLegendGap = 0.006;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
