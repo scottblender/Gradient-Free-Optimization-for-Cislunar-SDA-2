@@ -10,4 +10,5 @@ value = replace(value,"Gateway periods","LG periods");
 value = replace(value,"Mean observer stability index","Mean stability index");
 value = replace(value,"Mean runtime to 1200 FE (s)","Runtime to 1200 FE (s)");
 value = replace(value,"Mean final best objective","Final best objective");
+value = replace(value,"6000-FE GA reference","GA (6000 FE)");
 end
