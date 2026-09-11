@@ -280,7 +280,7 @@ colors = colors_for_optimizers(R.Optimizer,style);
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
-b = bar(ax,1:height(R),values,0.72,'FaceColor','flat'); b.CData = colors;
+b = bar(ax,1:height(R),values,style.groupedBarWidth,'FaceColor','flat'); b.CData = colors;
 errorbar(ax,1:height(R),values,errors,'k.','LineWidth',1.0, ...
     'CapSize',style.capSize,'HandleVisibility','off');
 format_category_axis(ax,optimizer_labels(R.Optimizer),yLabel,style);
@@ -320,7 +320,7 @@ R = r.results; missions = string(r.missions); optimizers = string(r.optimizers);
 [values,errors] = grouped_values(R,missions,optimizers,valueField,stdField);
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
-b = bar(ax,1:numel(missions),values,'grouped'); drawnow;
+b = bar(ax,1:numel(missions),values,'grouped','BarWidth',style.groupedBarWidth); drawnow;
 for k = 1:numel(optimizers)
     b(k).FaceColor = optimizer_color(optimizers(k),style);
     errorbar(ax,b(k).XEndPoints,values(:,k),errors(:,k),'k.', ...
@@ -456,7 +456,7 @@ for m = 1:3
 end
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
-b = bar(ax,1:3,values,'grouped'); drawnow;
+b = bar(ax,1:3,values,'grouped','BarWidth',style.groupedBarWidth); drawnow;
 for c = 1:2
     b(c).FaceColor = style.configurationColors(c,:);
     errorbar(ax,b(c).XEndPoints,values(:,c),errors(:,c),'k.','LineWidth',0.9, ...
@@ -696,6 +696,7 @@ set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', 
     'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontSize = style.labelFontSize; ax.YLabel.FontSize = style.labelFontSize;
 wrap_manuscript_label(ax.XLabel); wrap_manuscript_label(ax.YLabel);
+space_manuscript_bars(ax,style);
 end
 
 function style_legend(lgd,ax,style)

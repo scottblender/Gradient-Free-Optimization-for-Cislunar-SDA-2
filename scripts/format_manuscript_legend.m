@@ -8,6 +8,7 @@ columns=min(numel(lgd.String),style.legendMaxColumns);
 lgd.NumColumns=columns; drawnow;
 while lgd.Position(3)>0.92 && columns>1
     columns=columns-1; lgd.NumColumns=columns; drawnow;
+format_manuscript_ticks(ax);
 end
 lp=lgd.Position; lp(1)=(1-lp(3))/2;
 % A fixed top anchor keeps labels off the trajectory and inside the page.
@@ -17,4 +18,5 @@ assert(plotPosition(4)>0.30 && lp(1)>=0,'Manuscript:LegendSpace', ...
     'Legend text is too large for this canvas; shorten labels in the plotter.');
 ax.Units='normalized'; ax.PositionConstraint='innerposition'; ax.Position=plotPosition;
 drawnow;
+format_manuscript_ticks(ax);
 end

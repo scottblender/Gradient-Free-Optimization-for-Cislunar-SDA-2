@@ -374,3 +374,9 @@ run_manuscript_figures(1); % Clear generated final exports and regenerate all
 The master runner, table printer, saved parallel benchmark, and common output
 parent are retained. `test_manuscript_figure_export` checks that the completed
 styled scene is unchanged by EPS/PNG writing; it requires MATLAB graphics.
+
+During construction, symmetric three-tick 3-D axes such as `[-0.05 0 0.05]`
+retain only the two endpoint ticks. Data limits and 2-D zero baselines are
+unchanged. Grouped bars use width 0.64, fixed outside padding, and 25-degree
+rotation for long category labels; bar centers and error-bar coordinates stay
+aligned. These settings are not applied during EPS export.

@@ -52,7 +52,7 @@ colors = colors_for_optimizers(R.Optimizer,style);
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 values = R.(valueField); errors = R.(stdField);
-b = bar(ax,1:height(R),values,0.72,'FaceColor','flat');
+b = bar(ax,1:height(R),values,style.groupedBarWidth,'FaceColor','flat');
 b.CData = colors;
 errorbar(ax,1:height(R),values,errors,'k.','LineWidth',1.0, ...
     'CapSize',style.capSize,'HandleVisibility','off');
@@ -189,6 +189,7 @@ set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', 
 ax.XLabel.FontSize = style.labelFontSize;
 ax.YLabel.FontSize = style.labelFontSize;
 wrap_manuscript_label(ax.XLabel); wrap_manuscript_label(ax.YLabel);
+space_manuscript_bars(ax,style);
 end
 
 
