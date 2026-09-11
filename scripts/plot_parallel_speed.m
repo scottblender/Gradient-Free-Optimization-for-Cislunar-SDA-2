@@ -52,6 +52,7 @@ for kind=1:2
     ylabel(ax,'Mean best-so-far objective');
     legend(ax,'Location','northoutside','Orientation','horizontal','Box','off');
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
+    prepare_manuscript_figure(fig);
     export_manuscript_figure(fig,files(kind));
     clear cleanup;
 end

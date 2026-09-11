@@ -373,3 +373,23 @@ fonts, fits legend columns to the available width, wraps long plain-text axis
 labels, and reduces automatic numeric tick density. Paired exports keep the same
 physical canvas. Run `test_manuscript_figure_export` and
 `test_parallel_speed_figures` in MATLAB to check export sizing and legend spacing.
+
+### Geometry export repair
+
+`prepare_manuscript_figure` applies bold Times New Roman text, at most three
+legend columns, sparse 3-D ticks, and reserved label margins before a figure is
+previewed or exported. Perspective trajectory lines have clipping disabled;
+trajectory samples, camera direction, projection, and data aspect ratio are
+preserved. Orbit decimation now retains the recorded endpoint rather than
+silently omitting it. No artificial closing segment is added.
+
+`export_manuscript_figure` then prints that completed scene using painters and
+`-loose` for the full paper canvas; it does not rewrite EPS bounding boxes or
+reflow the plot. Geometry panels share the 7.6-by-7.0-inch canvas. For regenerated
+definition figures without deleting unrelated final figures:
+
+```matlab
+run_manuscript_figures("definitions");
+% Optional MATLAB graphics regression, no orbit catalog or optimization needed:
+test_manuscript_figure_export;
+```

@@ -419,6 +419,7 @@ end
 
 function export_figure(fig,figureDir,stem,saveFigures,dpi)
 if ~saveFigures, return; end
+prepare_manuscript_figure(fig);
 export_manuscript_figure(fig,fullfile(char(figureDir),char(stem)));
 close(fig);
 end

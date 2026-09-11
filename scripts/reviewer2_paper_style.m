@@ -55,7 +55,7 @@ style.monteCarloFigureHeight = style.metricFigureHeight;
 % -------------------------------------------------------------------------
 % Shared layouts.
 % -------------------------------------------------------------------------
-style.geometryPlotPosition = [0.12 0.18 0.76 0.64];
+style.geometryPlotPosition = [0.17 0.23 0.66 0.49];
 style.metricPlotPosition = [0.16 0.18 0.79 0.60];
 style.schematicPlotPosition = [0.05 0.06 0.90 0.88];
 style.measurementXLim = [-0.95 5.10];
@@ -64,8 +64,8 @@ style.measurementAxisLength = [4.25 3.45];
 
 % Legends are created at northoutside by each plotter, then moved only by
 % the plotter's own centered-layout helper. Five/six-item geometry legends
-% should remain in one row whenever the canvas permits it.
-style.legendMaxColumns = 6;
+% wrap into at most three columns so bold labels do not touch.
+style.legendMaxColumns = 3;
 style.geometryLegendGap = 0.008;
 
 % Desired tick density. Non-trajectory quantitative renderers may use these

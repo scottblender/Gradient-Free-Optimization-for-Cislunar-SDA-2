@@ -26,10 +26,12 @@ if isempty(paper) || numel(paper)~=2 || any(~isfinite(paper)) || any(paper<=0)
 end
 set(fig,'PaperPosition',[0 0 paper]);
 
+% Keep the full paper canvas (-loose), so equal-size panels are not scaled
+% differently by LaTeX because their label-dependent tight boxes differ.
 % Finish rendering exactly the figure state produced by the plotter, then
 % export it. No figure property is changed after this drawnow.
 drawnow;
-print(fig,[base '.eps'],'-depsc2','-painters','-r600');
+print(fig,[base '.eps'],'-depsc2','-painters','-loose','-r600');
 print(fig,[base '.png'],'-dpng',sprintf('-r%d',style.exportDpi));
 
 assert(isfile([base '.eps']) && dir([base '.eps']).bytes>0, ...

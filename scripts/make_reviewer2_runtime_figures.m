@@ -202,6 +202,7 @@ end
 
 function export_figure(fig,out,stem,saveFigures,style)
 if ~saveFigures, return; end
+prepare_manuscript_figure(fig);
 export_manuscript_figure(fig,fullfile(char(out),char(stem)));
 close(fig);
 end

@@ -244,8 +244,9 @@ for groupIndex = 1:numel(familyGroups)
             for plotted = 1:numel(selectedRows)
                 state = T.state{selectedRows(plotted)};
                 step = max(1,round(size(state,1)/maxPointsPerOrbit));
-                handle = plot3(ax,state(1:step:end,1), ...
-                    state(1:step:end,2),state(1:step:end,3),'-', ...
+                samples=unique([1:step:size(state,1),size(state,1)]);
+                handle = plot3(ax,state(samples,1), ...
+                    state(samples,2),state(samples,3),'-', ...
                     'Color',colors(member,:),'LineWidth',0.85);
                 if plotted==1
                     familyHandles(member) = handle;
@@ -1409,6 +1410,7 @@ end
 
 
 function export_publication_eps(fig,fileName)
+prepare_manuscript_figure(fig);
 export_manuscript_figure(fig,fileName);
 fprintf('Saved vector EPS: %s\n',fileName);
 end
@@ -1418,6 +1420,7 @@ function inspect_before_export(fig,inspectFigure,description)
 
 style = reviewer2_paper_style();
 enforce_minimum_font_size(fig,style.fontSize);
+prepare_manuscript_figure(fig);
 
 if inspectFigure
     figure(fig);

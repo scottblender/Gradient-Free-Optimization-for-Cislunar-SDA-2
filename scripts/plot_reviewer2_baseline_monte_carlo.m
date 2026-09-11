@@ -78,6 +78,7 @@ for k = 1:height(summary)
     drawnow;
     if saveFigures
         base = fullfile(char(figureDir),char(stem));
+        prepare_manuscript_figure(fig);
         export_manuscript_figure(fig,base);
         close(fig);
     end
