@@ -681,6 +681,7 @@ runStateFile = fullfile(DataDir,'optimization_run.mat');
 save(runStateFile,'runState','-v7');
 
 RunTimer = tic;
+setappdata(0,'OPT_FE_TIMER',RunTimer);
 solverError = [];
 solverExitFlag = NaN;
 solverOutput = struct();
@@ -1147,7 +1148,7 @@ function stop = bo_outfun(results,state,FE_BUDGET,RunTimer)
 end
 
 function reset_fe_history()
-    setappdata(0,'OPT_FE_HISTORY',zeros(0,2));
+    setappdata(0,'OPT_FE_HISTORY',zeros(0,3));
     setappdata(0,'OPT_GA_BEST',struct('J',Inf,'x',[]));
     setappdata(0,'OPT_BO_BUDGET_RUNTIME',NaN);
 end
@@ -1155,13 +1156,16 @@ end
 function append_fe_history(fe, bestJ)
     H = getappdata(0, 'OPT_FE_HISTORY');
     if isempty(H)
-        H = zeros(0,2);
+        H = zeros(0,3);
     end
 
     if isempty(H) || fe > H(end,1)
-        H(end+1,:) = [fe, bestJ];
+        H(end+1,:) = [fe, bestJ, toc(getappdata(0,'OPT_FE_TIMER'))];
     elseif fe == H(end,1)
-        H(end,2) = min(H(end,2), bestJ);
+        if bestJ < H(end,2)
+            H(end,2) = bestJ;
+            H(end,3) = toc(getappdata(0,'OPT_FE_TIMER'));
+        end
     end
 
     setappdata(0, 'OPT_FE_HISTORY', H);
@@ -1170,8 +1174,8 @@ end
 function T = get_fe_history()
     H = getappdata(0, 'OPT_FE_HISTORY');
     if isempty(H)
-        T = table([], [], 'VariableNames', {'fe','bestJ'});
+        T = table([], [], [], 'VariableNames', {'fe','bestJ','elapsed_s'});
     else
-        T = array2table(H, 'VariableNames', {'fe','bestJ'});
+        T = array2table(H, 'VariableNames', {'fe','bestJ','elapsed_s'});
     end
 end

@@ -11,9 +11,21 @@ for k = 1:2
         'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight]);
     closeFigure = onCleanup(@() close(fig));
     ax = axes(fig); plot(ax,1:10,k*(1:10)); xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)');
+    if k==2
+        hold(ax,'on');
+        for j=2:5, plot(ax,1:10,j*(1:10)); end
+        ylabel(ax,'Mean effective position uncertainty (km)');
+        legend(ax,{'GA','PSO','BO','ABCO','ACO'},'Location','northoutside');
+        setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
+    end
     text(ax,5,5*k,repmat('label ',1,k),'FontSize',8);
     file = fullfile(folder,sprintf('panel%d.eps',k));
     meta = export_manuscript_figure(fig,file);
+    if k==2
+        lp=ax.Legend.Position; ap=ax.Position;
+        assert(lp(2)>ap(2)+ap(4),'Legend overlaps the plot rectangle.');
+        assert(lp(1)>=0 && lp(1)+lp(3)<=1,'Legend extends outside canvas.');
+    end
     epsText = fileread(file);
     boxes(k) = string(regexp(epsText,'(?m)^%%BoundingBox:[^\r\n]*','match','once'));
     assert(contains(epsText,'%%HiResBoundingBox: 0 0 468.000000 374.400000'));

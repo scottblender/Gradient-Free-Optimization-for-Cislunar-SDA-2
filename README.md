@@ -335,3 +335,41 @@ Run `setup_project; test_manuscript_figure_export` in MATLAB for a data-free EPS
 canvas/font regression check. `test_manuscript_table_formatting` checks result
 row formatting with synthetic processed data. Full publication figures require
 the local catalog and completed study data.
+
+### Serial/parallel convergence and export cleanup
+
+```matlab
+setup_project;
+results = test_parallel_speed(3); % Run serial + parallel LG GA, 6000 FE each
+run_manuscript_figures("parallel"); % Export saved histories only
+run_manuscript_figures(0);          % All manuscript figures; keep old exports
+run_manuscript_figures(1);          % All manuscript figures; clear exports first
+% Clear final exports and regenerate only the parallel comparison:
+run_manuscript_figures("parallel",'ClearDirectory',1);
+```
+
+The benchmark saves completed runs, callback FE/objective/time histories, CSVs,
+and a timing summary beneath `MANUSCRIPT_OUTPUT/parallel_speed_lunar_gateway_<timestamp>/`.
+The master runner automatically includes the latest complete LG 6000-FE benchmark;
+use `ParallelSpeedDirectory` to select a particular saved benchmark. Missing tests
+are reported and skipped; figure generation never starts new optimizations.
+Old 120-FE timing tests cannot supply the new histories and must be rerun.
+
+Two separate EPS/PNG figures show mean best-so-far objective against FE and actual
+optimization elapsed time. Callback time excludes pool startup and post-search
+validation. Timing repetitions reuse seeds 0/1001 and alternate serial/parallel
+execution order; they are not independent stochastic trials. Time curves use
+previous-observation steps over each mode's common recorded time interval, without
+extrapolating a completed run or inventing time-zero objective values.
+
+Both figures and a copy of the numeric timing summary are exported directly to
+`MANUSCRIPT_OUTPUT/`. The numeric first argument is `0` to retain final exports
+(default), or `1` to clear final EPS/PNG files and generated table/summary files.
+Benchmark subdirectories and numerical source data are preserved. When selecting
+only one section with cleanup enabled, only that section's figures are regenerated.
+
+Final layout now measures legends and axis-label margins after applying export
+fonts, fits legend columns to the available width, wraps long plain-text axis
+labels, and reduces automatic numeric tick density. Paired exports keep the same
+physical canvas. Run `test_manuscript_figure_export` and
+`test_parallel_speed_figures` in MATLAB to check export sizing and legend spacing.

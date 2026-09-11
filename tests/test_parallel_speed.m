@@ -1,231 +1,101 @@
 function results = test_parallel_speed(nRepeats, missionType)
-%TEST_PARALLEL_SPEED Compare serial vs parallel runtime using the real study.
-%
-% Examples:
-%   test_parallel_speed
-%   test_parallel_speed(3)
-%   test_parallel_speed(3,"LOW_THRUST_TRANSFER")
-%
-% Runs the same:
-%   - GA
-%   - 120 FE
-%   - 3 observers
-%   - angles only
-%   - optimizer seed 0
-%   - measurement seed 1001
-%
-% Reports:
-%   optimization runtime from runState.runtime_s
-%   total wall-clock runtime
-%   serial/parallel speedup
-
-if nargin < 1 || isempty(nRepeats)
-    nRepeats = 2;
-end
-
-if nargin < 2 || isempty(missionType)
-    missionType = "LUNAR_GATEWAY";
-end
-
+%TEST_PARALLEL_SPEED Serial/parallel GA timing and convergence at 6000 FE.
+% test_parallel_speed(3)                 % LG, one period, three AO observers
+% test_parallel_speed(3,"LOW_THRUST_TRANSFER") % optional other target
+% Repetitions use the same seeds: timing repetitions, not independent trials.
+% Saved histories include actual callback times, excluding pool startup.
+% Use run_manuscript_figures("parallel") to export the saved LG comparison.
+if nargin < 1 || isempty(nRepeats), nRepeats = 2; end
+if nargin < 2 || isempty(missionType), missionType = "LUNAR_GATEWAY"; end
+validateattributes(nRepeats,{'numeric'},{'scalar','integer','positive','finite'});
 missionType = upper(string(missionType));
-
-assert(ismember(missionType, ...
-    ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"]), ...
-    'Unknown mission type.');
-
+assert(isscalar(missionType) && ismember(missionType, ...
+    ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"]),'Unknown mission type.');
 projectDir = fileparts(fileparts(mfilename('fullpath')));
-addpath(projectDir);
-paths = setup_project();
-
-budget = 120;
-optimizerSeed = 0;
-measurementSeed = 1001;
-
-stamp = char(datetime('now','Format','yyyyMMdd_HHmmss'));
-testRoot = fullfile(paths.results, ...
-    ['PARALLEL_SPEED_TEST_' stamp]);
+addpath(projectDir); paths = setup_project();
+budget = 6000;
+stamp = char(datetime('now','Format','yyyyMMdd_HHmmss_SSS'));
+testRoot = fullfile(paths.root,'MANUSCRIPT_OUTPUT', ...
+    ['parallel_speed_' lower(char(missionType)) '_' stamp]);
 mkdir(testRoot);
-
-% Preserve current environment.
-envNames = { ...
-    'MAX_EVALS'
-    'USE_PARALLEL_OPT'
-    'MISSION_TYPE'
-    'MEAS_MODEL'
-    'NUM_OBSERVERS'
-    'NPERIODS'
-    'USE_SCREENING'
-    'USE_J1'
-    'USE_J2'
-    'USE_J3'
-    'SEED'
-    'MEAS_NOISE_SEED'
-    'MAKE_PLOTS'
-    'OPTIMIZER_MODE'
-    'STUDY_ID'
-    'RUN_DIR'
-    'IMPULSE_DV_MPS'
-    'IMPULSE_DIRECTION'
-    'IMPULSE_DURATION_TU'
-    };
-
-oldValues = cellfun(@getenv, envNames, ...
-    'UniformOutput', false);
-
-cleanup = onCleanup(@() restore_environment( ...
-    envNames, oldValues)); %#ok<NASGU>
-
-% Fixed study settings.
-setenv('MAX_EVALS', num2str(budget));
-setenv('MISSION_TYPE', char(missionType));
-setenv('MEAS_MODEL', 'ANGLES_ONLY');
-setenv('NUM_OBSERVERS', '3');
-setenv('NPERIODS', '1');
-setenv('USE_SCREENING', '1');
-setenv('USE_J1', '1');
-setenv('USE_J2', '1');
-setenv('USE_J3', '1');
-setenv('SEED', num2str(optimizerSeed));
-setenv('MEAS_NOISE_SEED', num2str(measurementSeed));
-setenv('MAKE_PLOTS', '0');
-setenv('OPTIMIZER_MODE', 'GA');
-setenv('STUDY_ID', 'parallel_speed_test');
-
-setenv('IMPULSE_DV_MPS', '10');
-setenv('IMPULSE_DIRECTION', 'PROGRADE');
-setenv('IMPULSE_DURATION_TU', '1.5');
-
+envNames = {'MAX_EVALS','USE_PARALLEL_OPT','MISSION_TYPE','MEAS_MODEL', ...
+    'NUM_OBSERVERS','NPERIODS','USE_SCREENING','USE_J1','USE_J2','USE_J3', ...
+    'SEED','MEAS_NOISE_SEED','MAKE_PLOTS','OPTIMIZER_MODE','STUDY_ID','RUN_DIR', ...
+    'IMPULSE_DV_MPS','IMPULSE_DIRECTION','IMPULSE_DURATION_TU'};
+oldValues = cellfun(@getenv,envNames,'UniformOutput',false);
+cleanup = onCleanup(@() restore_environment(envNames,oldValues)); %#ok<NASGU>
+values = {'6000','0',char(missionType),'ANGLES_ONLY','3','1','1','1','1','1', ...
+    '0','1001','0','GA','parallel_speed_test','', '10','PROGRADE','1.5'};
+for k = 1:numel(envNames), setenv(envNames{k},values{k}); end
 modeNames = ["Serial","Parallel"];
-useParallel = [false,true];
-
 nRows = 2*nRepeats;
-
-Mode = strings(nRows,1);
-Repeat = zeros(nRows,1);
-Workers = zeros(nRows,1);
-OptimizationRuntime_s = nan(nRows,1);
-WallRuntime_s = nan(nRows,1);
-BestJ = nan(nRows,1);
-
+Mode = strings(nRows,1); Repeat = zeros(nRows,1); Workers = zeros(nRows,1);
+OptimizationRuntime_s = nan(nRows,1); WallRuntime_s = nan(nRows,1);
+BestJ = nan(nRows,1); SearchFE = nan(nRows,1); SolverCalls = nan(nRows,1);
+RunDirectory = strings(nRows,1); histories = cell(nRows,1);
 row = 0;
-
-for m = 1:2
-
-    % Make the comparison clean.
-    p = gcp('nocreate');
-    if ~isempty(p)
-        delete(p);
-    end
-
-    for r = 1:nRepeats
-
-        row = row + 1;
-
-        setenv('USE_PARALLEL_OPT', ...
-            num2str(double(useParallel(m))));
-
-        runDir = fullfile(testRoot, ...
-            lower(char(modeNames(m))), ...
-            sprintf('repeat_%02d',r));
-
-        mkdir(runDir);
-        setenv('RUN_DIR',runDir);
-
-        fprintf('\n----------------------------------------\n');
-        fprintf('%s run %d/%d\n', ...
-            modeNames(m),r,nRepeats);
-        fprintf('Mission: %s | FE: %d\n', ...
-            missionType,budget);
-        fprintf('----------------------------------------\n');
-
-        wallTimer = tic;
-
-        R = run_case(projectDir);
-
-        wallElapsed = toc(wallTimer);
-
-        Mode(row) = modeNames(m);
-        Repeat(row) = r;
-        OptimizationRuntime_s(row) = R.runtime_s;
-        WallRuntime_s(row) = wallElapsed;
-        BestJ(row) = R.bestJ;
-
-        if isfield(R.settings,'workerCount')
-            Workers(row) = R.settings.workerCount;
-        end
-
-        fprintf('Optimization runtime: %.3f s\n', ...
-            R.runtime_s);
-        fprintf('Wall-clock runtime:    %.3f s\n', ...
-            wallElapsed);
-        fprintf('Best J:                %.12g\n', ...
-            R.bestJ);
+% Alternate which mode runs first to reduce systematic execution-order bias.
+for r = 1:nRepeats
+    order = [1 2]; if mod(r,2)==0, order = [2 1]; end
+    for m = order
+        pool = gcp('nocreate');
+        if m==1 && ~isempty(pool), delete(pool); end
+        row = row+1;
+        setenv('USE_PARALLEL_OPT',num2str(m==2));
+        runDir = fullfile(testRoot,lower(char(modeNames(m))),sprintf('repeat_%02d',r));
+        mkdir(runDir); setenv('RUN_DIR',runDir);
+        fprintf('\n%s run %d/%d | %s | %d FE\n',modeNames(m),r,nRepeats,missionType,budget);
+        timer = tic; R = run_case(projectDir); wallElapsed = toc(timer);
+        H = R.history;
+        assert(all(ismember({'fe','bestJ','elapsed_s'},H.Properties.VariableNames)), ...
+            'Missing callback timing; update run_opt.m before running this test.');
+        assert(R.searchFunctionEvaluations==budget && H.fe(end)==budget, ...
+            'Benchmark did not complete the prescribed FE budget.');
+        Mode(row)=modeNames(m); Repeat(row)=r; Workers(row)=R.settings.workerCount;
+        OptimizationRuntime_s(row)=R.runtime_s; WallRuntime_s(row)=wallElapsed;
+        BestJ(row)=R.bestJ; SearchFE(row)=R.searchFunctionEvaluations;
+        SolverCalls(row)=R.solverFunctionEvaluations; RunDirectory(row)=string(runDir);
+        histories{row}=H;
+        writetable(H,fullfile(runDir,'convergence_history.csv'));
+        % Save completed repetitions incrementally so interrupted tests remain auditable.
+        results = table(Mode(1:row),Repeat(1:row),Workers(1:row), ...
+            OptimizationRuntime_s(1:row),WallRuntime_s(1:row),BestJ(1:row), ...
+            SearchFE(1:row),SolverCalls(1:row),RunDirectory(1:row), ...
+            'VariableNames',{'Mode','Repeat','Workers','OptimizationRuntime_s', ...
+            'WallRuntime_s','BestJ','SearchFE','SolverCalls','RunDirectory'});
+        completed = histories(1:row);
+        benchmark = struct('mission',missionType,'budget',budget,'nRepeats',nRepeats, ...
+            'optimizerSeed',0,'measurementSeed',1001,'results',results, ...
+            'histories',{completed},'complete',row==nRows);
+        save(fullfile(testRoot,'parallel_speed_convergence.mat'),'benchmark');
+        writetable(results,fullfile(testRoot,'parallel_speed_results.csv'));
     end
 end
-
-% Clean up pool after benchmark.
-p = gcp('nocreate');
-if ~isempty(p)
-    delete(p);
-end
-
-results = table( ...
-    Mode,Repeat,Workers, ...
-    OptimizationRuntime_s,WallRuntime_s,BestJ);
-
+pool = gcp('nocreate'); if ~isempty(pool), delete(pool); end
 disp(results);
-
-serialOpt = mean( ...
-    results.OptimizationRuntime_s(results.Mode=="Serial"));
-parallelOpt = mean( ...
-    results.OptimizationRuntime_s(results.Mode=="Parallel"));
-
-serialWall = mean( ...
-    results.WallRuntime_s(results.Mode=="Serial"));
-parallelWall = mean( ...
-    results.WallRuntime_s(results.Mode=="Parallel"));
-
-optSpeedup = serialOpt/parallelOpt;
-wallSpeedup = serialWall/parallelWall;
-
-fprintf('\n========== SPEED SUMMARY ==========\n');
-fprintf('Mission: %s\n',missionType);
-fprintf('FE budget: %d\n',budget);
-fprintf('Repeats per mode: %d\n\n',nRepeats);
-
-fprintf('Mean optimization runtime:\n');
-fprintf('  Serial:   %.3f s\n',serialOpt);
-fprintf('  Parallel: %.3f s\n',parallelOpt);
-fprintf('  Speedup:  %.2fx\n\n',optSpeedup);
-
-fprintf('Mean full wall-clock runtime:\n');
-fprintf('  Serial:   %.3f s\n',serialWall);
-fprintf('  Parallel: %.3f s\n',parallelWall);
-fprintf('  Speedup:  %.2fx\n',wallSpeedup);
-
-fprintf('\nResults saved under:\n%s\n',testRoot);
-fprintf('===================================\n');
-
-writetable(results, ...
-    fullfile(testRoot,'parallel_speed_results.csv'));
-
+serial = results.Mode=="Serial"; parallel = results.Mode=="Parallel";
+summary = sprintf(['GA %s | %d FE | %d fixed-seed timing repetitions per mode\n' ...
+    'Mean optimization runtime: serial %.3f s; parallel %.3f s; speedup %.3fx\n' ...
+    'Mean wall runtime: serial %.3f s; parallel %.3f s; speedup %.3fx\n' ...
+    'Wall runtime includes setup/validation and may include pool startup.\n'], ...
+    missionType,budget,nRepeats,mean(results.OptimizationRuntime_s(serial)), ...
+    mean(results.OptimizationRuntime_s(parallel)), ...
+    mean(results.OptimizationRuntime_s(serial))/mean(results.OptimizationRuntime_s(parallel)), ...
+    mean(results.WallRuntime_s(serial)),mean(results.WallRuntime_s(parallel)), ...
+    mean(results.WallRuntime_s(serial))/mean(results.WallRuntime_s(parallel)));
+fprintf('%s\nSaved benchmark: %s\n',summary,testRoot);
+fid=fopen(fullfile(testRoot,'parallel_speed_summary.txt'),'w');
+assert(fid>=0,'Cannot write benchmark summary.');
+fileCleanup=onCleanup(@() fclose(fid)); %#ok<NASGU>
+fprintf(fid,'%s',summary);
 end
-
 
 function R = run_case(projectDir)
-%RUN_CASE Give run_opt its own workspace because run_opt begins with clear.
-
+% run_opt begins with clear; isolate it from the benchmark workspace.
 run(fullfile(projectDir,'run_opt.m'));
-
 R = runState;
-
 end
-
 
 function restore_environment(names,values)
-
-for k = 1:numel(names)
-    setenv(names{k},values{k});
-end
-
+for k=1:numel(names), setenv(names{k},values{k}); end
 end

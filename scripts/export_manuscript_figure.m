@@ -18,44 +18,8 @@ for k = 1:numel(fontObjects)
     obj.FontSize = max(obj.FontSize,style.fontSize);
     if isprop(obj,'FontName'), obj.FontName = style.fontName; end
 end
-% Legends wrap instead of shrinking text. Respect manually centered legends
-% by recentering after changing their number of columns.
-legends = findall(fig,'Type','legend');
-for k = 1:numel(legends)
-    lgd = legends(k);
-    lgd.NumColumns = min(lgd.NumColumns,style.legendMaxColumns);
-    lgd.Box = 'off';
-end
-drawnow;
-for k = 1:numel(legends)
-    lgd = legends(k);
-    if strcmp(lgd.Location,'none')
-        lgd.Units = 'normalized';
-        pos = lgd.Position;
-        pos(1) = (1-pos(3))/2;
-        pos(2) = min(pos(2),0.98-pos(4));
-        lgd.Position = pos;
-    end
-end
-% Restore a common inner axes rectangle after MATLAB lays out outside
-% legends, then place each legend in the reserved band above the plot.
-axesObjects = findall(fig,'Type','axes');
-for k = 1:numel(axesObjects)
-    ax = axesObjects(k);
-    if isappdata(ax,'ManuscriptAxesPosition')
-        pos = getappdata(ax,'ManuscriptAxesPosition');
-        set(ax,'Units','normalized','PositionConstraint','innerposition','Position',pos);
-        if ~isempty(ax.Legend)
-            lgd = ax.Legend; lgd.Units = 'normalized';
-            drawnow;
-            lp = lgd.Position;
-            lp(1) = (1-lp(3))/2;
-            lp(2) = min(pos(2)+pos(4)+0.025,0.99-lp(4));
-            lgd.Position = lp;
-            ax.Position = pos;
-        end
-    end
-end
+% Fit layout only after the final font sizes have been applied.
+layout_manuscript_figure(fig,style);
 % Fail visibly on unsupported transparency rather than producing a subtly
 % different EPS. Current manuscript renderers use opaque vector objects.
 for property = ["FaceAlpha","EdgeAlpha"]
