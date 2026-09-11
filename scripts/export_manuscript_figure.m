@@ -17,6 +17,12 @@ set(fig,'PaperPosition',[0 0 paper]);
 % as LG, LT, and GI where the full names only consume figure space.
 abbreviate_manuscript_text(fig);
 
+% Repeated optimizer labels in the orbit-family selection summary are dense
+% at the final manuscript font. Spread those category centers slightly while
+% preserving the larger gaps between mission blocks. This is intentionally
+% limited to repeated GA/PSO/ABC/ACO/BO categorical axes.
+spread_repeated_optimizer_groups(fig);
+
 fontObjects = findall(fig,'-property','FontSize');
 for k = 1:numel(fontObjects)
     obj = fontObjects(k);
@@ -94,6 +100,93 @@ for k = 1:numel(textObjects)
     catch
         % Ignore graphics proxy objects that expose non-writable String data.
     end
+end
+end
+
+function spread_repeated_optimizer_groups(fig)
+%SPREAD_REPEATED_OPTIMIZER_GROUPS Add modest spacing inside mission blocks.
+axesObjects = findall(fig,'Type','axes');
+allowed = ["GA","PSO","ABC","ACO","BO"];
+for k = 1:numel(axesObjects)
+    ax = axesObjects(k);
+    labels = upper(strip(string(ax.XTickLabel(:))));
+    ticks = double(ax.XTick(:));
+    if numel(labels) < 8 || numel(labels) ~= numel(ticks) || ...
+            any(~ismember(labels,allowed))
+        continue;
+    end
+
+    repeatIndex = find(labels(2:end) == labels(1),1,'first');
+    if isempty(repeatIndex), continue; end
+    groupSize = repeatIndex;
+    if groupSize < 2 || mod(numel(labels),groupSize) ~= 0, continue; end
+    pattern = labels(1:groupSize);
+    numGroups = numel(labels)/groupSize;
+    validPattern = true;
+    for g = 1:numGroups
+        idx = (g-1)*groupSize+(1:groupSize);
+        if ~isequal(labels(idx),pattern)
+            validPattern = false;
+            break;
+        end
+    end
+    if ~validPattern, continue; end
+
+    oldTicks = ticks(:).';
+    if numel(oldTicks) < 2 || any(diff(oldTicks) <= 0), continue; end
+    baseWithin = median(diff(oldTicks(1:groupSize)));
+    if ~isfinite(baseWithin) || baseWithin <= 0, continue; end
+    withinSpacing = 1.15*baseWithin;
+    if numGroups > 1
+        oldGap = oldTicks(groupSize+1)-oldTicks(groupSize);
+    else
+        oldGap = 1.5*withinSpacing;
+    end
+    groupGap = max(oldGap,1.45*withinSpacing);
+
+    newTicks = zeros(size(oldTicks));
+    groupCentersOld = zeros(numGroups,1);
+    groupCentersNew = zeros(numGroups,1);
+    start = oldTicks(1);
+    for g = 1:numGroups
+        idx = (g-1)*groupSize+(1:groupSize);
+        if g > 1
+            start = newTicks(idx(1)-1)+groupGap;
+        end
+        newTicks(idx) = start+(0:groupSize-1)*withinSpacing;
+        groupCentersOld(g) = mean(oldTicks(idx));
+        groupCentersNew(g) = mean(newTicks(idx));
+    end
+
+    bars = findall(ax,'Type','Bar');
+    movedBar = false;
+    for b = 1:numel(bars)
+        xData = double(bars(b).XData(:).');
+        if numel(xData) == numel(oldTicks) && ...
+                max(abs(xData-oldTicks)) <= 100*eps(max(1,max(abs(oldTicks))))
+            bars(b).XData = newTicks;
+            movedBar = true;
+        end
+    end
+    if ~movedBar, continue; end
+
+    ax.XTick = newTicks;
+    textObjects = findall(ax,'Type','text');
+    missionLabels = ["LG","LT","GI"];
+    missionIndex = 0;
+    for t = 1:numel(textObjects)
+        value = string(textObjects(t).String);
+        if isscalar(value) && any(value == missionLabels)
+            missionIndex = missionIndex+1;
+            if missionIndex <= numGroups
+                pos = textObjects(t).Position;
+                [~,nearest] = min(abs(groupCentersOld-pos(1)));
+                pos(1) = groupCentersNew(nearest);
+                textObjects(t).Position = pos;
+            end
+        end
+    end
+    drawnow;
 end
 end
 
