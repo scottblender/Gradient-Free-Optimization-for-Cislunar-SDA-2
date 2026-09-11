@@ -97,15 +97,10 @@ for k = 1:numel(axesObjects)
         basePosition = ax.Position;
     end
 
-    % Metric plots receive useful numerical resolution. Geometry/trajectory
-    % axes retain the plotter-selected tick scale, except for the known
-    % projected-label collision where a symmetric [-a,0,+a] set is reduced
-    % to its two endpoints (e.g. -0.05 and 0.05).
     if is_geometry_axis(ax)
-        compact_symmetric_geometry_ticks(ax,'X');
-        compact_symmetric_geometry_ticks(ax,'Y');
-        compact_symmetric_geometry_ticks(ax,'Z');
+        simplify_geometry_ticks(ax);
     else
+        % Add useful numerical resolution only to non-trajectory metric plots.
         densify_metric_ticks(ax,'X',style.max2DXTicks);
         densify_metric_ticks(ax,'Y',style.max2DYTicks);
     end
@@ -126,6 +121,12 @@ for k = 1:numel(axesObjects)
     lgd.FontSize = max(lgd.FontSize,style.fontSize);
     lgd.FontWeight = style.fontWeight;
     lgd.Orientation = 'horizontal';
+
+    % Long geometry labels can push an otherwise valid two-row legend beyond
+    % the fixed EPS width at manuscript font size. Compact only standardized
+    % plot-facing phrases here, in the one authoritative formatter, before
+    % MATLAB measures the northoutside legend. No font-size reduction is used.
+    compact_manuscript_legend_labels(lgd);
     lgd.Location = 'northoutside';
 
     count = numel(lgd.String);
@@ -161,6 +162,9 @@ for k = 1:numel(axesObjects)
     rows = ceil(count/max(1,lgd.NumColumns));
     assert(rows <= style.legendMaxRows,'Manuscript:LegendRows', ...
         'Legend requires more than %d rows in %s.',style.legendMaxRows,class(lgd));
+    assert(pos(3) <= 0.996,'Manuscript:LegendTooWide', ...
+        ['Legend remains wider than the EPS canvas after two-row wrapping and ' ...
+        'standard label compaction.']);
 
     northPosition = lgd.Position;
     setappdata(ax,'ManuscriptNorthOutsideReference',northPosition);
@@ -172,7 +176,7 @@ for k = 1:numel(axesObjects)
     ax.Position = basePosition;
     drawnow;
     pos = lgd.Position;
-    pos(1) = max(0.002,(1-pos(3))/2);
+    pos(1) = max(0.002,min((1-pos(3))/2,0.998-pos(3)));
     minimumBottom = basePosition(2)+basePosition(4)+style.legendMinimumGap;
     desiredBottom = northPosition(2)+style.legendNorthOutsideYOffset;
     maximumBottom = 0.99-pos(4);
@@ -183,6 +187,36 @@ for k = 1:numel(axesObjects)
 end
 
 drawnow;
+end
+
+
+function compact_manuscript_legend_labels(lgd)
+%COMPACT_MANUSCRIPT_LEGEND_LABELS Shorten standard long plot-facing labels.
+labels = string(lgd.String);
+if isempty(labels), return; end
+
+long = [ ...
+    "Endpoint orbits", ...
+    "Target trajectory", ...
+    "Observer orbits", ...
+    "Nominal Gateway", ...
+    "Post-impulse", ...
+    "Lunar Gateway", ...
+    "Low-thrust transfer", ...
+    "Gateway impulse"];
+short = [ ...
+    "Endpoints", ...
+    "Target", ...
+    "Obs. orbits", ...
+    "Nominal LG", ...
+    "GI traj.", ...
+    "LG", ...
+    "LT", ...
+    "GI"];
+for k = 1:numel(long)
+    labels(labels == long(k)) = short(k);
+end
+lgd.String = cellstr(labels);
 end
 
 
@@ -248,7 +282,7 @@ end
 
 
 function tf = is_geometry_axis(ax)
-% Geometry/trajectory axes keep their original tick scale.
+% Geometry/trajectory axes use sparse projected tick labels for readability.
 viewAngles = view(ax);
 isPerspective3D = abs(viewAngles(1)) > 1e-9 || abs(viewAngles(2)-90) > 1e-9;
 labels = [label_text(ax.XLabel),label_text(ax.YLabel),label_text(ax.ZLabel)];
@@ -257,19 +291,29 @@ tf = isPerspective3D || hasLU;
 end
 
 
-function compact_symmetric_geometry_ticks(ax,axisName)
-% Remove only the center zero from a symmetric three-tick trajectory axis.
-% This targets projected 3-D axes where labels such as 0 and 0.05 overlap;
-% nonsymmetric/manual tick sets are preserved exactly.
-property = axisName+"Tick";
-ticks = double(ax.(property));
-if numel(ticks) ~= 3 || any(~isfinite(ticks)), return; end
-scale = max(1,max(abs(ticks)));
-tolerance = 100*eps(scale);
-isCenteredZero = abs(ticks(2)) <= tolerance;
-isSymmetric = abs(ticks(1)+ticks(3)) <= tolerance;
-if isCenteredZero && isSymmetric
-    ax.(property) = ticks([1 3]);
+function simplify_geometry_ticks(ax)
+%SIMPLIFY_GEOMETRY_TICKS Remove the crowded center zero from symmetric
+% three-tick trajectory axes, e.g. [-0.05 0 0.05] -> [-0.05 0.05].
+for axisName = ["X","Y","Z"]
+    tickProperty = axisName+"Tick";
+    labelProperty = axisName+"TickLabel";
+    ticks = double(ax.(tickProperty));
+    if numel(ticks) ~= 3 || any(~isfinite(ticks)), continue; end
+    scale = max(1,max(abs(ticks)));
+    tolerance = 100*eps(scale);
+    if abs(ticks(2)) <= tolerance && abs(ticks(1)+ticks(3)) <= tolerance
+        labels = ax.(labelProperty);
+        ax.(tickProperty) = ticks([1 3]);
+        if ~isempty(labels) && size(labels,1)==3
+            if iscell(labels)
+                ax.(labelProperty) = labels([1 3]);
+            elseif isstring(labels)
+                ax.(labelProperty) = labels([1 3]);
+            elseif ischar(labels)
+                ax.(labelProperty) = labels([1 3],:);
+            end
+        end
+    end
 end
 end
 
