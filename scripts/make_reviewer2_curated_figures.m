@@ -299,7 +299,7 @@ if annotateBO
 end
 lgd = legend(ax,legendHandles,cellstr(legendLabels),'Location','northoutside', ...
     'Orientation','horizontal','NumColumns',min(numel(legendLabels),6),'Box','off');
-style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
+style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_runtime_convergence(r,out,saveFigures,style)
@@ -347,7 +347,7 @@ if ~isempty(baselineRefs)
 end
 lgd = legend(ax,legendHandles,cellstr(legendLabels),'Location','northoutside', ...
     'Orientation','horizontal','NumColumns',min(numel(legendLabels),5),'Box','off');
-style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
+style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_comparison_convergence(r,mission,out,stem,saveFigures,style)
@@ -395,7 +395,7 @@ ax.XTick = counts; xlabel(ax,'Number of observers','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 lgd = legend(ax,handles,{'Angles only','Angles + range'}, ...
     'Location','northoutside','Orientation','horizontal','Box','off');
-style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
+style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_baseline_duration_metric(r,measurement,valueField,stdField,yLabel,out,stem,saveFigures,style)
@@ -418,7 +418,7 @@ end
 ax.XTick = periods; xlabel(ax,'Tracking duration (Gateway periods)','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal','NumColumns',2,'Box','off');
-style_legend(lgd,style); export_figure(fig,out,stem,saveFigures,style);
+style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_baseline_observer_convergence(r,mission,measurement,out,stem,saveFigures,style)
@@ -466,7 +466,7 @@ ax.XTick = 1:3; ax.XTickLabel = cellstr(mission_labels(missions));
 xlabel(ax,'Target case','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
 lgd = legend(ax,b,{'Screening ON','Screening OFF'},'Location','northoutside', ...
-    'Orientation','horizontal','Box','off'); style_legend(lgd,style);
+    'Orientation','horizontal','Box','off'); style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -603,7 +603,7 @@ for m = 1:3
         'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
 end
 style_axes(ax,style); lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
-    'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,style);
+    'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -623,7 +623,7 @@ for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = 1:4; ax.XTickLabel = cellstr(labels); ylim(ax,[0 100]);
 xlabel(ax,'Objective configuration','FontWeight','bold'); ylabel(ax,'Observer selections (%)','FontWeight','bold');
 style_axes(ax,style); lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
-    'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,style);
+    'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -643,7 +643,7 @@ allY = allY(isfinite(allY)); lo = min(allY); hi = max(allY); span = max(hi-lo,0.
 ylim(ax,[lo-0.06*span hi+0.08*span]); xlim(ax,[60 budget]);
 xlabel(ax,'Function evaluations','FontWeight','bold'); ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
 style_axes(ax,style); lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',min(numel(handles),5),'Box','off'); style_legend(lgd,style);
+    'NumColumns',min(numel(handles),5),'Box','off'); style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -690,14 +690,17 @@ movegui(fig,'center'); set(fig,'DefaultAxesFontName',style.fontName,'DefaultAxes
 end
 
 function style_axes(ax,style)
+set(ax,'Units','normalized','Position',style.metricPlotPosition);
 set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
     'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top', ...
     'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontSize = style.labelFontSize; ax.YLabel.FontSize = style.labelFontSize;
+wrap_manuscript_label(ax.XLabel); wrap_manuscript_label(ax.YLabel);
 end
 
-function style_legend(lgd,style)
+function style_legend(lgd,ax,style)
 lgd.FontName = style.fontName; lgd.FontSize = style.fontSize; lgd.FontWeight = 'bold';
+format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
 end
 
 function format_category_axis(ax,labels,yLabel,style)

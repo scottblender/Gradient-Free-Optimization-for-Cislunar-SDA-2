@@ -197,15 +197,15 @@ The raw optimization runs remain under `results/RUNTIME_COMPARISON_1200/`, `resu
 Final Reviewer 2 figures use:
 
 - Times New Roman;
-- the September 10 typography: 12 pt axes/legends;
-- 14 pt axis labels;
+- 22 pt bold axes/legends, set when the plot is constructed;
+- 24 pt bold axis labels;
 - one standalone metric figure per EPS/PNG so subfigures can be assembled in LaTeX;
 - directly overlaid comparable convergence curves on one axes;
 - convergence figures show only the 20-run mean best-so-far curves; run-to-run variability is retained in the processed tables and metric figures;
 - no grid lines and no surrounding axes box;
 - 20-run mean +/- sample standard deviation for quantitative comparisons;
 - objective/cost comparison bars with the matched long-run AO GA baseline shown as a dashed reference;
-- the September 10 canvas sizes and centered 3-D layouts;
+- matched canvas sizes within geometry, measurement, and metric panel groups;
 - solid observer-orbit lines, duplicate periodic orbits drawn once, no Earth, and low-thrust endpoint-orbit context.
 
 The curated paper set intentionally omits redundant plots. In particular, 6000-FE optimization runtime remains in numerical tables rather than being repeated as a bar figure, and coverage-fraction figures are omitted. The focused 1200-FE runtime figure is retained because computational cost is the scientific purpose of that study.
@@ -351,22 +351,26 @@ Both figures and a copy of the numeric timing summary are exported directly to
 Benchmark subdirectories and numerical source data are preserved. When selecting
 only one section with cleanup enabled, only that section's figures are regenerated.
 
-### Restored September 10 export path
+### Formatting, final plot, EPS export
 
-The plotters and style constants are restored from commit `1d18c2d`, the last
-September 10 version. Fonts, legends, ticks, camera settings, axes positioning,
-and clipping are established by those plotters. There is no final formatting
-pass, forced full-page bounding box, or `-loose` export option. EPS uses the
-original `print(...,'-depsc2','-painters','-r600')` path.
+Formatting is applied by the plotters during construction using
+`reviewer2_paper_style`: bold Times New Roman text, larger labels, reserved
+margins, and legends with at most three columns. RA/Dec use the same canvas,
+axis lengths, limits, and label positions. DRO shares the orbit-family canvas
+and plotting rectangle. Each output remains a separate EPS for LaTeX assembly.
 
-The master runner, definition section selection, numeric clear option, table
-printer, saved parallel benchmark, and common output parent are retained.
-The old typography is intentional: export-time enlargement has been removed.
+The occlusion geometry retains its existing canvas, fonts, geometry, and callouts.
+
+The final plot is then passed to the working September 10 EPS print path.
+Export functions do not resize fonts, rearrange legends, move axes, change
+clipping/cameras, or rewrite bounding boxes. `format_manuscript_legend` is called
+only during plot construction; the EPS writer never invokes it.
 
 ```matlab
-run_manuscript_figures("definitions"); % Regenerate definition EPS files
-run_manuscript_figures(1);             % Clear final exports and regenerate all
+run_manuscript_figures("definitions");
+run_manuscript_figures(1); % Clear generated final exports and regenerate all
 ```
 
-`test_manuscript_figure_export` verifies that writing EPS/PNG leaves figure
-properties unchanged. This graphics test requires MATLAB.
+The master runner, table printer, saved parallel benchmark, and common output
+parent are retained. `test_manuscript_figure_export` checks that the completed
+styled scene is unchanged by EPS/PNG writing; it requires MATLAB graphics.

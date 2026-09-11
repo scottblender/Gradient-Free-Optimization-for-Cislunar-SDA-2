@@ -50,8 +50,10 @@ for kind=1:2
         stem='parallel_speed_lg_convergence_time';
     end
     ylabel(ax,'Mean best-so-far objective');
-    legend(ax,'Location','northoutside','Orientation','horizontal','Box','off', ...
+    lgd=legend(ax,'Location','northoutside','Orientation','horizontal','Box','off', ...
         'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
+    wrap_manuscript_label(ax.YLabel);
+    format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
     export_manuscript_figure(fig,files(kind));
     clear cleanup;

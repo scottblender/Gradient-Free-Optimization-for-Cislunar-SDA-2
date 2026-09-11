@@ -211,8 +211,7 @@ for groupIndex = 1:numel(familyGroups)
     if numel(group)==2
         [ax,plotPosition] = create_centered_3d_axes(fig);
     else
-        ax = axes(fig);
-        plotPosition = [];
+        [ax,plotPosition] = create_centered_3d_axes(fig);
     end
 
     hold(ax,'on');
@@ -349,7 +348,7 @@ for groupIndex = 1:numel(familyGroups)
         finalize_centered_3d_axes(ax,legendHandle,plotPosition);
     else
         ax.Units = 'normalized';
-        ax.Position = [0.12,0.13,0.80,0.80];
+        format_manuscript_legend(ax,legendHandle,style,plotPosition);
         ax.LooseInset = max(ax.TightInset,0.015);
     end
 
@@ -494,10 +493,10 @@ plot(ax,phase([selectedSlot,selectedSlot]),[0,0.16],':k');
 plot(ax,phase([nextSlot,nextSlot]),[0,0.16],':k');
 text(ax,mean(phase([selectedSlot,nextSlot])),0.20, ...
     '\Delta t/T=1/50','HorizontalAlignment','center', ...
-    'FontName',style.fontName,'FontSize',16,'FontWeight','bold');
+    'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
 text(ax,0.99,-0.025,{'t=T','not stored'}, ...
     'HorizontalAlignment','right','VerticalAlignment','top', ...
-    'FontName',style.fontName,'FontSize',15,'FontWeight','bold');
+    'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
 
 xlabel(ax,'Normalized epoch, t/T');
 yticks(ax,[]);
@@ -510,8 +509,7 @@ legendHandle = legend(ax, ...
     {'Candidate slots','Slot j','Slot j+1','Excluded endpoint'}, ...
     'Location','northoutside','Orientation','horizontal');
 format_study_legend(legendHandle,2,[16 9]);
-place_legend_above(legendHandle,2,12);
-ax.Position = [0.12,0.19,0.80,0.56];
+format_manuscript_legend(ax,legendHandle,style,style.geometryPlotPosition);
 
 phaseFile = fullfile(outputDir,'slot_phase_grid.eps');
 inspect_before_export(figPhase,inspectFigure, ...
@@ -562,7 +560,7 @@ outputDir = fullfile(projectPaths.results,'study_definition_figures');
 if ~isfolder(outputDir), mkdir(outputDir); end
 
 fig = publication_figure( ...
-    style.visibilityFigureWidth,style.visibilityFigureHeight);
+    style.visibilityFigureWidth,style.visibilityFigureHeight,12);
 
 cObserver = [0.90,0.12,0.10];
 cTarget = [0.00,0.39,0.72];
@@ -769,24 +767,24 @@ alphaRadius = 1.20;
 plot(ax1,alphaRadius*cos(alphaSamples),alphaRadius*sin(alphaSamples), ...
     '-','Color',cAngle,'LineWidth',2.0);
 
-text(ax1,4.40,-0.08,'x','FontWeight','bold','FontSize',17);
+text(ax1,4.40,-0.08,'x','FontWeight','bold','FontSize',style.fontSize);
 text(ax1,-0.10,3.74,'y', ...
-    'FontWeight','bold','FontSize',17, ...
+    'FontWeight','bold','FontSize',style.fontSize, ...
     'HorizontalAlignment','center','VerticalAlignment','bottom');
 text(ax1,0,-0.43,'Observer','Color',cObserver, ...
-    'FontWeight','bold','FontSize',15,'HorizontalAlignment','center');
+    'FontWeight','bold','FontSize',style.fontSize,'HorizontalAlignment','center');
 text(ax1,projection(1),projection(2)+0.28,'Target projection', ...
-    'Color',cTarget,'FontWeight','bold','FontSize',15, ...
+    'Color',cTarget,'FontWeight','bold','FontSize',style.fontSize, ...
     'HorizontalAlignment','center','VerticalAlignment','bottom');
 rhoXYLabelX = 1.68;
 rhoXYLabelY = projection(2)/projection(1)*rhoXYLabelX+0.55;
 text(ax1,rhoXYLabelX,rhoXYLabelY,'\rho_{xy}', ...
-    'Color',cProjection,'FontWeight','bold','FontSize',16);
+    'Color',cProjection,'FontWeight','bold','FontSize',style.fontSize);
 text(ax1,1.52*cos(alpha/2),1.52*sin(alpha/2)+0.06,'\alpha', ...
-    'Color',cAngle,'FontWeight','bold','FontSize',18);
+    'Color',cAngle,'FontWeight','bold','FontSize',style.fontSize);
 
-xlim(ax1,[-0.72,4.65]);
-ylim(ax1,[-0.72,3.85]);
+xlim(ax1,[-0.95,5.10]);
+ylim(ax1,[-0.80,4.20]);
 set(findall(figRa,'Type','text'),'FontName',style.fontName);
 
 raFigureFile = fullfile(outputDir, ...
@@ -807,8 +805,8 @@ axis(ax2,'equal');
 axis(ax2,'off');
 
 target = [rhoXY,rho(3)];
-quiver(ax2,0,0,4.35,0,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
-quiver(ax2,0,0,0,3.25,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
+quiver(ax2,0,0,4.25,0,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
+quiver(ax2,0,0,0,3.45,0,'Color','k','LineWidth',1.8,'MaxHeadSize',0.08);
 plot(ax2,[0,target(1)],[0,target(2)],'-k','LineWidth',2.2);
 plot(ax2,[target(1),target(1)],[0,target(2)],'--', ...
     'Color',cProjection,'LineWidth',1.5);
@@ -822,24 +820,25 @@ plot(ax2,deltaRadius*cos(deltaSamples),deltaRadius*sin(deltaSamples), ...
 
 % rho_xy is the horizontal coordinate in this panel and therefore
 % labels the horizontal axis at its positive arrow tip.
-text(ax2,4.48,-0.08,'\rho_{xy}', ...
-    'Color','k','FontWeight','bold','FontSize',16, ...
+text(ax2,4.40,-0.08,'\rho_{xy}', ...
+    'Color','k','FontWeight','bold','FontSize',style.fontSize, ...
     'HorizontalAlignment','left','VerticalAlignment','middle');
-text(ax2,-0.12,3.42,'z','FontWeight','bold','FontSize',17);
+text(ax2,-0.10,3.74,'z','FontWeight','bold','FontSize',style.fontSize, ...
+    'HorizontalAlignment','center','VerticalAlignment','bottom');
 text(ax2,0,-0.43,'Observer','Color',cObserver, ...
-    'FontWeight','bold','FontSize',15,'HorizontalAlignment','center');
+    'FontWeight','bold','FontSize',style.fontSize,'HorizontalAlignment','center');
 text(ax2,target(1),target(2)+0.28,'Target', ...
-    'Color',cTarget,'FontWeight','bold','FontSize',15, ...
+    'Color',cTarget,'FontWeight','bold','FontSize',style.fontSize, ...
     'HorizontalAlignment','center','VerticalAlignment','bottom');
 rhoLabelX = 2.02;
 rhoLabelY = target(2)/target(1)*rhoLabelX+0.55;
 text(ax2,rhoLabelX,rhoLabelY,'\rho', ...
-    'FontWeight','bold','FontSize',16);
+    'FontWeight','bold','FontSize',style.fontSize);
 text(ax2,1.56*cos(delta/2),1.56*sin(delta/2)+0.06,'\delta', ...
-    'Color',cAngle,'FontWeight','bold','FontSize',18);
+    'Color',cAngle,'FontWeight','bold','FontSize',style.fontSize);
 
-xlim(ax2,[-0.72,4.75]);
-ylim(ax2,[-0.72,3.60]);
+xlim(ax2,[-0.95,5.10]);
+ylim(ax2,[-0.80,4.20]);
 set(findall(figDec,'Type','text'),'FontName',style.fontName);
 
 decFigureFile = fullfile(outputDir, ...
@@ -1114,20 +1113,8 @@ ylim(ax,pad_axis_limits(ax.YLim,style.geometryYPadding));
 zlim(ax,pad_axis_limits(ax.ZLim,style.geometryZPadding));
 axis(ax,'vis3d');
 
-legendHandle.Units = 'normalized';
-drawnow;
-legendPosition = legendHandle.Position;
-legendPosition(1) = 0.5-legendPosition(3)/2;
-legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
-legendPosition(2) = min(legendBottom,0.98-legendPosition(4));
-legendHandle.Position = legendPosition;
-legendHandle.AutoUpdate = 'off';
+format_manuscript_legend(ax,legendHandle,style,plotPosition);
 
-% Creating or moving a legend can shift a perspective axes. Restore the
-% same centered inner box after all legend layout operations.
-ax.PositionConstraint = 'innerposition';
-ax.Position = plotPosition;
-drawnow;
 end
 
 
@@ -1264,13 +1251,14 @@ legendHandle.FontName = style.fontName;
 legendHandle.FontSize = style.fontSize;
 legendHandle.FontWeight = 'bold';
 legendHandle.ItemTokenSize = itemTokenSize;
-legendHandle.NumColumns = numColumns;
+legendHandle.NumColumns = min(numColumns,style.legendMaxColumns);
 end
 
 
-function fig = publication_figure(widthInches,heightInches)
+function fig = publication_figure(widthInches,heightInches,axesFontSize)
 
 style = reviewer2_paper_style();
+if nargin<3, axesFontSize=style.fontSize; end
 fig = figure( ...
     'Color','w', ...
     'Units','inches', ...
@@ -1282,7 +1270,7 @@ fig = figure( ...
     'Renderer','painters', ...
     'InvertHardcopy','off');
 set(fig,'DefaultAxesFontName',style.fontName, ...
-    'DefaultAxesFontSize',style.fontSize);
+    'DefaultAxesFontSize',axesFontSize);
 end
 
 

@@ -8,11 +8,12 @@ function style = reviewer2_paper_style()
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
-% Compatibility for the newer runner/parallel plot; legacy layouts are unchanged.
+% Construction-time layout only; export functions never apply these settings.
 style.manuscriptPanelWidth = 3.3;
-style.metricPlotPosition = [0.13 0.16 0.775 0.70];
-style.fontSize = 12;
-style.labelFontSize = 14;
+style.metricPlotPosition = [0.18 0.23 0.76 0.52];
+style.legendMaxColumns = 3;
+style.fontSize = 22;
+style.labelFontSize = 24;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -25,7 +26,7 @@ style.exportDpi = 300;
 % the same outer paper size within each class.
 % -------------------------------------------------------------------------
 style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 4.6;
+style.metricFigureHeight = 5.8;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
@@ -43,13 +44,13 @@ style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
 style.visibilityFigureWidth = 7.2;
 style.visibilityFigureHeight = 5.1;
-style.measurementFigureWidth = 4.45;
-style.measurementFigureHeight = 4.55;
-style.monteCarloFigureWidth = 4.8;
-style.monteCarloFigureHeight = 4.2;
+style.measurementFigureWidth = 6.5;
+style.measurementFigureHeight = 5.8;
+style.monteCarloFigureWidth = style.metricFigureWidth;
+style.monteCarloFigureHeight = style.metricFigureHeight;
 
 % Shared 3-D layout and fallback camera.
-style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
+style.geometryPlotPosition = [0.14 0.23 0.72 0.54];
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;

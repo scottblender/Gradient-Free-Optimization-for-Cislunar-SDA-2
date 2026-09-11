@@ -9,12 +9,14 @@ fig=figure('Visible','off','Color','w','Units','inches', ...
     'PaperPosition',[0 0 style.geometryFigureWidth style.geometryFigureHeight], ...
     'PaperPositionMode','manual','Renderer','painters');
 closeFigure=onCleanup(@() close(fig)); %#ok<NASGU>
-ax=axes(fig,'Position',style.geometryPlotPosition,'FontSize',12,'FontWeight','bold');
+ax=axes(fig,'Position',style.geometryPlotPosition,'FontSize',style.fontSize,'FontWeight','bold');
 theta=linspace(0,2*pi,401);
 plot3(ax,1+0.1*cos(theta),0.1*sin(theta),0.2*cos(theta));
 axis(ax,'equal'); view(ax,-37.5,30); ax.Projection='perspective';
 xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
 lgd=legend(ax,'Orbit','Location','northoutside','FontWeight','bold'); drawnow;
+format_manuscript_legend(ax,lgd,style,style.geometryPlotPosition);
+assert(strcmp(lgd.FontWeight,'bold') && lgd.FontSize==style.fontSize);
 properties={'Position','XLim','YLim','ZLim','XTick','YTick','ZTick', ...
     'FontSize','FontWeight','View','Projection','DataAspectRatio','Clipping'};
 before=cellfun(@(p) get(ax,p),properties,'UniformOutput',false);
