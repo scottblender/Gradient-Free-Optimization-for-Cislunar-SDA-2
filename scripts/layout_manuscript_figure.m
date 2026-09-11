@@ -12,6 +12,8 @@ for k=1:numel(axesObjects)
     % plots because projected labels can collapse into the same screen-space
     % corner. Apply explicit per-axis limits to both automatic and manual
     % numeric ticks; the y axis uses only two endpoints for the paper camera.
+    % In contrast, 2-D metric/convergence plots are actively given readable
+    % nice-number ticks when MATLAB's automatic selection is too sparse.
     viewAngles=view(ax);
     isThreeDimensional=abs(viewAngles(1))>1e-9 || abs(viewAngles(2)-90)>1e-9;
     for axisName=["X","Y","Z"]
@@ -45,9 +47,22 @@ for k=1:numel(axesObjects)
                     ax.(labelProperty)=cellstr(manualLabels);
                 end
             end
-        elseif strcmp(ax.(axisName+"TickMode"),'auto') && numel(ticks)>6
-            keep=unique(round(linspace(1,numel(ticks),5)));
-            ax.(tickProperty)=ticks(keep);
+        elseif axisName~="Z" && strcmp(ax.(axisName+"Scale"),'linear') && ...
+                strcmp(ax.(axisName+"TickMode"),'auto')
+            if axisName=="X"
+                maxTicks=style.max2DXTicks;
+            else
+                maxTicks=style.max2DYTicks;
+            end
+            limits=ax.(axisName+"Lim");
+            niceTicks=nice_linear_ticks(limits,maxTicks);
+            % Never make an already-readable automatic axis sparser. Only
+            % replace it when the nice-number set adds useful resolution or
+            % when MATLAB produced more labels than the manuscript limit.
+            if ~isempty(niceTicks) && ...
+                    (numel(niceTicks)>numel(ticks) || numel(ticks)>maxTicks)
+                ax.(tickProperty)=niceTicks;
+            end
         end
     end
 
@@ -155,6 +170,31 @@ for k=1:numel(axesObjects)
     % Figure size is increased through the shared axes rectangle instead.
 end
 drawnow;
+end
+
+function ticks=nice_linear_ticks(limits,maxTicks)
+%NICE_LINEAR_TICKS Dense readable 1/2/2.5/5-decade ticks within fixed limits.
+limits=double(limits(:).');
+ticks=[];
+if numel(limits)~=2 || any(~isfinite(limits)) || limits(2)<=limits(1) || maxTicks<2
+    return;
+end
+span=limits(2)-limits(1);
+roughStep=span/max(2,maxTicks-1);
+if ~isfinite(roughStep) || roughStep<=0, return; end
+power=10^floor(log10(roughStep));
+steps=power*[1 2 2.5 5 10];
+tolerance=1e-10*max(1,max(abs(limits)));
+for step=steps
+    first=ceil((limits(1)-tolerance)/step)*step;
+    last=floor((limits(2)+tolerance)/step)*step;
+    candidate=first:step:last;
+    if numel(candidate)>=2 && numel(candidate)<=maxTicks
+        candidate(abs(candidate)<100*eps(max(1,max(abs(candidate)))))=0;
+        ticks=candidate;
+        return;
+    end
+end
 end
 
 function wrap_label(label,limit)
