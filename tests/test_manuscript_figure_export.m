@@ -15,16 +15,21 @@ for k = 1:2
         hold(ax,'on');
         for j=2:5, plot(ax,1:10,j*(1:10)); end
         ylabel(ax,'Mean effective position uncertainty (km)');
-        legend(ax,{'GA','PSO','BO','ABCO','ACO'},'Location','northoutside');
+        legend(ax,{'GA','PSO','BO','ABCO','ACO'},'Location','northoutside', ...
+            'Orientation','horizontal');
         setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
     end
     text(ax,5,5*k,repmat('label ',1,k),'FontSize',8);
     file = fullfile(folder,sprintf('panel%d.eps',k));
     meta = export_manuscript_figure(fig,file);
     if k==2
-        lp=ax.Legend.Position; ap=ax.Position;
+        lgd=ax.Legend; lp=lgd.Position; ap=ax.Position;
         assert(lp(2)>ap(2)+ap(4),'Legend overlaps the plot rectangle.');
         assert(lp(1)>=0 && lp(1)+lp(3)<=1,'Legend extends outside canvas.');
+        assert(abs((lp(1)+0.5*lp(3))-0.5)<0.02,'Legend is not centered above the plot.');
+        assert(strcmpi(lgd.Orientation,'horizontal'),'Legend must remain horizontal.');
+        rows=ceil(numel(lgd.String)/lgd.NumColumns);
+        assert(rows<=style.legendMaxRows,'Legend must use at most two rows.');
     end
     epsText = fileread(file);
     boxes(k) = string(regexp(epsText,'(?m)^%%BoundingBox:[^\r\n]*','match','once'));
@@ -42,5 +47,8 @@ assert(boxes(1)==boxes(2),'Paired EPS canvases differ.');
 assert(isequal(imageSizes(1,:),imageSizes(2,:)),'Paired PNG canvases differ.');
 assert(style.geometryFigureWidth==style.measurementFigureWidth && ...
     style.geometryFigureHeight==style.measurementFigureHeight);
-fprintf('Manuscript EPS canvas and font checks passed.\n');
+assert(style.visibilityFigureWidth==style.metricFigureWidth && ...
+    style.visibilityFigureHeight>style.metricFigureHeight, ...
+    'Keep-out schematic should retain manuscript width but use a taller canvas.');
+fprintf('Manuscript EPS canvas, legend, and font checks passed.\n');
 end

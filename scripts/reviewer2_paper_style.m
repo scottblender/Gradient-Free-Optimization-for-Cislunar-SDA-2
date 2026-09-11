@@ -41,8 +41,11 @@ style.orbitFamilyFigureHeight = style.geometryFigureHeight;
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
+% The keep-out schematic carries several callouts and angle annotations.
+% Keep the standard 6.5-inch width so LaTeX scaling and printed font size do
+% not change, but give this illustration additional vertical room.
 style.visibilityFigureWidth = style.metricFigureWidth;
-style.visibilityFigureHeight = style.metricFigureHeight;
+style.visibilityFigureHeight = 6.4;
 style.measurementFigureWidth = style.metricFigureWidth;
 style.measurementFigureHeight = style.metricFigureHeight;
 style.monteCarloFigureWidth = style.metricFigureWidth;
@@ -55,7 +58,11 @@ style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
 style.measurementXLim = [-0.95 5.10];
 style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
-style.legendMaxColumns = 2;
+% Legends remain centered above the axes. Preserve the plotter-requested
+% column count when it fits; export may wrap only to a second row if needed.
+style.legendMaxColumns = 6;
+style.legendMaxRows = 2;
+style.legendWidthLimit = 0.94;
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;

@@ -21,24 +21,42 @@ for k=1:numel(axesObjects)
     lgd=ax.Legend; legendHeight=0;
     if ~isempty(lgd) && isvalid(lgd)
         lgd.Units='normalized'; lgd.Box='off';
-        lgd.FontWeight=style.fontWeight; lgd.Orientation='horizontal';
+        lgd.FontWeight=style.fontWeight;
+        lgd.Orientation='horizontal';
         lgd.Location='northoutside';
-        % Choose the shortest legend that fits the page, rather than forcing
-        % five orbit families into three rows or overlapping long labels.
-        count=numel(lgd.String); bestColumns=1; bestHeight=Inf;
-        for columns=1:count
-            lgd.NumColumns=columns; drawnow;
-            pos=lgd.Position;
-            if pos(3)<=0.94 && pos(4)<bestHeight
-                bestColumns=columns; bestHeight=pos(4);
-            end
+
+        % Preserve the plotter's intended top-centered legend arrangement.
+        % Start from an explicit NumColumns value when one was requested;
+        % otherwise prefer one row. If that is too wide, wrap once only so
+        % the final legend occupies at most two rows. Do not search through
+        % alternative column counts during export because that makes the
+        % legend geometry change unexpectedly between preview and EPS.
+        count=numel(lgd.String);
+        if isprop(lgd,'NumColumnsMode') && strcmp(lgd.NumColumnsMode,'manual')
+            columns=max(1,min(count,lgd.NumColumns));
+        else
+            columns=count;
         end
-        lgd.NumColumns=bestColumns; drawnow;
+        minimumTwoRowColumns=max(1,ceil(count/style.legendMaxRows));
+        columns=max(columns,minimumTwoRowColumns);
+        lgd.NumColumns=columns;
+        drawnow;
         pos=lgd.Position;
+        if pos(3)>style.legendWidthLimit && columns>minimumTwoRowColumns
+            columns=minimumTwoRowColumns;
+            lgd.NumColumns=columns;
+            drawnow;
+            pos=lgd.Position;
+        end
+        rows=ceil(count/columns);
+        assert(rows<=style.legendMaxRows,'Manuscript:LegendRows', ...
+            'Legend requires more than %d rows; shorten legend text.',style.legendMaxRows);
         assert(pos(3)<=0.96,'Manuscript:LegendWidth', ...
-            'Legend exceeds canvas width; shorten legend text before export.');
+            'Two-row legend exceeds canvas width; shorten legend text before export.');
         legendHeight=pos(4)+0.045;
-        pos(1)=(1-pos(3))/2; pos(2)=0.975-pos(4); lgd.Position=pos;
+        pos(1)=(1-pos(3))/2;
+        pos(2)=0.975-pos(4);
+        lgd.Position=pos;
     end
     if isappdata(ax,'ManuscriptAxesPosition')
         base=getappdata(ax,'ManuscriptAxesPosition');
