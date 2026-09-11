@@ -1,19 +1,19 @@
 function style = reviewer2_paper_style()
-%REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
+%REVIEWER2_PAPER_STYLE Single source of truth for manuscript figure styling.
 %
-% The figure geometry follows the last known-good manuscript layout. The
-% manuscript pass increases readability with moderate fonts, compact labels,
-% tighter 3-D framing, and explicit margins rather than export-time reflow.
+% All manuscript renderers should take figure size, axes geometry, typography,
+% legend placement, and 3-D padding from this file. Plot-specific code may
+% choose data, colors, cameras, and labels, but should not redefine layout.
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
 
-% Typography: larger than the original 12/14 pt manuscript figures, but
-% compact enough that tick labels and axis labels remain inside the EPS canvas.
+% Typography.
 style.fontSize = 16;
 style.labelFontSize = 18;
 style.legendFontSize = 14;
-style.geometryLegendFontSize = 15; % slightly larger only for 3-D geometry legends
+style.geometryLegendFontSize = 15;
+style.legendMinFontSize = 12;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -21,47 +21,56 @@ style.capSize = 7;
 style.alphaBand = 0.16;
 style.exportDpi = 300;
 
-% Dense categorical figures retain enough margin for labels while using more
-% of the available canvas than the oversized-font layout.
+% -------------------------------------------------------------------------
+% One standard EPS/PNG canvas for every manuscript figure.
+% Keeping the outer paper rectangle identical gives every exported figure the
+% same crop in LaTeX. Specialized figure-size aliases remain for compatibility
+% with existing renderers, but all resolve to this one canvas.
+% -------------------------------------------------------------------------
+style.figureWidth = 6.5;
+style.figureHeight = 5.2;
+style.metricFigureWidth = style.figureWidth;
+style.metricFigureHeight = style.figureHeight;
+style.convergenceFigureWidth = style.figureWidth;
+style.convergenceFigureHeight = style.figureHeight;
+style.geometryFigureWidth = style.figureWidth;
+style.geometryFigureHeight = style.figureHeight;
+style.orbitFamilyFigureWidth = style.figureWidth;
+style.orbitFamilyFigureHeight = style.figureHeight;
+style.slotPhaseFigureWidth = style.figureWidth;
+style.slotPhaseFigureHeight = style.figureHeight;
+style.visibilityFigureWidth = style.figureWidth;
+style.visibilityFigureHeight = style.figureHeight;
+style.measurementFigureWidth = style.figureWidth;
+style.measurementFigureHeight = style.figureHeight;
+style.monteCarloFigureWidth = style.figureWidth;
+style.monteCarloFigureHeight = style.figureHeight;
+style.panelFigureHeight = style.figureHeight; % backward compatibility
 style.manuscriptPanelWidth = 3.3;
-style.metricPlotPosition = [0.16 0.18 0.80 0.62];
-style.legendMaxColumns = 8;  % prefer a single row; wrap only when necessary
+
+% -------------------------------------------------------------------------
+% Standard 2-D layout.
+% The plot top is deliberately below the legend row so long vertical y-axis
+% labels cannot collide with the legend. format_manuscript_legend restores
+% this rectangle after MATLAB creates the legend.
+% -------------------------------------------------------------------------
+style.metricPlotPosition = [0.15 0.17 0.82 0.56];
+style.legend2DGap = 0.08;
+style.legendMaxColumns = 8;
+style.legendMaxWidth = 0.96;
+style.legendItemTokenSize = [18 8];
 style.groupedBarWidth = 0.64;
 style.categoryLabelAngle = 30;
 
 % -------------------------------------------------------------------------
-% Export-size classes. These retain the working original proportions.
+% Standard 3-D layout.
+% The axes are exactly centered horizontally. The legend intentionally sits
+% slightly inside the otherwise-unused top portion of the 3-D axes box so it
+% stays visually close to the trajectories without reducing the data region.
 % -------------------------------------------------------------------------
-style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 4.6;
-style.figureWidth = style.metricFigureWidth;
-style.figureHeight = style.metricFigureHeight;
-style.panelFigureHeight = 6.2; % retained only for backward compatibility
-style.convergenceFigureWidth = style.metricFigureWidth;
-style.convergenceFigureHeight = style.metricFigureHeight;
-
-style.geometryFigureWidth = 7.6;
-style.geometryFigureHeight = 7.0;
-style.orbitFamilyFigureWidth = style.geometryFigureWidth;
-style.orbitFamilyFigureHeight = style.geometryFigureHeight;
-style.slotPhaseFigureWidth = style.geometryFigureWidth;
-style.slotPhaseFigureHeight = style.geometryFigureHeight;
-
-% Keep the occlusion/keepout schematic exactly on its established canvas.
-style.visibilityFigureWidth = 7.2;
-style.visibilityFigureHeight = 5.1;
-
-% RA and Dec remain matched and use a compact manuscript panel.
-style.measurementFigureWidth = 5.2;
-style.measurementFigureHeight = 4.8;
-style.monteCarloFigureWidth = 4.8;
-style.monteCarloFigureHeight = 4.2;
-
-% Shared 3-D layout. The x-position and width are exactly symmetric about
-% the exported canvas center (0.09 + 0.82/2 = 0.50). Tight axis padding keeps
-% the trajectories large without changing camera geometry or EPS export.
-style.geometryPlotPosition = [0.09 0.16 0.82 0.70];
-style.geometryLegendGap = 0.006;
+style.geometryPlotPosition = [0.10 0.14 0.80 0.70];
+style.geometryLegendGap = -0.02;
+style.geometryLegendItemTokenSize = [16 8];
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
