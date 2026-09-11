@@ -32,9 +32,6 @@ assert_manuscript_fonts(fig,style,stem);
 assert_geometry_has_content(fig,stem);
 assert_eps_compatible_objects(fig,stem);
 
-% Complete deferred graphics work, but do not call refresh or alter any
-% graphics property after this point. The state printed here is the same
-% finalized state produced by the plot-generation function.
 drawnow;
 
 % Do not leave stale exports behind if generation/export fails.
@@ -46,9 +43,8 @@ tempEps = [tempBase '.eps'];
 tempPng = [tempBase '.png'];
 tempCleanup = onCleanup(@() cleanup_temporary_exports(tempEps,tempPng));
 
-% Use the stable runner-era EPS path. -loose affects only MATLAB's initial
-% bounding box; the box is normalized below to the fixed physical paper.
-% Crucially, there is no styling/layout operation between drawnow and print.
+% Use the stable runner-era EPS path. No styling/layout operation occurs
+% between the final drawnow and these print calls.
 print(fig,tempEps,'-depsc2','-painters','-loose');
 print(fig,tempPng,'-dpng',sprintf('-r%d',style.exportDpi));
 assert(isfile(tempEps) && dir(tempEps).bytes>0,'EPS export failed: %s',base);
@@ -94,23 +90,34 @@ axesObjects = findall(fig,'Type','axes');
 for k = 1:numel(axesObjects)
     ax = axesObjects(k);
     if strcmpi(ax.Visible,'off'), continue; end
-    oldUnits = ax.Units;
-    ax.Units = 'normalized';
-    p = double(ax.Position);
-    ax.Units = oldUnits;
-    assert(p(1)>=-0.005 && p(2)>=-0.005 && ...
-        p(1)+p(3)<=1.005 && p(2)+p(4)<=1.005, ...
-        'Manuscript:AxesOutsideCanvas','Axes outside EPS canvas in %s.',stem);
+
+    p = hgconvertunits(fig,double(ax.Position),ax.Units,'normalized',fig);
+    ti = hgconvertunits(fig,double(ax.TightInset),ax.Units,'normalized',fig);
+    envelope = [p(1)-ti(1),p(2)-ti(2), ...
+        p(1)+p(3)+ti(3),p(2)+p(4)+ti(4)];
+    assert(envelope(1)>=-0.01 && envelope(2)>=-0.01 && ...
+        envelope(3)<=1.01 && envelope(4)<=1.01, ...
+        'Manuscript:TextOutsideCanvas', ...
+        'Axes labels/ticks extend outside EPS canvas in %s.',stem);
 
     lgd = ax.Legend;
-    if ~isempty(lgd) && isvalid(lgd)
-        oldLegendUnits = lgd.Units;
-        lgd.Units = 'normalized';
-        lp = double(lgd.Position);
-        lgd.Units = oldLegendUnits;
-        assert(lp(1)>=-0.005 && lp(2)>=-0.005 && ...
-            lp(1)+lp(3)<=1.005 && lp(2)+lp(4)<=1.005, ...
-            'Manuscript:LegendOutsideCanvas','Legend outside EPS canvas in %s.',stem);
+    if isempty(lgd) || ~isvalid(lgd), continue; end
+    lp = hgconvertunits(fig,double(lgd.Position),lgd.Units,'normalized',fig);
+    assert(lp(1)>=-0.005 && lp(2)>=-0.005 && ...
+        lp(1)+lp(3)<=1.005 && lp(2)+lp(4)<=1.005, ...
+        'Manuscript:LegendOutsideCanvas','Legend outside EPS canvas in %s.',stem);
+
+    % For quantitative 2-D figures, an outside/manual-above legend must sit
+    % above the axes/tick envelope rather than covering labels or data.
+    if ~is_geometry_axis(ax)
+        location = lower(string(lgd.Location));
+        isAboveLegend = contains(location,'northoutside') || ...
+            (location=="none" && lp(2)>=p(2)+0.5*p(4));
+        if isAboveLegend
+            assert(lp(2)>=p(2)+p(4)+ti(4)-0.004, ...
+                'Manuscript:LegendOverlap', ...
+                'Legend overlaps metric axes/tick labels in %s.',stem);
+        end
     end
 end
 end
@@ -129,29 +136,34 @@ for k = 1:numel(objects)
         end
     catch err
         if startsWith(err.identifier,'Manuscript:'), rethrow(err); end
-        % Ignore graphics proxy objects with inaccessible font properties.
     end
 end
 end
 
 
 function assert_geometry_has_content(fig,stem)
-% A visible 3-D/LU axes must contain drawable data before EPS export. This
-% catches accidental empty geometry at generation time without modifying it.
 axesObjects = findall(fig,'Type','axes');
 for k = 1:numel(axesObjects)
     ax = axesObjects(k);
-    if strcmpi(ax.Visible,'off'), continue; end
-    labels = lower(string({ax.XLabel.String,ax.YLabel.String,ax.ZLabel.String}));
-    v = view(ax);
-    isGeometry = any(contains(labels,'(lu)')) || ...
-        abs(v(1))>1e-9 || abs(v(2)-90)>1e-9;
-    if ~isGeometry, continue; end
+    if strcmpi(ax.Visible,'off') || ~is_geometry_axis(ax), continue; end
     drawable = [findall(ax,'Type','line');findall(ax,'Type','surface'); ...
         findall(ax,'Type','patch');findall(ax,'Type','scatter')];
     assert(~isempty(drawable),'Manuscript:EmptyGeometry', ...
         'Geometry axes contain no drawable objects before export in %s.',stem);
 end
+end
+
+
+function tf = is_geometry_axis(ax)
+labels = lower([label_string(ax.XLabel),label_string(ax.YLabel),label_string(ax.ZLabel)]);
+v = view(ax);
+tf = any(contains(labels,'(lu)')) || abs(v(1))>1e-9 || abs(v(2)-90)>1e-9;
+end
+
+
+function value = label_string(handle)
+value = string(handle.String);
+if isempty(value), value=""; else, value=strjoin(value(:).'," "); end
 end
 
 
