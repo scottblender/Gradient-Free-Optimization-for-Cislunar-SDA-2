@@ -128,8 +128,15 @@ text = replace(text,"Gateway","LG");
 text = replace(text,"Low-thrust","LT");
 
 if isLegend
+    % Geometry legends repeat these descriptions across many panels. Keep
+    % the meaning obvious while conserving enough horizontal space for the
+    % final 22-point manuscript font.
     text(text=="Post-impulse") = "GI traj.";
     text(text=="Transfer") = "LT traj.";
+    text(text=="Target trajectory") = "Target";
+    text(text=="Observer orbits") = "Obs. orbits";
+    text(text=="Endpoint orbits") = "Endpoints";
+    text(text=="6000-FE GA reference") = "6000-FE GA ref.";
 end
 
 if wasChar
