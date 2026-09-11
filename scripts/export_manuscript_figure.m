@@ -11,6 +11,12 @@ set(fig,'PaperUnits','inches','PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off','Color','w');
 paper = get(fig,'PaperSize');
 set(fig,'PaperPosition',[0 0 paper]);
+
+% Shorten repeated mission/case wording before final layout. This keeps the
+% scientific terminology intact while using compact plot-facing labels such
+% as LG, LT, and GI where the full names only consume figure space.
+abbreviate_manuscript_text(fig);
+
 fontObjects = findall(fig,'-property','FontSize');
 for k = 1:numel(fontObjects)
     obj = fontObjects(k);
@@ -58,4 +64,69 @@ metadata = struct('stem',stem,'widthInches',paper(1), ...
     'heightInches',paper(2),'minimumFontPoints',style.fontSize, ...
     'placementWidthInches',style.manuscriptPanelWidth, ...
     'minimumPrintedFontPoints',style.fontSize*style.manuscriptPanelWidth/paper(1));
+end
+
+function abbreviate_manuscript_text(fig)
+%ABBREVIATE_MANUSCRIPT_TEXT Compact repeated case names in final figures.
+% Apply to legends, categorical tick labels, and free text. Axis variable
+% names and mathematical notation are otherwise left unchanged.
+legendObjects = findall(fig,'Type','legend');
+for k = 1:numel(legendObjects)
+    legendObjects(k).String = abbreviate_value(legendObjects(k).String,true);
+end
+
+axesObjects = findall(fig,'Type','axes');
+for k = 1:numel(axesObjects)
+    ax = axesObjects(k);
+    if ~isempty(ax.XTickLabel)
+        ax.XTickLabel = abbreviate_value(ax.XTickLabel,false);
+    end
+    if ~isempty(ax.YTickLabel)
+        ax.YTickLabel = abbreviate_value(ax.YTickLabel,false);
+    end
+    if ~isempty(ax.ZTickLabel)
+        ax.ZTickLabel = abbreviate_value(ax.ZTickLabel,false);
+    end
+end
+
+textObjects = findall(fig,'Type','text');
+for k = 1:numel(textObjects)
+    try
+        textObjects(k).String = abbreviate_value(textObjects(k).String,false);
+    catch
+        % Ignore graphics proxy objects that expose non-writable String data.
+    end
+end
+end
+
+function output = abbreviate_value(value,isLegend)
+if ~(ischar(value) || isstring(value) || iscell(value))
+    output = value;
+    return;
+end
+
+wasChar = ischar(value);
+wasCell = iscell(value);
+text = string(value);
+
+% Replace the full case names first, then common shorter references.
+text = replace(text,"Lunar Gateway","LG");
+text = replace(text,"Low-thrust transfer","LT");
+text = replace(text,"Gateway impulse","GI");
+text = replace(text,"Gateway-impulse","GI");
+text = replace(text,"Gateway","LG");
+text = replace(text,"Low-thrust","LT");
+
+if isLegend
+    text(text=="Post-impulse") = "GI traj.";
+    text(text=="Transfer") = "LT traj.";
+end
+
+if wasChar
+    output = char(text);
+elseif wasCell
+    output = cellstr(text);
+else
+    output = text;
+end
 end

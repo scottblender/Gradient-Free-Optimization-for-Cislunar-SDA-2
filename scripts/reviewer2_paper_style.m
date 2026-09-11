@@ -8,8 +8,8 @@ function style = reviewer2_paper_style()
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
-% A 6.5-inch EPS placed at 3 inches retains approximately 10-point text.
-style.manuscriptPanelWidth = 3.0;
+% A 7.25-inch EPS placed at 3.3 inches retains approximately 10-point text.
+style.manuscriptPanelWidth = 3.3;
 style.minimumPrintedFontSize = 10;
 style.fontSize = 22;
 style.labelFontSize = 24;
@@ -24,11 +24,11 @@ style.exportDpi = 300;
 % Export-size classes. Figures intended to line up in LaTeX share exactly
 % the same outer paper size within each class.
 % -------------------------------------------------------------------------
-style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 5.2;
+style.metricFigureWidth = 7.25;
+style.metricFigureHeight = 5.8;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
-style.panelFigureHeight = 6.2; % retained only for backward compatibility
+style.panelFigureHeight = 6.8; % retained only for backward compatibility
 style.convergenceFigureWidth = style.metricFigureWidth;
 style.convergenceFigureHeight = style.metricFigureHeight;
 
@@ -42,10 +42,10 @@ style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
 % The keep-out schematic carries several callouts and angle annotations.
-% Keep the standard 6.5-inch width so LaTeX scaling and printed font size do
-% not change, but give this illustration additional vertical room.
+% Keep the shared manuscript width, but give this illustration additional
+% vertical room so its labels and angular callouts remain well separated.
 style.visibilityFigureWidth = style.metricFigureWidth;
-style.visibilityFigureHeight = 6.4;
+style.visibilityFigureHeight = 7.0;
 style.measurementFigureWidth = style.metricFigureWidth;
 style.measurementFigureHeight = style.metricFigureHeight;
 style.monteCarloFigureWidth = style.metricFigureWidth;

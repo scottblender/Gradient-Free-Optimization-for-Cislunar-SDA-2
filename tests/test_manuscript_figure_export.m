@@ -15,6 +15,8 @@ for k = 1:3
         hold(ax,'on');
         for j=2:6, plot(ax,1:10,j*(1:10)); end
         ylabel(ax,'Mean effective position uncertainty (km)');
+        ax.XTick = 1:3;
+        ax.XTickLabel = {'Lunar Gateway','Low-thrust transfer','Gateway impulse'};
         lgd=legend(ax,{'Nominal Gateway','Post-impulse','10 m/s burn', ...
             'Moon','L1','L2'},'Location','northoutside', ...
             'Orientation','horizontal','NumColumns',3);
@@ -41,6 +43,11 @@ for k = 1:3
         assert(lgd.FontSize>=style.fontSize,'Legend font size changed during export.');
         if k==2
             assert(lgd.NumColumns==3,'Impulse-style legend should remain two balanced rows.');
+            legendText = string(lgd.String);
+            assert(any(legendText=="Nominal LG") && any(legendText=="GI traj."), ...
+                'Mission abbreviations were not applied to the legend.');
+            assert(isequal(string(ax.XTickLabel(:)),["LG";"LT";"GI"]), ...
+                'Mission abbreviations were not applied to categorical ticks.');
         else
             assert(lgd.NumColumns==2 && rows==1, ...
                 'Two-entry legends such as DRO/Moon must export as one row.');
@@ -48,7 +55,9 @@ for k = 1:3
     end
     epsText = fileread(file);
     boxes(k) = string(regexp(epsText,'(?m)^%%BoundingBox:[^\r\n]*','match','once'));
-    assert(contains(epsText,'%%HiResBoundingBox: 0 0 468.000000 374.400000'));
+    expectedHires = sprintf('%%%%HiResBoundingBox: 0 0 %.6f %.6f', ...
+        72*style.metricFigureWidth,72*style.metricFigureHeight);
+    assert(contains(epsText,expectedHires));
     assert(meta.minimumPrintedFontPoints>=style.minimumPrintedFontSize);
     png = imfinfo(strrep(file,'.eps','.png')); imageSizes(k,:)=[png.Width png.Height];
     objects=findall(fig,'-property','FontSize');
@@ -60,10 +69,12 @@ for k = 1:3
 end
 assert(all(boxes==boxes(1)),'Paired EPS canvases differ.');
 assert(all(all(imageSizes==imageSizes(1,:))),'Paired PNG canvases differ.');
+assert(style.metricFigureWidth>6.5 && style.metricFigureHeight>5.2, ...
+    'Manuscript export canvas should be larger than the legacy dimensions.');
 assert(style.geometryFigureWidth==style.measurementFigureWidth && ...
     style.geometryFigureHeight==style.measurementFigureHeight);
 assert(style.visibilityFigureWidth==style.metricFigureWidth && ...
     style.visibilityFigureHeight>style.metricFigureHeight, ...
     'Keep-out schematic should retain manuscript width but use a taller canvas.');
-fprintf('Manuscript EPS canvas, legend, and font checks passed.\n');
+fprintf('Manuscript EPS canvas, abbreviation, legend, and font checks passed.\n');
 end
