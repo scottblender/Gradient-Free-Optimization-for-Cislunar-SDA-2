@@ -79,6 +79,13 @@ style.max3DYTicks = 2;
 style.max3DZTicks = 3;
 style.max3DTicks = 3; % compatibility alias for older tests/helpers
 
+% Two-dimensional metric and convergence figures need enough numeric ticks
+% for readers to estimate intermediate values directly from the plot. These
+% are upper bounds for the shared nice-tick generator; manual/categorical
+% axes remain untouched.
+style.max2DXTicks = 8;
+style.max2DYTicks = 7;
+
 % Repeated optimizer names in the all-case family-selection summary need a
 % little additional horizontal separation at the final manuscript font.
 style.familyOptimizerSpacingFactor = 1.22;
