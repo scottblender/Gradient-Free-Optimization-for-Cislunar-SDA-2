@@ -51,12 +51,12 @@ style.measurementFigureHeight = style.metricFigureHeight;
 style.monteCarloFigureWidth = style.metricFigureWidth;
 style.monteCarloFigureHeight = style.metricFigureHeight;
 
-% Shared 3-D layout and fallback camera. The larger normalized plot box and
-% modest camera zoom make orbit/trajectory geometry occupy substantially more
-% of the exported EPS without changing the LaTeX placement width or distorting
-% equal-axis geometry.
-style.geometryPlotPosition = [0.08 0.11 0.84 0.70];
-style.geometryCameraZoom = 1.30;
+% Shared 3-D layout and fallback camera. Keep the plot box appreciably larger
+% than the legacy [0.15 0.18 0.72 0.60] layout, but leave enough physical
+% margin for perspective axes, tick labels, and legends to remain inside the
+% fixed EPS canvas. Camera zoom is intentionally avoided because it can push
+% projected 3-D geometry outside the export rectangle.
+style.geometryPlotPosition = [0.09 0.12 0.82 0.67];
 style.metricPlotPosition = [0.18 0.22 0.77 0.55];
 style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
 style.measurementXLim = [-0.95 5.10];
