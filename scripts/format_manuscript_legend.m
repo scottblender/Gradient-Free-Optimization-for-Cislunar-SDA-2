@@ -104,10 +104,15 @@ elseif any(labels == "Nominal Gateway") && ~hasTargetTrajectory
     labels(labels == "Nominal Gateway") = "LG";
 end
 
-labels(labels == "Observer orbits") = "Observers";
-labels(labels == "Endpoint orbits") = "Endpoints";
+% Keep the high-frequency trajectory legend entries very short so the full
+% row remains centered and close to the plot at manuscript scale.
+labels(labels == "Observer orbits") = "Obs.";
+labels(labels == "Observers") = "Obs.";
+labels(labels == "Endpoint orbits") = "Endpt.";
+labels(labels == "Endpoints") = "Endpt.";
 labels(labels == "Candidate slots") = "Slots";
-labels(labels == "Excluded endpoint") = "Endpoint";
+labels(labels == "Excluded endpoint") = "Endpt.";
+labels(labels == "Endpoint") = "Endpt.";
 
 % Preserve explicit equilibrium-point names in orbit-database legends. The
 % family labels L1/L2 and the physical "L1 point"/"L2 point" markers must not
