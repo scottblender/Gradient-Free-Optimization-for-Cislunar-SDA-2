@@ -1,47 +1,102 @@
 function format_manuscript_legend(ax,lgd,style,plotPosition)
-%FORMAT_MANUSCRIPT_LEGEND Finalize a horizontal manuscript legend.
-% Formatting occurs during plot construction only. Start with one row and
-% add rows only when the legend would exceed the available figure width.
-% The axes then expand upward to the legend so unused vertical whitespace
-% does not make the plotted content artificially small in the EPS panel.
+%FORMAT_MANUSCRIPT_LEGEND Format legends without wasting manuscript space.
+%
+% Two-dimensional result plots keep MATLAB's working north-outside layout so
+% axes labels remain inside the canvas. Three-dimensional trajectory plots use
+% the original manuscript behavior: place the legend immediately above the
+% fixed plot box, then restore the axes position. No export-time reformatting.
 
-labels = abbreviate_manuscript_text(string(lgd.String));
+labels = string(lgd.String);
+labels = contextual_legend_labels(labels);
+labels = abbreviate_manuscript_text(labels);
 lgd.String = cellstr(labels);
 lgd.FontName = style.fontName;
-lgd.FontSize = style.fontSize;
+if isfield(style,'legendFontSize')
+    lgd.FontSize = style.legendFontSize;
+else
+    lgd.FontSize = style.fontSize;
+end
 lgd.FontWeight = 'bold';
 lgd.Box = 'off';
-lgd.Orientation = 'horizontal';
-lgd.Location = 'northoutside';
-lgd.Units = 'normalized';
 
-columns = min(numel(labels),style.legendMaxColumns);
-lgd.NumColumns = max(columns,1);
-drawnow;
-while lgd.Position(3) > 0.92 && columns > 1
-    columns = columns-1;
-    lgd.NumColumns = columns;
+% Preserve in-axes legends such as the DRO panel. For north-outside legends,
+% prefer one row and wrap only when the row is physically too wide.
+isNorthOutside = strcmpi(string(lgd.Location),"northoutside");
+if isNorthOutside
+    lgd.Orientation = 'horizontal';
+    columns = min(numel(labels),style.legendMaxColumns);
+    lgd.NumColumns = max(columns,1);
+    lgd.Units = 'normalized';
+    drawnow;
+    while lgd.Position(3) > 0.94 && columns > 1
+        columns = columns-1;
+        lgd.NumColumns = columns;
+        drawnow;
+    end
+end
+
+% MATLAB reports [0 90] for ordinary 2-D axes. Only perspective/3-D axes
+% receive the fixed manuscript geometry treatment.
+is3D = abs(ax.View(2)-90) > 1e-8;
+if is3D && isNorthOutside
+    lgd.Units = 'normalized';
+    drawnow;
+    pos = lgd.Position;
+    pos(1) = max(0.01,0.5-pos(3)/2);
+    legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
+    pos(2) = min(legendBottom,0.98-pos(4));
+    lgd.Position = pos;
+    lgd.AutoUpdate = 'off';
+
+    % Restore the known-good plot box after MATLAB creates/moves the legend.
+    ax.Units = 'normalized';
+    ax.PositionConstraint = 'innerposition';
+    ax.Position = plotPosition;
     drawnow;
 end
 
-% Keep the legend near the top of the paper, then use all available space
-% below it for the axes. Previously the axes retained their shorter nominal
-% height, leaving a large blank band between the plot and legend.
-lp = lgd.Position;
-lp(1) = max(0.02,0.5-lp(3)/2);
-lp(2) = 0.97-lp(4);
-lgd.Position = lp;
-lgd.AutoUpdate = 'off';
-
-plotPosition(4) = lp(2)-style.geometryLegendGap-plotPosition(2);
-assert(plotPosition(4) > 0.30 && lp(1) >= 0,'Manuscript:LegendSpace', ...
-    'Legend text is too large for this canvas; shorten labels in the plotter.');
-ax.Units = 'normalized';
-ax.PositionConstraint = 'innerposition';
-ax.Position = plotPosition;
-drawnow;
-
 % Remove only the crowded central zero from symmetric three-tick 3-D axes.
-% Data limits and two-dimensional zero baselines are unchanged.
 format_manuscript_ticks(ax);
+end
+
+
+function labels = contextual_legend_labels(labels)
+%CONTEXTUAL_LEGEND_LABELS Use compact mission-specific trajectory labels.
+labels = string(labels);
+
+hasEndpoints = any(labels == "Endpoint orbits");
+hasPostImpulse = any(labels == "Post-impulse") || any(labels == "Nominal Gateway");
+hasTargetTrajectory = any(labels == "Target trajectory");
+
+% Result-geometry legends.
+if hasTargetTrajectory
+    if hasEndpoints
+        labels(labels == "Target trajectory") = "LT";
+    elseif any(labels == "Nominal Gateway")
+        labels(labels == "Target trajectory") = "GI";
+        labels(labels == "Nominal Gateway") = "Nominal LG";
+    else
+        labels(labels == "Target trajectory") = "LG";
+    end
+end
+
+% Study-definition trajectory legends.
+if any(labels == "Transfer")
+    labels(labels == "Transfer") = "LT";
+end
+if any(labels == "Post-impulse")
+    labels(labels == "Post-impulse") = "GI";
+    labels(labels == "Nominal Gateway") = "Nominal LG";
+elseif any(labels == "Nominal Gateway") && ~hasTargetTrajectory
+    labels(labels == "Nominal Gateway") = "LG";
+end
+
+labels(labels == "Observer orbits") = "Observers";
+labels(labels == "Endpoint orbits") = "Endpoints";
+labels(labels == "Candidate slots") = "Slots";
+labels(labels == "Excluded endpoint") = "Endpoint";
+
+% Keep physical objects and Lagrange-point labels explicit.
+labels(labels == "L1 point") = "L1";
+labels(labels == "L2 point") = "L2";
 end
