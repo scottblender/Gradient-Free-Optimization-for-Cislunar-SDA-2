@@ -63,6 +63,11 @@ end
 function format_manuscript_figure(fig,style)
 %FORMAT_MANUSCRIPT_FIGURE Single authoritative pre-export formatter.
 
+% Improve neutral candidate-slot visibility only for the slot-definition
+% demonstration. Selected/adjacent slots already use distinct filled colors;
+% the excluded endpoint remains hollow by design.
+fill_slot_demo_candidate_markers(fig,style);
+
 % Typography is finalized first so MATLAB measures legends at the actual
 % manuscript font size. No later helper is allowed to resize or reposition.
 fontObjects = findall(fig,'-property','FontSize');
@@ -173,6 +178,67 @@ for k = 1:numel(axesObjects)
 end
 
 drawnow;
+end
+
+
+function fill_slot_demo_candidate_markers(fig,style)
+%FILL_SLOT_DEMO_CANDIDATE_MARKERS Fill neutral slot-grid markers for print.
+legends = findall(fig,'Type','legend');
+isSlotDemo = false;
+for k = 1:numel(legends)
+    labels = string(legends(k).String);
+    if any(labels == "Candidate slots") && any(labels == "Slot j")
+        isSlotDemo = true;
+        break;
+    end
+end
+if ~isSlotDemo, return; end
+
+% 3-D slot-geometry panel: the candidate slots are the small hollow circles;
+% Slot j and Slot j+1 are larger and already filled with distinct colors.
+lines = findall(fig,'Type','line');
+for k = 1:numel(lines)
+    h = lines(k);
+    if ~isprop(h,'Marker') || strcmpi(string(h.Marker),"none") || ...
+            ~isprop(h,'MarkerFaceColor') || ~isprop(h,'MarkerSize')
+        continue;
+    end
+    if h.MarkerSize <= 6 && is_white_color(h.MarkerFaceColor)
+        h.MarkerFaceColor = style.slotCandidateFillColor;
+    end
+end
+
+% Phase-grid panel: scatter(...,'w','filled') may store white in CData with
+% MarkerFaceColor='flat', so handle that representation explicitly.
+scatters = findall(fig,'Type','scatter');
+for k = 1:numel(scatters)
+    h = scatters(k);
+    if ~isprop(h,'SizeData') || isempty(h.SizeData) || max(double(h.SizeData(:))) > 40
+        continue;
+    end
+    faceIsWhite = isprop(h,'MarkerFaceColor') && is_white_color(h.MarkerFaceColor);
+    cdataIsWhite = isprop(h,'CData') && is_white_matrix(h.CData);
+    if faceIsWhite || cdataIsWhite
+        if isprop(h,'CData'), h.CData = style.slotCandidateFillColor; end
+        if isprop(h,'MarkerFaceColor'), h.MarkerFaceColor = style.slotCandidateFillColor; end
+    end
+end
+end
+
+
+function tf = is_white_color(value)
+if ischar(value) || isstring(value)
+    tf = any(strcmpi(string(value),["w","white"]));
+elseif isnumeric(value) && numel(value)==3
+    tf = all(abs(double(value(:).')-[1 1 1]) < 1e-12);
+else
+    tf = false;
+end
+end
+
+
+function tf = is_white_matrix(value)
+tf = isnumeric(value) && ~isempty(value) && all(abs(double(value(:))-1) < 1e-12);
 end
 
 
