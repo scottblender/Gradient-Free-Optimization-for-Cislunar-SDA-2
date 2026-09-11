@@ -28,14 +28,15 @@ assert(height(R)==2*B.nRepeats && all(R.SearchFE==6000),'Incomplete benchmark.')
 style=reviewer2_paper_style(); files=strings(2,1);
 for kind=1:2
     fig=figure('Visible','off','Color','w','Units','inches', ...
-        'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
-        'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight], ...
-        'PaperPosition',[0 0 style.metricFigureWidth style.metricFigureHeight], ...
+        'Position',[1 1 style.figureWidth style.figureHeight], ...
+        'PaperUnits','inches','PaperSize',[style.figureWidth style.figureHeight], ...
+        'PaperPosition',[0 0 style.figureWidth style.figureHeight], ...
         'PaperPositionMode','manual','Renderer','painters','InvertHardcopy','off');
     cleanup=onCleanup(@() close(fig)); %#ok<NASGU>
-    ax=axes(fig); hold(ax,'on');
+    ax=axes(fig,'Units','normalized','Position',style.metricPlotPosition); hold(ax,'on');
     set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
-        'LineWidth',style.axisLineWidth,'Box','off','FontWeight','bold');
+        'LineWidth',style.axisLineWidth,'Box','off','FontWeight','bold', ...
+        'TickDir','out','Layer','top','XGrid','off','YGrid','off','ZGrid','off');
     for m=1:2
         indices=find(R.Mode==modes(m));
         assert(numel(indices)==B.nRepeats && numel(unique(R.Repeat(indices)))==B.nRepeats, ...
@@ -64,15 +65,15 @@ for kind=1:2
             'DisplayName',char(modes(m)));
     end
     if kind==1
-        xlabel(ax,'Function evaluations'); xlim(ax,[0 6000]);
+        xlabel(ax,'Function evaluations','FontWeight','bold','FontSize',style.labelFontSize); xlim(ax,[0 6000]);
         stem='parallel_speed_lg_convergence_fe';
     else
-        xlabel(ax,'Optimization elapsed time (s)');
+        xlabel(ax,'Optimization elapsed time (s)','FontWeight','bold','FontSize',style.labelFontSize);
         stem='parallel_speed_lg_convergence_time';
     end
-    ylabel(ax,'Mean best-so-far objective');
-    legend(ax,'Location','northoutside','Orientation','horizontal','Box','off', ...
-        'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
+    ylabel(ax,'Best-so-far objective','FontWeight','bold','FontSize',style.labelFontSize);
+    lgd=legend(ax,'Location','northoutside','Orientation','horizontal','Box','off');
+    format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
     drawnow;
     print(fig,char(files(kind)),'-depsc2','-painters','-r600');
