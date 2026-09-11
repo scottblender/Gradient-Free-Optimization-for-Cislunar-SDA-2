@@ -64,13 +64,12 @@ style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
 
 % Legends remain centered above the axes. Their final vertical placement is
-% measured directly from the axes rectangle using one explicit gap. Do not
-% add TightInset to this gap at export time: that previously kept the legend
-% high even when the nominal gap was reduced.
+% measured directly from the axes rectangle using one explicit gap. Keep the
+% gap modest: 0.004 was too tight, while 0.020 left excess white space.
 style.legendMaxColumns = 6;
 style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
-style.legendAxesGap = 0.020;
+style.legendAxesGap = 0.010;
 style.geometryLegendGap = style.legendAxesGap; % compatibility for plotters
 style.legendTopPadding = 0.015;
 
