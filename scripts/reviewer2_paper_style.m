@@ -62,13 +62,15 @@ style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
 style.measurementXLim = [-0.95 5.10];
 style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
-% Legends remain centered above the axes. Keep them close to the plot so
-% trajectory/orbit geometry can use more of the fixed export canvas.
+% Legends remain centered above the axes. Use one moderate shared gap in
+% both the plotters and final exporter: larger than the earlier too-tight
+% placement, but lower than the old export-time position.
 style.legendMaxColumns = 6;
 style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
-style.geometryLegendGap = 0.004;
+style.geometryLegendGap = 0.008;
 style.legendTopPadding = 0.015;
+style.legendMinimumTopClearance = 0.010;
 
 % Perspective projection can collapse numeric tick labels into the same
 % screen-space corner. The y axis is especially short for the manuscript
