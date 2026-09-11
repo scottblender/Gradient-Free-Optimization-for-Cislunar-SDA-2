@@ -74,9 +74,8 @@ for k=1:numel(axesObjects)
                 ['Legend remains wider than the preferred canvas width after ' ...
                  'two-row wrapping and compact swatches; exporting centered.']);
         end
-        legendHeight=pos(4)+0.045;
+        legendHeight=pos(4)+style.legendTopPadding;
         pos(1)=max(0.002,(1-pos(3))/2);
-        pos(2)=0.975-pos(4);
         lgd.Position=pos;
     end
     if isappdata(ax,'ManuscriptAxesPosition')
@@ -97,6 +96,20 @@ for k=1:numel(axesObjects)
         assert(width>0.3 && height>0.25,'Manuscript:LayoutSpace', ...
             'Labels leave insufficient plotting space; shorten labels before export.');
         ax.Position=[left bottom width height];
+    end
+
+    % Place the legend immediately above the final axes/tick-label envelope
+    % instead of pinning it to the top of the paper. This removes unused
+    % vertical whitespace while retaining a small, explicit separation.
+    if ~isempty(lgd) && isvalid(lgd)
+        drawnow;
+        pos=lgd.Position;
+        inset=ax.TightInset;
+        topClearance=max(0.015,inset(4)+0.010);
+        desiredBottom=ax.Position(2)+ax.Position(4)+topClearance+style.geometryLegendGap;
+        pos(1)=max(0.002,(1-pos(3))/2);
+        pos(2)=min(desiredBottom,0.99-pos(4));
+        lgd.Position=pos;
     end
 
     % Do not camera-zoom 3-D plots at export time. MATLAB already frames the
