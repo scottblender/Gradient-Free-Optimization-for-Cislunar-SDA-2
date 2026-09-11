@@ -97,10 +97,15 @@ for k = 1:numel(axesObjects)
         basePosition = ax.Position;
     end
 
-    % Add useful numerical resolution only to non-trajectory metric plots.
-    % CR3BP geometry/trajectory plots are identified by 3-D view or explicit
-    % '(LU)' axis units and retain their plotter-selected ticks exactly.
-    if ~is_geometry_axis(ax)
+    % Metric plots receive useful numerical resolution. Geometry/trajectory
+    % axes retain the plotter-selected tick scale, except for the known
+    % projected-label collision where a symmetric [-a,0,+a] set is reduced
+    % to its two endpoints (e.g. -0.05 and 0.05).
+    if is_geometry_axis(ax)
+        compact_symmetric_geometry_ticks(ax,'X');
+        compact_symmetric_geometry_ticks(ax,'Y');
+        compact_symmetric_geometry_ticks(ax,'Z');
+    else
         densify_metric_ticks(ax,'X',style.max2DXTicks);
         densify_metric_ticks(ax,'Y',style.max2DYTicks);
     end
@@ -243,12 +248,29 @@ end
 
 
 function tf = is_geometry_axis(ax)
-% Geometry/trajectory axes keep their original tick choices.
+% Geometry/trajectory axes keep their original tick scale.
 viewAngles = view(ax);
 isPerspective3D = abs(viewAngles(1)) > 1e-9 || abs(viewAngles(2)-90) > 1e-9;
 labels = [label_text(ax.XLabel),label_text(ax.YLabel),label_text(ax.ZLabel)];
 hasLU = any(contains(lower(labels),'(lu)'));
 tf = isPerspective3D || hasLU;
+end
+
+
+function compact_symmetric_geometry_ticks(ax,axisName)
+% Remove only the center zero from a symmetric three-tick trajectory axis.
+% This targets projected 3-D axes where labels such as 0 and 0.05 overlap;
+% nonsymmetric/manual tick sets are preserved exactly.
+property = axisName+"Tick";
+ticks = double(ax.(property));
+if numel(ticks) ~= 3 || any(~isfinite(ticks)), return; end
+scale = max(1,max(abs(ticks)));
+tolerance = 100*eps(scale);
+isCenteredZero = abs(ticks(2)) <= tolerance;
+isSymmetric = abs(ticks(1)+ticks(3)) <= tolerance;
+if isCenteredZero && isSymmetric
+    ax.(property) = ticks([1 3]);
+end
 end
 
 
