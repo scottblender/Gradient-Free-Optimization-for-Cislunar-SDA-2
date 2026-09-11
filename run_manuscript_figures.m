@@ -49,8 +49,10 @@ if opts.ClearDirectory
 end
 sources = strings(0,1);
 if ismember("definitions",sections)
-    output.definitions = plot_study_definition_figures(logical(opts.Inspect),opts.DefinitionSections);
-    % Gather only the selected figures, not stale files from other sections.
+    output.definitions = plot_study_definition_figures_for_manuscript( ...
+        logical(opts.Inspect),opts.DefinitionSections,output.directory);
+    % Definition products already live in the shared manuscript directory;
+    % collect only the selected figure paths for the manifest.
     sources = [sources;definition_files(output.definitions)];
 end
 selected = intersect(resultSections,sections,'stable');
