@@ -10,21 +10,22 @@ x = unique(vertcat(bars.XData));
 x = sort(x(:));
 if numel(x) > 1 && isnumeric(x)
     gap = min(diff(x));
-    xlim(ax,[x(1)-0.60*gap,x(end)+0.60*gap]);
+    xlim(ax,[x(1)-0.65*gap,x(end)+0.65*gap]);
 end
 
 labels = abbreviate_manuscript_text(string(ax.XTickLabel));
 ax.XTickLabel = cellstr(labels);
 
-% Family-comparison figures can contain many short optimizer labels. Rotate
-% those labels slightly even though the strings themselves are short.
+% Dense family-comparison figures contain repeated optimizer names. A larger
+% rotation keeps GA/PSO/ABC/ACO distinct without shrinking the manuscript font.
 if numel(labels) >= 8 || any(strlength(labels) > 10)
     ax.XTickLabelRotation = style.categoryLabelAngle;
 end
 
 % Abbreviate repeated case names used as in-axes annotations and long axis
-% labels. This improves readability without changing any saved result data.
+% labels. Mission-group labels are nudged upward slightly above the 100% bars.
 textObjects = findall(ax,'Type','text');
+yRange = diff(ylim(ax));
 for k = 1:numel(textObjects)
     try
         original = string(textObjects(k).String);
@@ -35,6 +36,11 @@ for k = 1:numel(textObjects)
             else
                 textObjects(k).String = cellstr(shortened);
             end
+        end
+        if isscalar(shortened) && any(shortened == ["LG","LT","GI"])
+            p = textObjects(k).Position;
+            p(2) = p(2) + 0.02*yRange;
+            textObjects(k).Position = p;
         end
     catch
         % Ignore graphics proxy objects that do not expose writable strings.
