@@ -1,0 +1,90 @@
+% Fixed configuration tables from the supplied clean manuscript (2026-09-11).
+% Result, catalog, and target-state tables are generated from saved data.
+
+\begin{table}[!htbp]
+\caption{Objective-function weights and mission-specific normalization thresholds.}
+\label{tab:cost_weights_thresholds}
+\centering
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}cccccc@{}}
+\hline
+\textbf{Mission} & $\mathbf{w}$ & $\epsilon_{r,\mathrm{RMSE}}$ & $\epsilon_{v,\mathrm{RMSE}}$ & $\epsilon_{r,\sigma}$ & $\epsilon_{v,\sigma}$ & $\epsilon_S$ \\
+\hline
+LT transfer & $[1,\;1,\;0.1]$ & $100~\mathrm{km}/LU$ & $0.1~\mathrm{km/s}/VU$ & $100~\mathrm{km}/LU$ & $0.1~\mathrm{km/s}/VU$ & $1.0$ \\
+LG & $[1,\;1,\;0.1]$ & $1~\mathrm{km}/LU$ & $10^{-3}~\mathrm{km/s}/VU$ & $1~\mathrm{km}/LU$ & $10^{-3}~\mathrm{km/s}/VU$ & $1.0$ \\
+GI & $[1,\;1,\;0.1]$ & $1~\mathrm{km}/LU$ & $10^{-3}~\mathrm{km/s}/VU$ & $1~\mathrm{km}/LU$ & $10^{-3}~\mathrm{km/s}/VU$ & $1.0$ \\
+\hline
+\end{tabular*}
+\end{table}
+
+\begin{table}[!htbp]
+\caption{Gradient-free optimization algorithms compared in this study.}
+\label{tab:gradient_free_algorithms}
+\centering
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular*}{\textwidth}{@{}L{0.18\textwidth}L{0.28\textwidth}L{0.46\textwidth}@{}}
+\hline
+\textbf{Algorithm} & \textbf{Search strategy} & \textbf{Role in this study} \\
+\hline
+GA & Population-based stochastic & Baseline evolutionary search method \\
+PSO & Swarm-based stochastic & Population-based comparison method \\
+BO & Sequential surrogate-assisted & Sample-efficient comparison method \\
+ABCO & Population-based foraging & Discrete and combinatorial comparison method \\
+ACO & Pheromone-based graph & Discrete and combinatorial comparison method \\
+\hline
+\end{tabular*}
+\end{table}
+
+\begin{table}[!htbp]
+\caption{Optimization, EKF, and visibility-screening parameters.}
+\label{tab:optimization_ekf_parameters}
+\centering
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular*}{\textwidth}{@{}L{0.22\textwidth}@{\extracolsep{\fill}}L{0.34\textwidth}L{0.38\textwidth}@{}}
+\hline
+\textbf{Category} & \textbf{Parameter} & \textbf{Value} \\
+\hline
+All methods & Number of observers & $N_{\mathrm{obs}}=3,5,7,10$ \\
+All methods & Design variables & $2N_{\mathrm{obs}}=6,10,14,20$ \\
+All methods & Slots per orbit & 50 \\
+Five-method comparison & Search evaluation budget & 1200 FE \\
+Four-method comparison & Search evaluation budget & 6000 FE \\
+Baseline GA & Search evaluation budget & 6000 FE \\
+Repeated-run studies & Optimizer seeds & $0,\ldots,19$ \\
+Repeated-run studies & Number of independent runs & 20 \\
+Measurements & Fixed noise seed & 1001 \\
+GA & Population size & 60 \\
+PSO & Swarm size & 60 \\
+ABCO & Colony size / abandonment limit & 60 / 20 \\
+ACO & Number of ants & 60 \\
+ACO & $\alpha$, $\beta$, $\rho$, $Q$ & $1.0$, $1.0$, $0.2$, $1.0$ \\
+EKF & Initial covariance & $\mathrm{diag}(p,p,p,v,v,v)$ \\
+EKF & $p$ and $v$ values & $p=(1/LU)^2$, $v=[10/(1000VU)]^2$ \\
+EKF & EKF cadence & $0.01$ TU \\
+EKF & Process noise covariance, LG and GI & $Q_k=10^{-8}I_6$ \\
+EKF & Process noise covariance, LT & $Q_k=6.25\times10^{-4}I_6$ \\
+EKF & AO measurement noise covariance & $\mathrm{diag}(10^{-8},10^{-8})$ \\
+EKF & AR measurement noise covariance & $\mathrm{diag}(10^{-8},10^{-8},(1/LU)^2)$ \\
+Screening & Earth / Moon / Sun exclusion & $15^\circ$ / $10^\circ$ / $20^\circ$ \\
+Sun model & Initial solar phase angle and inclination & $\theta_0=0\ \mathrm{rad}$, $i_{\mathrm{sun}}=0\ \mathrm{rad}$ \\
+\hline
+\end{tabular*}
+\end{table}
+
+\begin{table}[!htbp]
+\caption{Measurement-screening and objective-component configurations for the GA studies.}
+\label{tab:comparison_cases}
+\centering
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}cc@{}}
+\hline
+\textbf{Case} & \textbf{Screening} & \textbf{Objective components} \\
+\hline
+Combined objective with screening & ON & $J_1+J_2+J_3$ \\
+Combined objective without screening & OFF & $J_1+J_2+J_3$ \\
+Estimation-error only & ON & $J_1$ \\
+Uncertainty only & ON & $J_2$ \\
+Stability only & ON & $J_3$ \\
+\hline
+\end{tabular*}
+\end{table}

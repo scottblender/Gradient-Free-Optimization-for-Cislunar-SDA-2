@@ -1,14 +1,23 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% All manuscript camera settings and export-size classes live here so
-% perspective or LaTeX-alignment changes do not require editing individual
-% plotters. The legacy geometryAzimuth/geometryElevation and figureWidth/
-% figureHeight fields remain compatibility aliases.
+% Manuscript formatting is applied while figures are constructed. Export
+% functions must not resize/reflow completed figures or modify their axes,
+% legends, cameras, clipping, or paper geometry.
 
 style.fontName = 'Times New Roman';
-style.fontSize = 12;
-style.labelFontSize = 14;
+style.fontWeight = 'bold';
+
+% Manuscript readability. These values intentionally reproduce the larger
+% visual scale of the earlier readable figures while leaving room for ticks,
+% labels, and legends inside the exported canvas.
+style.manuscriptPanelWidth = 3.3;
+style.metricPlotPosition = [0.18 0.23 0.76 0.52];
+style.legendMaxColumns = 8;  % start row-oriented; wrap only when space requires it
+style.groupedBarWidth = 0.64;
+style.categoryLabelAngle = 25;
+style.fontSize = 22;
+style.labelFontSize = 24;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -21,7 +30,7 @@ style.exportDpi = 300;
 % the same outer paper size within each class.
 % -------------------------------------------------------------------------
 style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 4.6;
+style.metricFigureHeight = 5.8;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
@@ -32,20 +41,22 @@ style.geometryFigureWidth = 7.6;
 style.geometryFigureHeight = 7.0;
 style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
-% The two slot-definition panels are intended to be paired in LaTeX, so
-% the phase panel uses the same outer dimensions as the slot-orbit panel.
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
+% Keep the occlusion/keepout schematic at its established size. The
+% definition renderer also pins that schematic to its existing 12 pt text.
 style.visibilityFigureWidth = 7.2;
 style.visibilityFigureHeight = 5.1;
-style.measurementFigureWidth = 4.45;
-style.measurementFigureHeight = 4.55;
-style.monteCarloFigureWidth = 4.8;
-style.monteCarloFigureHeight = 4.2;
+
+% RA and Dec deliberately share the same outer canvas and axes geometry.
+style.measurementFigureWidth = style.metricFigureWidth;
+style.measurementFigureHeight = style.metricFigureHeight;
+style.monteCarloFigureWidth = style.metricFigureWidth;
+style.monteCarloFigureHeight = style.metricFigureHeight;
 
 % Shared 3-D layout and fallback camera.
-style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
+style.geometryPlotPosition = [0.14 0.23 0.72 0.54];
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
@@ -54,11 +65,7 @@ style.geometryXPadding = 0.08;
 style.geometryYPadding = 0.10;
 style.geometryZPadding = 0.10;
 
-% -------------------------------------------------------------------------
-% Camera controls: orbit-family study-definition figures.
-% Each view is [azimuth elevation] in degrees. Edit these values here only.
-% DRO preserves the current top-down orthographic presentation by default.
-% -------------------------------------------------------------------------
+% Orbit-family study-definition cameras.
 style.orbitFamilyViews.northern_halo = [-37.5 30];
 style.orbitFamilyViews.southern_halo = [-37.5 30];
 style.orbitFamilyViews.northern_rectilinear = [-37.5 30];
@@ -71,12 +78,7 @@ style.orbitFamilyProjections.northern_rectilinear = 'perspective';
 style.orbitFamilyProjections.southern_rectilinear = 'perspective';
 style.orbitFamilyProjections.dro_family = 'orthographic';
 
-% -------------------------------------------------------------------------
-% Camera controls: target/maneuver trajectory figures.
-% These settings are used by both the study-definition tracking cases and
-% the baseline/comparison trajectory results. Low thrust is intentionally
-% offset slightly so its projected path does not appear to cross the Moon.
-% -------------------------------------------------------------------------
+% Target/maneuver trajectory cameras.
 style.maneuverViews.LUNAR_GATEWAY = [-37.5 30];
 style.maneuverViews.LOW_THRUST_TRANSFER = [-37.5 35];
 style.maneuverViews.GATEWAY_IMPULSE = [-37.5 30];

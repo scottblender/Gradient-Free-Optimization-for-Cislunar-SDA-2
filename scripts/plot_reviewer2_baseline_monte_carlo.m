@@ -66,6 +66,7 @@ for k = 1:height(summary)
     lgd.FontName = style.fontName;
     lgd.FontSize = style.fontSize;
     lgd.FontWeight = 'bold';
+    format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
 
     stem = "baseline_mc_"+mission_code(s.Mission)+"_"+ ...
         measurement_code(s.Measurement)+"_o"+string(s.NumObservers);
@@ -74,7 +75,6 @@ for k = 1:height(summary)
     end
     figureStem(k) = stem;
 
-    enforce_minimum_font_size(fig,12);
     drawnow;
     if saveFigures
         base = fullfile(char(figureDir),char(stem));

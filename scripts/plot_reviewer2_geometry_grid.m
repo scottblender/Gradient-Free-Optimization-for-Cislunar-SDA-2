@@ -296,16 +296,7 @@ end
 
 
 function center_reference_legend(ax,lgd,plotPosition,style)
-lgd.Units = 'normalized'; drawnow;
-pos = lgd.Position;
-pos(1) = 0.5-pos(3)/2;
-legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
-pos(2) = min(legendBottom,0.98-pos(4));
-lgd.Position = pos;
-lgd.AutoUpdate = 'off';
-ax.PositionConstraint = 'innerposition';
-ax.Position = plotPosition;
-drawnow;
+format_manuscript_legend(ax,lgd,style,plotPosition);
 end
 
 
@@ -417,7 +408,7 @@ end
 
 
 function export_figure(fig,figureDir,stem,saveFigures,dpi)
-enforce_minimum_font_size(fig,12); drawnow;
+drawnow;
 if ~saveFigures
     close(fig);
     return;
