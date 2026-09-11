@@ -75,12 +75,10 @@ for k=1:numel(axesObjects)
         lgd.Units='normalized'; lgd.Box='off';
         lgd.FontWeight=style.fontWeight;
         lgd.Orientation='horizontal';
-        lgd.Location='northoutside';
 
-        % Keep legends centered above the axes and preserve the plotter's
-        % intended one-row/two-row organization. Two-entry legends (e.g.
-        % DRO + Moon) are always one row. Longer legends may wrap once, but
-        % export never changes the font size or creates a third row.
+        % Do not reset Location to northoutside here. The plotters already
+        % establish the intended manual legend placement; resetting Location
+        % during export was the source of the visible reversion.
         count=numel(lgd.String);
         if count<=2
             columns=count;
@@ -129,6 +127,7 @@ for k=1:numel(axesObjects)
         legendHeight=pos(4)+style.legendTopPadding;
         pos(1)=max(0.002,(1-pos(3))/2);
         lgd.Position=pos;
+        lgd.Location='none';
     end
     if isappdata(ax,'ManuscriptAxesPosition')
         base=getappdata(ax,'ManuscriptAxesPosition');
@@ -151,9 +150,8 @@ for k=1:numel(axesObjects)
     end
 
     % Final legend placement is measured directly from the axes rectangle.
-    % TightInset is already accounted for when sizing the axes above; adding
-    % it again here made the legend appear unchanged even when the requested
-    % gap was reduced. Use one explicit axes-to-legend gap instead.
+    % Keep Location='none' so print/export cannot snap the legend back to
+    % MATLAB's automatic northoutside position after this manual placement.
     if ~isempty(lgd) && isvalid(lgd)
         drawnow;
         pos=lgd.Position;
@@ -162,6 +160,7 @@ for k=1:numel(axesObjects)
         pos(1)=max(0.002,(1-pos(3))/2);
         pos(2)=min(desiredBottom,maximumBottom);
         lgd.Position=pos;
+        lgd.Location='none';
         setappdata(ax,'ManuscriptFinalLegendGap', ...
             lgd.Position(2)-(ax.Position(2)+ax.Position(4)));
     end
