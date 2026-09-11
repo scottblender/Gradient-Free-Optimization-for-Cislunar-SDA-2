@@ -5,12 +5,22 @@ style = reviewer2_paper_style();
 folder = tempname; mkdir(folder);
 cleanup = onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
 boxes = strings(3,1); imageSizes = zeros(3,2);
+cameraViewAngleBefore = NaN;
 for k = 1:3
     fig = figure('Visible','off','Units','inches', ...
         'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
         'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight]);
     closeFigure = onCleanup(@() close(fig));
-    ax = axes(fig); plot(ax,1:10,k*(1:10)); xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)');
+    ax = axes(fig);
+    if k==1
+        t=linspace(0,2*pi,200);
+        plot3(ax,cos(t),sin(t),0.35*sin(2*t),'LineWidth',1.5);
+        xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
+        axis(ax,'equal'); view(ax,-37.5,30);
+        cameraViewAngleBefore=ax.CameraViewAngle;
+    else
+        plot(ax,1:10,k*(1:10)); xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)');
+    end
     if k==2
         hold(ax,'on');
         for j=2:6, plot(ax,1:10,j*(1:10)); end
@@ -29,9 +39,19 @@ for k = 1:3
             'Orientation','vertical','NumColumns',1);
         setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
     end
-    text(ax,5,5*k,repmat('label ',1,k),'FontSize',8);
+    if k==1
+        text(ax,0,0,0,'label','FontSize',8);
+    else
+        text(ax,5,5*k,repmat('label ',1,k),'FontSize',8);
+    end
     file = fullfile(folder,sprintf('panel%d.eps',k));
     meta = export_manuscript_figure(fig,file);
+    if k==1
+        assert(ax.CameraViewAngle < cameraViewAngleBefore, ...
+            '3-D manuscript geometry was not camera-zoomed during export.');
+        assert(isappdata(ax,'ManuscriptGeometryZoomApplied'), ...
+            '3-D geometry zoom marker was not set.');
+    end
     if k>=2
         lgd=ax.Legend; lp=lgd.Position; ap=ax.Position;
         assert(lp(2)>ap(2)+ap(4),'Legend overlaps the plot rectangle.');
@@ -72,10 +92,14 @@ assert(all(boxes==boxes(1)),'Paired EPS canvases differ.');
 assert(all(all(imageSizes==imageSizes(1,:))),'Paired PNG canvases differ.');
 assert(style.metricFigureWidth>6.5 && style.metricFigureHeight>5.2, ...
     'Manuscript export canvas should be larger than the legacy dimensions.');
+assert(style.geometryPlotPosition(3)>0.80 && style.geometryPlotPosition(4)>0.65, ...
+    '3-D manuscript axes should occupy most of the export canvas.');
+assert(style.geometryCameraZoom>1, ...
+    '3-D manuscript geometry should use a camera zoom greater than one.');
 assert(style.geometryFigureWidth==style.measurementFigureWidth && ...
     style.geometryFigureHeight==style.measurementFigureHeight);
 assert(style.visibilityFigureWidth==style.metricFigureWidth && ...
     style.visibilityFigureHeight>style.metricFigureHeight, ...
     'Keep-out schematic should retain manuscript width but use a taller canvas.');
-fprintf('Manuscript EPS canvas, abbreviation, legend, and font checks passed.\n');
+fprintf('Manuscript EPS canvas, geometry zoom, abbreviation, legend, and font checks passed.\n');
 end
