@@ -9,6 +9,10 @@ function output = run_manuscript_figures(sections,varargin)
 % run_manuscript_figures("monte_carlo",'MonteCarloDirectory',folder)
 % Reprocess=false reuses the last processed reports saved by this runner.
 % Monte Carlo only replots saved samples; it never launches new evaluations.
+%
+% All final EPS/PNG files are additionally consolidated under:
+%   MANUSCRIPT_OUTPUT/figures/
+% Tables, manifests, and numerical summaries remain in MANUSCRIPT_OUTPUT/.
 if nargin < 1 || isempty(sections), sections = "all"; end
 clearFirst = false;
 if isnumeric(sections) || islogical(sections)
@@ -36,6 +40,8 @@ compiled = fullfile(paths.root,'COMPILED_REVIEWER_2_RESULTS');
 if ~isfolder(compiled), mkdir(compiled); end
 output.directory = string(opts.OutputDirectory);
 if ~isfolder(output.directory), mkdir(output.directory); end
+output.figureDirectory = string(fullfile(output.directory,'figures'));
+if ~isfolder(output.figureDirectory), mkdir(output.figureDirectory); end
 if opts.ClearDirectory
     % Clear final exports only; retain benchmark subdirectories and raw data.
     patterns = ["*.eps","*.png","figure_manifest.csv","manuscript_tables.txt", ...
@@ -46,13 +52,20 @@ if opts.ClearDirectory
             if ~old(k).isdir, delete(fullfile(old(k).folder,old(k).name)); end
         end
     end
+    % The consolidated figure directory contains only final EPS/PNG copies.
+    for pattern = ["*.eps","*.png"]
+        old = dir(fullfile(output.figureDirectory,pattern));
+        for k = 1:numel(old)
+            if ~old(k).isdir, delete(fullfile(old(k).folder,old(k).name)); end
+        end
+    end
 end
 sources = strings(0,1);
 if ismember("definitions",sections)
     output.definitions = plot_study_definition_figures_for_manuscript( ...
         logical(opts.Inspect),opts.DefinitionSections,output.directory);
     % Definition products already live in the shared manuscript directory;
-    % collect only the selected figure paths for the manifest.
+    % collect only the selected figure paths for the manifest/consolidation.
     sources = [sources;definition_files(output.definitions)];
 end
 selected = intersect(resultSections,sections,'stable');
@@ -124,22 +137,39 @@ if ismember("parallel",sections)
             'No completed LG 6000-FE benchmark. Run test_parallel_speed first; skipped parallel plots.');
     end
 end
+
+% -------------------------------------------------------------------------
+% Consolidate every generated/selected final figure into one manuscript folder.
+% Keep the original per-study files in place for traceability.
+% -------------------------------------------------------------------------
 sources = unique(sources,'stable');
 stems = strings(numel(sources),1);
+consolidated = strings(numel(sources),1);
 for k = 1:numel(sources)
     [folder,stem] = fileparts(sources(k)); stems(k) = stem;
     assert(sum(stems(1:k)==stem)==1,'Duplicate figure name: %s',stem);
-    if string(folder)==output.directory, continue; end
-    copyfile(sources(k),fullfile(output.directory,stem+".eps"));
+
+    destinationEps = fullfile(output.figureDirectory,stem+".eps");
+    if string(folder) ~= output.figureDirectory
+        copyfile(sources(k),destinationEps,'f');
+    end
+    consolidated(k) = string(destinationEps);
+
     png = fullfile(folder,stem+".png");
-    if isfile(png), copyfile(png,fullfile(output.directory,stem+".png")); end
+    if isfile(png)
+        destinationPng = fullfile(output.figureDirectory,stem+".png");
+        if string(folder) ~= output.figureDirectory
+            copyfile(png,destinationPng,'f');
+        end
+    end
 end
 style = reviewer2_paper_style();
-output.manifest = table(stems,sources,repmat(style.metricFigureWidth,numel(stems),1), ...
+output.manifest = table(stems,sources,consolidated, ...
+    repmat(style.metricFigureWidth,numel(stems),1), ...
     repmat(style.metricFigureHeight,numel(stems),1), ...
-    'VariableNames',{'FigureStem','SourceEPS','WidthInches','HeightInches'});
+    'VariableNames',{'FigureStem','SourceEPS','ConsolidatedEPS','WidthInches','HeightInches'});
 writetable(output.manifest,fullfile(output.directory,'figure_manifest.csv'));
-fprintf('\nManuscript EPS/PNG files: %s\n',output.directory);
+fprintf('\nConsolidated manuscript EPS/PNG files: %s\n',output.figureDirectory);
 output.tables = print_manuscript_tables('OutputDirectory',output.directory);
 fprintf('Place paired panels at equal widths, approximately %.1f inches each.\n',style.manuscriptPanelWidth);
 end
