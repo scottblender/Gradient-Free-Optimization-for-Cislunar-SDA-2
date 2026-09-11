@@ -10,22 +10,44 @@ for k=1:numel(axesObjects)
 
     % Perspective 3-D axes need substantially fewer numeric ticks than 2-D
     % plots because projected labels can collapse into the same screen-space
-    % corner. Keep automatic tick placement, but subsample the resulting nice
-    % values before final layout. Manual ticks supplied by a plotter are left
-    % untouched so intentional labels are preserved.
+    % corner. Apply explicit per-axis limits to both automatic and manual
+    % numeric ticks; the y axis uses only two endpoints for the paper camera.
     viewAngles=view(ax);
     isThreeDimensional=abs(viewAngles(1))>1e-9 || abs(viewAngles(2)-90)>1e-9;
     for axisName=["X","Y","Z"]
-        ticks=ax.(axisName+"Tick");
-        if strcmp(ax.(axisName+"TickMode"),'auto')
-            if isThreeDimensional && isfield(style,'max3DTicks') && ...
-                    numel(ticks)>style.max3DTicks
-                keep=unique(round(linspace(1,numel(ticks),style.max3DTicks)));
-                ax.(axisName+"Tick")=ticks(keep);
-            elseif ~isThreeDimensional && numel(ticks)>6
-                keep=unique(round(linspace(1,numel(ticks),5)));
-                ax.(axisName+"Tick")=ticks(keep);
+        tickProperty=axisName+"Tick";
+        labelProperty=axisName+"TickLabel";
+        labelModeProperty=axisName+"TickLabelMode";
+        ticks=ax.(tickProperty);
+        if isThreeDimensional
+            switch axisName
+                case "X"
+                    maxTicks=style.max3DXTicks;
+                case "Y"
+                    maxTicks=style.max3DYTicks;
+                otherwise
+                    maxTicks=style.max3DZTicks;
             end
+            if numel(ticks)>maxTicks
+                keep=unique(round(linspace(1,numel(ticks),maxTicks)));
+                preserveManualLabels=false;
+                manualLabels=string.empty(0,1);
+                if isprop(ax,char(labelModeProperty)) && ...
+                        strcmp(ax.(labelModeProperty),'manual')
+                    labelsBefore=string(ax.(labelProperty));
+                    if numel(labelsBefore)==numel(ticks)
+                        manualLabels=labelsBefore(keep);
+                        preserveManualLabels=true;
+                    end
+                end
+                ax.(tickProperty)=ticks(keep);
+                if preserveManualLabels
+                    ax.(labelProperty)=cellstr(manualLabels);
+                end
+            end
+        elseif strcmp(ax.(axisName+"TickMode"),'auto') && numel(ticks)>6
+            keep=unique(round(linspace(1,numel(ticks),5)));
+            ax.(tickProperty)=ticks(keep);
         end
     end
 
