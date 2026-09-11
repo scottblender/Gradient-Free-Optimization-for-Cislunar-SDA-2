@@ -21,7 +21,7 @@ for k=1:numel(axesObjects)
     lgd=ax.Legend; legendHeight=0;
     if ~isempty(lgd) && isvalid(lgd)
         lgd.Units='normalized'; lgd.Box='off';
-        lgd.FontWeight='normal'; lgd.Orientation='horizontal';
+        lgd.FontWeight=style.fontWeight; lgd.Orientation='horizontal';
         lgd.Location='northoutside';
         % Choose the shortest legend that fits the page, rather than forcing
         % five orbit families into three rows or overlapping long labels.

@@ -17,8 +17,9 @@ for k = 1:numel(fontObjects)
     if isprop(obj,'FontUnits'), obj.FontUnits = 'points'; end
     obj.FontSize = max(obj.FontSize,style.fontSize);
     if isprop(obj,'FontName'), obj.FontName = style.fontName; end
+    if isprop(obj,'FontWeight'), obj.FontWeight = style.fontWeight; end
 end
-% Fit layout only after the final font sizes have been applied.
+% Fit layout only after the final font sizes and weights have been applied.
 layout_manuscript_figure(fig,style);
 % Fail visibly on unsupported transparency rather than producing a subtly
 % different EPS. Current manuscript renderers use opaque vector objects.

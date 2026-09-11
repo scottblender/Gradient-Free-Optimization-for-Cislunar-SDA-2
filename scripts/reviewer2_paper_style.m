@@ -7,6 +7,7 @@ function style = reviewer2_paper_style()
 % figureHeight fields remain compatibility aliases.
 
 style.fontName = 'Times New Roman';
+style.fontWeight = 'bold';
 % A 6.5-inch EPS placed at 3 inches retains approximately 10-point text.
 style.manuscriptPanelWidth = 3.0;
 style.minimumPrintedFontSize = 10;

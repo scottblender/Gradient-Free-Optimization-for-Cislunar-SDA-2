@@ -33,6 +33,9 @@ for k = 1:2
     png = imfinfo(strrep(file,'.eps','.png')); imageSizes(k,:)=[png.Width png.Height];
     objects=findall(fig,'-property','FontSize');
     assert(all(arrayfun(@(obj) obj.FontSize>=style.fontSize,objects)));
+    weightObjects=findall(fig,'-property','FontWeight');
+    assert(all(arrayfun(@(obj) strcmpi(obj.FontWeight,style.fontWeight),weightObjects)), ...
+        'All manuscript figure text must be bold.');
     clear closeFigure;
 end
 assert(boxes(1)==boxes(2),'Paired EPS canvases differ.');
