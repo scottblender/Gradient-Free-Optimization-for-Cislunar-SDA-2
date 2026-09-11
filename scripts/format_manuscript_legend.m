@@ -28,6 +28,17 @@ if isNorthOutside
     lgd.NumColumns = max(columns,1);
     lgd.Units = 'normalized';
     drawnow;
+
+    % Comparison legends read best with all optimizer names adjacent and the
+    % long-run GA reference last. Shorten/shrink that row before wrapping it.
+    hasGaReference = any(labels == "GA (6000 FE)");
+    if hasGaReference
+        while lgd.Position(3) > 0.94 && lgd.FontSize > 12
+            lgd.FontSize = lgd.FontSize-1;
+            drawnow;
+        end
+    end
+
     while lgd.Position(3) > 0.94 && columns > 1
         columns = columns-1;
         lgd.NumColumns = columns;
@@ -48,7 +59,7 @@ if is3D && isNorthOutside
     lgd.Position = pos;
     lgd.AutoUpdate = 'off';
 
-    % Restore the known-good plot box after MATLAB creates/moves the legend.
+    % Restore the manuscript plot box after MATLAB creates/moves the legend.
     ax.Units = 'normalized';
     ax.PositionConstraint = 'innerposition';
     ax.Position = plotPosition;
@@ -65,7 +76,6 @@ function labels = contextual_legend_labels(labels)
 labels = string(labels);
 
 hasEndpoints = any(labels == "Endpoint orbits");
-hasPostImpulse = any(labels == "Post-impulse") || any(labels == "Nominal Gateway");
 hasTargetTrajectory = any(labels == "Target trajectory");
 
 % Result-geometry legends.
@@ -96,7 +106,6 @@ labels(labels == "Endpoint orbits") = "Endpoints";
 labels(labels == "Candidate slots") = "Slots";
 labels(labels == "Excluded endpoint") = "Endpoint";
 
-% Keep physical objects and Lagrange-point labels explicit.
-labels(labels == "L1 point") = "L1";
-labels(labels == "L2 point") = "L2";
+% Do not abbreviate "L1 point" or "L2 point" in the orbit-database plots;
+% the family labels L1/L2 and the physical equilibrium points must be distinct.
 end
