@@ -1,10 +1,13 @@
 function style = reviewer2_paper_style()
-%REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
+%REVIEWER2_PAPER_STYLE Single source of journal-figure styling constants.
 %
-% This file is the single source of manuscript figure style constants.
-% export_manuscript_figure applies these settings once, immediately before
-% writing EPS/PNG output. Individual plotters should define data and camera
-% geometry, but should not perform a second export-time layout pass.
+% Manuscript figures must follow this order:
+%   1) load this style,
+%   2) generate the complete figure using these values,
+%   3) export the already-final figure.
+%
+% export_manuscript_figure is intentionally a pure exporter/checker and must
+% not resize axes, move legends, change ticks, or restyle text after plotting.
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
@@ -21,56 +24,65 @@ style.alphaBand = 0.16;
 style.exportDpi = 300;
 
 % -------------------------------------------------------------------------
-% Export-size classes. Figures intended to line up in LaTeX share exactly
-% the same outer paper size within each class.
+% Export-size classes.
 % -------------------------------------------------------------------------
+% Give quantitative plots more vertical room for large labels and outside
+% legends. Geometry figures retain the established 6.5 x 5.2 aspect ratio.
 style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 5.2;
+style.metricFigureHeight = 5.8;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = style.metricFigureWidth;
 style.convergenceFigureHeight = style.metricFigureHeight;
 
-style.geometryFigureWidth = style.metricFigureWidth;
-style.geometryFigureHeight = style.metricFigureHeight;
+style.geometryFigureWidth = 6.5;
+style.geometryFigureHeight = 5.2;
 style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
-% The keep-out schematic needs extra vertical room so the equal-axis
-% geometry and callouts use more of the EPS at the same manuscript width.
-style.visibilityFigureWidth = style.metricFigureWidth;
+
+% Keep-out / occultation schematic: same manuscript width, taller canvas,
+% and tighter data limits so the geometry itself becomes visibly larger.
+style.visibilityFigureWidth = 6.5;
 style.visibilityFigureHeight = 6.4;
-style.measurementFigureWidth = style.metricFigureWidth;
-style.measurementFigureHeight = style.metricFigureHeight;
+style.visibilityPlotPosition = [0.035 0.045 0.93 0.91];
+style.visibilityXLim = [-2.65 2.25];
+style.visibilityYLim = [-1.65 2.95];
+
+style.measurementFigureWidth = style.geometryFigureWidth;
+style.measurementFigureHeight = style.geometryFigureHeight;
 style.monteCarloFigureWidth = style.metricFigureWidth;
 style.monteCarloFigureHeight = style.metricFigureHeight;
 
-% Stable runner-era axes layouts. Export does not camera-zoom or rescale
-% trajectory geometry after the plotter has chosen its data limits/camera.
+% -------------------------------------------------------------------------
+% Axes layouts used while figures are generated.
+% -------------------------------------------------------------------------
 style.geometryPlotPosition = [0.15 0.18 0.72 0.60];
-style.metricPlotPosition = [0.18 0.22 0.77 0.55];
+% Extra left/bottom room prevents 22/24-point metric labels from clipping;
+% the taller metric canvas leaves the legend band above the axes.
+style.metricPlotPosition = [0.19 0.18 0.75 0.59];
 style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
 style.measurementXLim = [-0.95 5.10];
 style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
 
-% Legend policy. MATLAB first computes northoutside; the master formatter
-% nudges it slightly downward, preserves a safe axes gap, and freezes it.
+% Legend policy used during figure generation. MATLAB establishes the
+% northoutside size first; plotters may then lower it slightly and freeze it.
 style.legendMaxColumns = 6;
 style.legendMaxRows = 2;
 style.legendWidthLimit = 0.94;
-style.legendNorthOutsideYOffset = -0.015;
-style.legendMinimumGap = 0.008;
-style.geometryLegendGap = 0.012; % live-figure compatibility only
+style.legendNorthOutsideYOffset = -0.012;
+style.legendMinimumGap = 0.010;
+style.geometryLegendGap = 0.012;
 
-% Non-trajectory numeric plots need enough ticks for quantitative reading.
+% Non-trajectory numeric plots should use enough ticks for quantitative
+% reading. Plotters apply this while generating the axes, never at export.
 style.max2DXTicks = 8;
 style.max2DYTicks = 7;
 
-% Slot-definition visibility. Selected/adjacent slots keep their distinct
-% colors; neutral candidate slots use this filled marker color in export.
+% Slot-definition visibility.
 style.slotCandidateFillColor = [0.72 0.72 0.72];
 
 style.geometryAzimuth = -37.5;
