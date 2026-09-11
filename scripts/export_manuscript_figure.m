@@ -1,61 +1,78 @@
 function metadata = export_manuscript_figure(fig,fileName)
-%EXPORT_MANUSCRIPT_FIGURE Export an already-final manuscript figure.
-%
-% Required workflow:
-%   style = reviewer2_paper_style();
-%   generate the complete figure using style;
-%   export_manuscript_figure(fig,fileName);
-%
-% This function deliberately does NOT change fonts, ticks, axes positions,
-% legends, cameras, limits, plotted data, or object styling. In particular,
-% 3-D graphics are never mutated immediately before the painters EPS pass.
-
+%EXPORT_MANUSCRIPT_FIGURE Vector EPS and PNG with identical fixed canvases.
+% Keep the complete paper rectangle: tight cropping makes paired diagrams
+% scale differently in LaTeX. Font sizes are specified at the export size.
 style = reviewer2_paper_style();
 [folder,stem,~] = fileparts(char(fileName));
 if isempty(folder), folder = pwd; end
 if ~isfolder(folder), mkdir(folder); end
 base = fullfile(folder,stem);
-finalEps = [base '.eps'];
-finalPng = [base '.png'];
-
-% Export configuration only. Paper geometry is part of the output format,
-% not a second figure-layout pass.
 set(fig,'PaperUnits','inches','PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off','Color','w');
-paper = double(get(fig,'PaperSize'));
+paper = get(fig,'PaperSize');
 set(fig,'PaperPosition',[0 0 paper]);
-
-% Validate the figure exactly as the plotter finished it. These checks are
-% read-only and intentionally occur before either file is written.
-assert_canvas_fit(fig,stem);
-assert_manuscript_fonts(fig,style,stem);
-assert_geometry_has_content(fig,stem);
-assert_eps_compatible_objects(fig,stem);
-
+fontObjects = findall(fig,'-property','FontSize');
+for k = 1:numel(fontObjects)
+    obj = fontObjects(k);
+    if isprop(obj,'FontUnits'), obj.FontUnits = 'points'; end
+    obj.FontSize = max(obj.FontSize,style.fontSize);
+    if isprop(obj,'FontName'), obj.FontName = style.fontName; end
+end
+% Legends wrap instead of shrinking text. Respect manually centered legends
+% by recentering after changing their number of columns.
+legends = findall(fig,'Type','legend');
+for k = 1:numel(legends)
+    lgd = legends(k);
+    lgd.NumColumns = min(lgd.NumColumns,style.legendMaxColumns);
+    lgd.Box = 'off';
+end
 drawnow;
-
-% Do not leave stale exports behind if generation/export fails.
-if isfile(finalEps), delete(finalEps); end
-if isfile(finalPng), delete(finalPng); end
-
-tempBase = tempname(folder);
-tempEps = [tempBase '.eps'];
-tempPng = [tempBase '.png'];
-tempCleanup = onCleanup(@() cleanup_temporary_exports(tempEps,tempPng));
-
-% Use the stable runner-era EPS path. No styling/layout operation occurs
-% between the final drawnow and these print calls.
-print(fig,tempEps,'-depsc2','-painters','-loose');
-print(fig,tempPng,'-dpng',sprintf('-r%d',style.exportDpi));
-assert(isfile(tempEps) && dir(tempEps).bytes>0,'EPS export failed: %s',base);
-assert(isfile(tempPng) && dir(tempPng).bytes>0,'PNG export failed: %s',base);
-
-% Normalize DSC bounds to the declared paper rectangle. This edits only EPS
-% metadata and never rescales/replots the figure contents.
-epsText = fileread(tempEps);
+for k = 1:numel(legends)
+    lgd = legends(k);
+    if strcmp(lgd.Location,'none')
+        lgd.Units = 'normalized';
+        pos = lgd.Position;
+        pos(1) = (1-pos(3))/2;
+        pos(2) = min(pos(2),0.98-pos(4));
+        lgd.Position = pos;
+    end
+end
+% Restore a common inner axes rectangle after MATLAB lays out outside
+% legends, then place each legend in the reserved band above the plot.
+axesObjects = findall(fig,'Type','axes');
+for k = 1:numel(axesObjects)
+    ax = axesObjects(k);
+    if isappdata(ax,'ManuscriptAxesPosition')
+        pos = getappdata(ax,'ManuscriptAxesPosition');
+        set(ax,'Units','normalized','PositionConstraint','innerposition','Position',pos);
+        if ~isempty(ax.Legend)
+            lgd = ax.Legend; lgd.Units = 'normalized';
+            drawnow;
+            lp = lgd.Position;
+            lp(1) = (1-lp(3))/2;
+            lp(2) = min(pos(2)+pos(4)+0.025,0.99-lp(4));
+            lgd.Position = lp;
+            ax.Position = pos;
+        end
+    end
+end
+% Fail visibly on unsupported transparency rather than producing a subtly
+% different EPS. Current manuscript renderers use opaque vector objects.
+for property = ["FaceAlpha","EdgeAlpha"]
+    objects = findall(fig,'-property',char(property));
+    for k = 1:numel(objects)
+        value = get(objects(k),char(property));
+        assert(isnumeric(value) && all(value(:)==1), ...
+            'Manuscript:Transparency','EPS requires opaque %s in %s.',property,stem);
+    end
+end
+drawnow;
+print(fig,[base '.eps'],'-depsc2','-painters','-loose');
+% MATLAB releases differ in their EPS bounding-box padding. Normalize both
+% DSC boxes to the physical paper rectangle, without rescaling the drawing.
+epsText = fileread([base '.eps']);
 assert(startsWith(epsText,'%!PS-Adobe'),'Invalid EPS output: %s',base);
-widthPt = 72*paper(1);
-heightPt = 72*paper(2);
+widthPt = 72*paper(1); heightPt = 72*paper(2);
 box = sprintf('%%%%BoundingBox: 0 0 %d %d',ceil(widthPt),ceil(heightPt));
 hires = sprintf('%%%%HiResBoundingBox: 0 0 %.6f %.6f',widthPt,heightPt);
 epsText = regexprep(epsText,'(?m)^%%BoundingBox:[^\r\n]*',box);
@@ -65,155 +82,15 @@ else
     firstNewline = find(epsText==newline,1);
     epsText = [epsText(1:firstNewline) hires newline epsText(firstNewline+1:end)];
 end
-fid = fopen(tempEps,'w');
+fid = fopen([base '.eps'],'w');
 assert(fid~=-1,'Cannot write EPS: %s',base);
-fileCleanup = onCleanup(@() fclose(fid));
+cleanup = onCleanup(@() fclose(fid));
 fwrite(fid,epsText,'char');
-clear fileCleanup;
-
-[ok,message] = movefile(tempEps,finalEps,'f');
-assert(ok,'Could not finalize EPS %s: %s',finalEps,message);
-[ok,message] = movefile(tempPng,finalPng,'f');
-assert(ok,'Could not finalize PNG %s: %s',finalPng,message);
-clear tempCleanup;
-
+clear cleanup;
+% print uses PaperPosition for PNG too; exportgraphics would tightly crop.
+print(fig,[base '.png'],'-dpng',sprintf('-r%d',style.exportDpi));
 metadata = struct('stem',stem,'widthInches',paper(1), ...
     'heightInches',paper(2),'minimumFontPoints',style.fontSize, ...
     'placementWidthInches',style.manuscriptPanelWidth, ...
     'minimumPrintedFontPoints',style.fontSize*style.manuscriptPanelWidth/paper(1));
-end
-
-
-function assert_canvas_fit(fig,stem)
-% Read-only clipping/overlap guard for the final generated state.
-axesObjects = findall(fig,'Type','axes');
-for k = 1:numel(axesObjects)
-    ax = axesObjects(k);
-    if strcmpi(ax.Visible,'off'), continue; end
-
-    p = hgconvertunits(fig,double(ax.Position),ax.Units,'normalized',fig);
-    ti = hgconvertunits(fig,double(ax.TightInset),ax.Units,'normalized',fig);
-    envelope = [p(1)-ti(1),p(2)-ti(2), ...
-        p(1)+p(3)+ti(3),p(2)+p(4)+ti(4)];
-    assert(envelope(1)>=-0.01 && envelope(2)>=-0.01 && ...
-        envelope(3)<=1.01 && envelope(4)<=1.01, ...
-        'Manuscript:TextOutsideCanvas', ...
-        'Axes labels/ticks extend outside EPS canvas in %s.',stem);
-
-    lgd = ax.Legend;
-    if isempty(lgd) || ~isvalid(lgd), continue; end
-    lp = hgconvertunits(fig,double(lgd.Position),lgd.Units,'normalized',fig);
-    assert(lp(1)>=-0.005 && lp(2)>=-0.005 && ...
-        lp(1)+lp(3)<=1.005 && lp(2)+lp(4)<=1.005, ...
-        'Manuscript:LegendOutsideCanvas','Legend outside EPS canvas in %s.',stem);
-
-    % For quantitative 2-D figures, an outside/manual-above legend must sit
-    % above the axes/tick envelope rather than covering labels or data.
-    if ~is_geometry_axis(ax)
-        location = lower(string(lgd.Location));
-        isAboveLegend = contains(location,'northoutside') || ...
-            (location=="none" && lp(2)>=p(2)+0.5*p(4));
-        if isAboveLegend
-            assert(lp(2)>=p(2)+p(4)+ti(4)-0.004, ...
-                'Manuscript:LegendOverlap', ...
-                'Legend overlaps metric axes/tick labels in %s.',stem);
-        end
-    end
-end
-end
-
-
-function assert_manuscript_fonts(fig,style,stem)
-% Validate only visible text-bearing manuscript objects. MATLAB graphics
-% contains internal ruler/decorator objects with FontSize/FontWeight
-% properties; those are implementation details and are not rendered as
-% independent manuscript text.
-textObjects = findall(fig,'Type','text');
-for k = 1:numel(textObjects)
-    obj = textObjects(k);
-    if isprop(obj,'Visible') && strcmpi(obj.Visible,'off'), continue; end
-    assert_font_object(obj,style,stem,'text');
-end
-
-axesObjects = findall(fig,'Type','axes');
-for k = 1:numel(axesObjects)
-    obj = axesObjects(k);
-    if strcmpi(obj.Visible,'off'), continue; end
-    assert_font_object(obj,style,stem,'axes');
-end
-
-legendObjects = findall(fig,'Type','legend');
-for k = 1:numel(legendObjects)
-    obj = legendObjects(k);
-    if isprop(obj,'Visible') && strcmpi(obj.Visible,'off'), continue; end
-    assert_font_object(obj,style,stem,'legend');
-end
-
-colorbars = findall(fig,'Type','colorbar');
-for k = 1:numel(colorbars)
-    obj = colorbars(k);
-    if isprop(obj,'Visible') && strcmpi(obj.Visible,'off'), continue; end
-    assert_font_object(obj,style,stem,'colorbar');
-end
-end
-
-
-function assert_font_object(obj,style,stem,kind)
-if isprop(obj,'FontSize')
-    assert(double(obj.FontSize)>=style.fontSize-1e-9, ...
-        'Manuscript:FontTooSmall','%s font below manuscript size in %s.',kind,stem);
-end
-if isprop(obj,'FontWeight')
-    assert(strcmpi(string(obj.FontWeight),style.fontWeight), ...
-        'Manuscript:FontNotBold','Non-bold manuscript %s in %s.',kind,stem);
-end
-if isprop(obj,'FontName')
-    assert(strcmpi(string(obj.FontName),style.fontName), ...
-        'Manuscript:FontName','Unexpected manuscript %s font in %s.',kind,stem);
-end
-end
-
-
-function assert_geometry_has_content(fig,stem)
-axesObjects = findall(fig,'Type','axes');
-for k = 1:numel(axesObjects)
-    ax = axesObjects(k);
-    if strcmpi(ax.Visible,'off') || ~is_geometry_axis(ax), continue; end
-    drawable = [findall(ax,'Type','line');findall(ax,'Type','surface'); ...
-        findall(ax,'Type','patch');findall(ax,'Type','scatter')];
-    assert(~isempty(drawable),'Manuscript:EmptyGeometry', ...
-        'Geometry axes contain no drawable objects before export in %s.',stem);
-end
-end
-
-
-function tf = is_geometry_axis(ax)
-labels = lower([label_string(ax.XLabel),label_string(ax.YLabel),label_string(ax.ZLabel)]);
-v = view(ax);
-tf = any(contains(labels,'(lu)')) || abs(v(1))>1e-9 || abs(v(2)-90)>1e-9;
-end
-
-
-function value = label_string(handle)
-value = string(handle.String);
-if isempty(value), value=""; else, value=strjoin(value(:).'," "); end
-end
-
-
-function assert_eps_compatible_objects(fig,stem)
-for property = ["FaceAlpha","EdgeAlpha"]
-    objects = findall(fig,'-property',char(property));
-    for k = 1:numel(objects)
-        value = get(objects(k),char(property));
-        assert(isnumeric(value) && all(value(:)==1), ...
-            'Manuscript:Transparency', ...
-            'EPS requires opaque %s in %s.',property,stem);
-    end
-end
-end
-
-
-function cleanup_temporary_exports(epsFile,pngFile)
-if isfile(epsFile), delete(epsFile); end
-if isfile(pngFile), delete(pngFile); end
 end

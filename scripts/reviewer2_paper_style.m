@@ -1,16 +1,12 @@
 function style = reviewer2_paper_style()
-%REVIEWER2_PAPER_STYLE Single source of journal-figure styling constants.
+%REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% Manuscript figures must follow this order:
-%   1) load this style,
-%   2) generate the complete figure using these values,
-%   3) export the already-final figure.
-%
-% export_manuscript_figure is intentionally a pure exporter/checker and must
-% not resize axes, move legends, change ticks, or restyle text after plotting.
+% All manuscript camera settings and export-size classes live here so
+% perspective or LaTeX-alignment changes do not require editing individual
+% plotters. The legacy geometryAzimuth/geometryElevation and figureWidth/
+% figureHeight fields remain compatibility aliases.
 
 style.fontName = 'Times New Roman';
-style.fontWeight = 'bold';
 % A 6.5-inch EPS placed at 3 inches retains approximately 10-point text.
 style.manuscriptPanelWidth = 3.0;
 style.minimumPrintedFontSize = 10;
@@ -24,67 +20,42 @@ style.alphaBand = 0.16;
 style.exportDpi = 300;
 
 % -------------------------------------------------------------------------
-% Export-size classes.
+% Export-size classes. Figures intended to line up in LaTeX share exactly
+% the same outer paper size within each class.
 % -------------------------------------------------------------------------
-% Give quantitative plots more vertical room for large labels and outside
-% legends. Geometry figures retain the established 6.5 x 5.2 aspect ratio.
 style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 5.8;
+style.metricFigureHeight = 5.2;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
 style.convergenceFigureWidth = style.metricFigureWidth;
 style.convergenceFigureHeight = style.metricFigureHeight;
 
-style.geometryFigureWidth = 6.5;
-style.geometryFigureHeight = 5.2;
+style.geometryFigureWidth = style.metricFigureWidth;
+style.geometryFigureHeight = style.metricFigureHeight;
 style.orbitFamilyFigureWidth = style.geometryFigureWidth;
 style.orbitFamilyFigureHeight = style.geometryFigureHeight;
+% The two slot-definition panels are intended to be paired in LaTeX, so
+% the phase panel uses the same outer dimensions as the slot-orbit panel.
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
-% Keep-out / occultation schematic: same manuscript width, taller canvas,
-% and tighter data limits so the geometry itself becomes visibly larger.
-style.visibilityFigureWidth = 6.5;
-style.visibilityFigureHeight = 6.4;
-style.visibilityPlotPosition = [0.035 0.045 0.93 0.91];
-style.visibilityXLim = [-2.65 2.25];
-style.visibilityYLim = [-1.65 2.95];
-
-style.measurementFigureWidth = style.geometryFigureWidth;
-style.measurementFigureHeight = style.geometryFigureHeight;
+style.visibilityFigureWidth = style.metricFigureWidth;
+style.visibilityFigureHeight = style.metricFigureHeight;
+style.measurementFigureWidth = style.metricFigureWidth;
+style.measurementFigureHeight = style.metricFigureHeight;
 style.monteCarloFigureWidth = style.metricFigureWidth;
 style.monteCarloFigureHeight = style.metricFigureHeight;
 
-% -------------------------------------------------------------------------
-% Axes layouts used while figures are generated.
-% -------------------------------------------------------------------------
+% Shared 3-D layout and fallback camera.
 style.geometryPlotPosition = [0.15 0.18 0.72 0.60];
-% Extra left/bottom room prevents 22/24-point metric labels from clipping;
-% the taller metric canvas leaves the legend band above the axes.
-style.metricPlotPosition = [0.19 0.18 0.75 0.59];
+style.metricPlotPosition = [0.18 0.22 0.77 0.55];
 style.schematicPlotPosition = [0.08 0.10 0.84 0.80];
 style.measurementXLim = [-0.95 5.10];
 style.measurementYLim = [-0.80 4.20];
 style.measurementAxisLength = [4.25 3.45];
-
-% Legend policy used during figure generation. MATLAB establishes the
-% northoutside size first; plotters may then lower it slightly and freeze it.
-style.legendMaxColumns = 6;
-style.legendMaxRows = 2;
-style.legendWidthLimit = 0.94;
-style.legendNorthOutsideYOffset = -0.012;
-style.legendMinimumGap = 0.010;
+style.legendMaxColumns = 2;
 style.geometryLegendGap = 0.012;
-
-% Non-trajectory numeric plots should use enough ticks for quantitative
-% reading. Plotters apply this while generating the axes, never at export.
-style.max2DXTicks = 8;
-style.max2DYTicks = 7;
-
-% Slot-definition visibility.
-style.slotCandidateFillColor = [0.72 0.72 0.72];
-
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';
@@ -94,6 +65,8 @@ style.geometryZPadding = 0.10;
 
 % -------------------------------------------------------------------------
 % Camera controls: orbit-family study-definition figures.
+% Each view is [azimuth elevation] in degrees. Edit these values here only.
+% DRO preserves the current top-down orthographic presentation by default.
 % -------------------------------------------------------------------------
 style.orbitFamilyViews.northern_halo = [-37.5 30];
 style.orbitFamilyViews.southern_halo = [-37.5 30];
@@ -109,6 +82,9 @@ style.orbitFamilyProjections.dro_family = 'orthographic';
 
 % -------------------------------------------------------------------------
 % Camera controls: target/maneuver trajectory figures.
+% These settings are used by both the study-definition tracking cases and
+% the baseline/comparison trajectory results. Low thrust is intentionally
+% offset slightly so its projected path does not appear to cross the Moon.
 % -------------------------------------------------------------------------
 style.maneuverViews.LUNAR_GATEWAY = [-37.5 30];
 style.maneuverViews.LOW_THRUST_TRANSFER = [-37.5 35];

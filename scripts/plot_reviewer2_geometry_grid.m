@@ -3,8 +3,14 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 %
 % Historical name retained for compatibility. Final manuscript trajectories
 % are exported as separate full-size panels rather than compressed MATLAB
-% tiled grids. All styling/layout is completed here before the pure EPS/PNG
-% exporter is called.
+% tiled grids. The construction matches plot_study_definition_figures.m:
+%   shared manuscript-size canvas
+%   centered inner axes box [0.12 0.20 0.76 0.64]
+%   maneuver-specific camera from reviewer2_paper_style, axis equal/vis3d
+%   8/10/10 percent x/y/z padding
+%   centered north-outside legend with the axes restored afterward
+%   Times New Roman, 12-point minimum text and 14-point axis labels
+%   no grid lines and no surrounding axes box
 %
 % Geometry is qualitative only. The supplied realization should be nearest
 % the 20-run group mean objective; statistical conclusions use group mean
@@ -60,7 +66,7 @@ end
 for k = 1:n
     mission = string(selection.Mission(k));
     panel = panelCells{k};
-    fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight,style);
+    fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
     plotPosition = style.geometryPlotPosition;
     ax = axes(fig,'Units','normalized','Position',plotPosition);
     ax.PositionConstraint = 'innerposition';
@@ -71,12 +77,6 @@ for k = 1:n
     xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
     axis(ax,'vis3d');
 
-    % Final trajectory tick selection happens during figure generation, not
-    % during export. This removes a projected center-zero label only for the
-    % symmetric three-tick case that caused 0 / 0.05 overlap.
-    simplify_geometry_ticks(ax);
-
-    legendLabels = compact_geometry_labels(legendLabels);
     legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
         'Location','northoutside','Orientation','horizontal');
     format_case_legend(legendHandle,panel.mission,style);
@@ -186,17 +186,17 @@ viewAngles = style.maneuverViews.(missionKey);
 view(ax,viewAngles(1),viewAngles(2));
 ax.Projection = style.maneuverProjections.(missionKey);
 xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
-set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
-    'FontWeight',style.fontWeight,'LineWidth',style.axisLineWidth, ...
+set(ax,'FontName',style.fontName,'FontSize',max(style.fontSize,12), ...
+    'FontWeight','bold','LineWidth',style.axisLineWidth, ...
     'TickLabelInterpreter','tex','Layer','top', ...
     'Box','off','XGrid','off','YGrid','off','ZGrid','off');
 ax.XLabel.FontName = style.fontName; ax.YLabel.FontName = style.fontName;
 ax.ZLabel.FontName = style.fontName;
-ax.XLabel.FontSize = style.labelFontSize;
-ax.YLabel.FontSize = style.labelFontSize;
-ax.ZLabel.FontSize = style.labelFontSize;
-ax.XLabel.FontWeight = style.fontWeight; ax.YLabel.FontWeight = style.fontWeight;
-ax.ZLabel.FontWeight = style.fontWeight;
+ax.XLabel.FontSize = max(style.labelFontSize,14);
+ax.YLabel.FontSize = max(style.labelFontSize,14);
+ax.ZLabel.FontSize = max(style.labelFontSize,14);
+ax.XLabel.FontWeight = 'bold'; ax.YLabel.FontWeight = 'bold';
+ax.ZLabel.FontWeight = 'bold';
 end
 
 
@@ -279,21 +279,11 @@ end
 end
 
 
-function labels = compact_geometry_labels(labels)
-labels = string(labels);
-labels(labels=="Endpoint orbits") = "Endpoints";
-labels(labels=="Target trajectory") = "Target";
-labels(labels=="Observer orbits") = "Obs. orbits";
-labels(labels=="Nominal Gateway") = "Nominal LG";
-labels(labels=="Post-impulse") = "GI traj.";
-end
-
-
 function format_case_legend(lgd,mission,style)
 lgd.Box = 'off';
 lgd.FontName = style.fontName;
 lgd.FontSize = style.fontSize;
-lgd.FontWeight = style.fontWeight;
+lgd.FontWeight = 'bold';
 lgd.ItemTokenSize = [16 9];
 if mission == "LOW_THRUST_TRANSFER"
     lgd.NumColumns = 4;
@@ -307,48 +297,16 @@ end
 
 
 function center_reference_legend(ax,lgd,plotPosition,style)
-% Let MATLAB establish true northoutside size first, then lower it slightly
-% and freeze that final generated position before export.
-lgd.Location = 'northoutside';
-lgd.Units = 'normalized';
-drawnow;
-northPosition = lgd.Position;
-lgd.Location = 'none';
-
+lgd.Units = 'normalized'; drawnow;
+pos = lgd.Position;
+pos(1) = 0.5-pos(3)/2;
+legendBottom = plotPosition(2)+plotPosition(4)+style.geometryLegendGap;
+pos(2) = min(legendBottom,0.98-pos(4));
+lgd.Position = pos;
+lgd.AutoUpdate = 'off';
 ax.PositionConstraint = 'innerposition';
 ax.Position = plotPosition;
 drawnow;
-pos = lgd.Position;
-pos(1) = max(0.002,min(0.5-pos(3)/2,0.998-pos(3)));
-minimumBottom = plotPosition(2)+plotPosition(4)+style.legendMinimumGap;
-desiredBottom = northPosition(2)+style.legendNorthOutsideYOffset;
-pos(2) = min(max(desiredBottom,minimumBottom),0.99-pos(4));
-lgd.Position = pos;
-lgd.AutoUpdate = 'off';
-ax.Position = plotPosition;
-drawnow;
-end
-
-
-function simplify_geometry_ticks(ax)
-for axisName = ["X","Y","Z"]
-    tickProperty = axisName+"Tick";
-    labelProperty = axisName+"TickLabel";
-    ticks = double(ax.(tickProperty));
-    if numel(ticks)~=3 || any(~isfinite(ticks)), continue; end
-    tolerance = 100*eps(max(1,max(abs(ticks))));
-    if abs(ticks(2))<=tolerance && abs(ticks(1)+ticks(3))<=tolerance
-        labels = ax.(labelProperty);
-        ax.(tickProperty) = ticks([1 3]);
-        if ~isempty(labels) && size(labels,1)==3
-            if iscell(labels) || isstring(labels)
-                ax.(labelProperty) = labels([1 3]);
-            elseif ischar(labels)
-                ax.(labelProperty) = labels([1 3],:);
-            end
-        end
-    end
-end
 end
 
 
@@ -451,24 +409,16 @@ key = strip(key,'_');
 end
 
 
-function fig = publication_figure(widthIn,heightIn,style)
+function fig = publication_figure(widthIn,heightIn)
 fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
     'PaperUnits','inches','PaperPosition',[0 0 widthIn heightIn], ...
     'PaperSize',[widthIn heightIn],'PaperPositionMode','manual', ...
     'Renderer','painters','InvertHardcopy','off');
-% Apply manuscript typography defaults before any axes/text/legend is made.
-set(fig,'DefaultAxesFontName',style.fontName, ...
-    'DefaultAxesFontSize',style.fontSize, ...
-    'DefaultAxesFontWeight',style.fontWeight, ...
-    'DefaultTextFontName',style.fontName, ...
-    'DefaultTextFontSize',style.fontSize, ...
-    'DefaultTextFontWeight',style.fontWeight);
 end
 
 
-function export_figure(fig,figureDir,stem,saveFigures,~)
+function export_figure(fig,figureDir,stem,saveFigures,dpi)
 if ~saveFigures, return; end
-drawnow;
 export_manuscript_figure(fig,fullfile(char(figureDir),char(stem)));
 close(fig);
 end
