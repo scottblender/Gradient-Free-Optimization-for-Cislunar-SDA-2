@@ -93,8 +93,8 @@ for k = 1:numel(axesObjects)
     end
 
     % Add useful numerical resolution only to non-trajectory metric plots.
-    % CR3BP geometry/trajectory plots are identified by 3-D view or LU axes
-    % and retain their plotter-selected ticks exactly.
+    % CR3BP geometry/trajectory plots are identified by 3-D view or explicit
+    % '(LU)' axis units and retain their plotter-selected ticks exactly.
     if ~is_geometry_axis(ax)
         densify_metric_ticks(ax,'X',style.max2DXTicks);
         densify_metric_ticks(ax,'Y',style.max2DYTicks);
@@ -181,7 +181,7 @@ function tf = is_geometry_axis(ax)
 viewAngles = view(ax);
 isPerspective3D = abs(viewAngles(1)) > 1e-9 || abs(viewAngles(2)-90) > 1e-9;
 labels = [label_text(ax.XLabel),label_text(ax.YLabel),label_text(ax.ZLabel)];
-hasLU = any(contains(lower(labels),'lu'));
+hasLU = any(contains(lower(labels),'(lu)'));
 tf = isPerspective3D || hasLU;
 end
 
