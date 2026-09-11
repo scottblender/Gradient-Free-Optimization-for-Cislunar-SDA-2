@@ -124,19 +124,52 @@ end
 
 
 function assert_manuscript_fonts(fig,style,stem)
-objects = findall(fig,'-property','FontSize');
-for k = 1:numel(objects)
-    obj = objects(k);
-    try
-        assert(double(obj.FontSize)>=style.fontSize-1e-9, ...
-            'Manuscript:FontTooSmall','Font below manuscript size in %s.',stem);
-        if isprop(obj,'FontWeight')
-            assert(strcmpi(string(obj.FontWeight),style.fontWeight), ...
-                'Manuscript:FontNotBold','Non-bold manuscript text in %s.',stem);
-        end
-    catch err
-        if startsWith(err.identifier,'Manuscript:'), rethrow(err); end
-    end
+% Validate only visible text-bearing manuscript objects. MATLAB graphics
+% contains internal ruler/decorator objects with FontSize/FontWeight
+% properties; those are implementation details and are not rendered as
+% independent manuscript text.
+textObjects = findall(fig,'Type','text');
+for k = 1:numel(textObjects)
+    obj = textObjects(k);
+    if isprop(obj,'Visible') && strcmpi(obj.Visible,'off'), continue; end
+    assert_font_object(obj,style,stem,'text');
+end
+
+axesObjects = findall(fig,'Type','axes');
+for k = 1:numel(axesObjects)
+    obj = axesObjects(k);
+    if strcmpi(obj.Visible,'off'), continue; end
+    assert_font_object(obj,style,stem,'axes');
+end
+
+legendObjects = findall(fig,'Type','legend');
+for k = 1:numel(legendObjects)
+    obj = legendObjects(k);
+    if isprop(obj,'Visible') && strcmpi(obj.Visible,'off'), continue; end
+    assert_font_object(obj,style,stem,'legend');
+end
+
+colorbars = findall(fig,'Type','colorbar');
+for k = 1:numel(colorbars)
+    obj = colorbars(k);
+    if isprop(obj,'Visible') && strcmpi(obj.Visible,'off'), continue; end
+    assert_font_object(obj,style,stem,'colorbar');
+end
+end
+
+
+function assert_font_object(obj,style,stem,kind)
+if isprop(obj,'FontSize')
+    assert(double(obj.FontSize)>=style.fontSize-1e-9, ...
+        'Manuscript:FontTooSmall','%s font below manuscript size in %s.',kind,stem);
+end
+if isprop(obj,'FontWeight')
+    assert(strcmpi(string(obj.FontWeight),style.fontWeight), ...
+        'Manuscript:FontNotBold','Non-bold manuscript %s in %s.',kind,stem);
+end
+if isprop(obj,'FontName')
+    assert(strcmpi(string(obj.FontName),style.fontName), ...
+        'Manuscript:FontName','Unexpected manuscript %s font in %s.',kind,stem);
 end
 end
 
