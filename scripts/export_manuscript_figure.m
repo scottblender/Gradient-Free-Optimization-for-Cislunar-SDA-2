@@ -78,24 +78,34 @@ end
 axesObjects = findall(fig,'Type','axes');
 for k = 1:numel(axesObjects)
     ax = axesObjects(k);
-    if ~isempty(ax.XTickLabel)
-        ax.XTickLabel = abbreviate_value(ax.XTickLabel,false);
-    end
-    if ~isempty(ax.YTickLabel)
-        ax.YTickLabel = abbreviate_value(ax.YTickLabel,false);
-    end
-    if ~isempty(ax.ZTickLabel)
-        ax.ZTickLabel = abbreviate_value(ax.ZTickLabel,false);
-    end
+    abbreviate_tick_labels(ax,'X');
+    abbreviate_tick_labels(ax,'Y');
+    abbreviate_tick_labels(ax,'Z');
 end
 
 textObjects = findall(fig,'Type','text');
 for k = 1:numel(textObjects)
     try
-        textObjects(k).String = abbreviate_value(textObjects(k).String,false);
+        value = textObjects(k).String;
+        shortened = abbreviate_value(value,false);
+        if ~isequal(value,shortened)
+            textObjects(k).String = shortened;
+        end
     catch
         % Ignore graphics proxy objects that expose non-writable String data.
     end
+end
+end
+
+function abbreviate_tick_labels(ax,axisName)
+property = [axisName 'TickLabel'];
+value = ax.(property);
+if isempty(value), return; end
+shortened = abbreviate_value(value,false);
+% Do not touch ordinary numeric labels. Assigning an unchanged TickLabel
+% would switch some MATLAB axes from automatic to manual label management.
+if ~isequal(value,shortened)
+    ax.(property) = shortened;
 end
 end
 
