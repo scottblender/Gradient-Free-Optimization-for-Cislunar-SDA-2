@@ -155,6 +155,7 @@ for k=1:numel(axesObjects)
         lgd.Location='northoutside';
         drawnow;
         pos=lgd.Position;
+        setappdata(ax,'ManuscriptNorthOutsidePosition',pos);
         pos(1)=max(0.002,(1-pos(3))/2);
         pos(2)=pos(2)+style.legendNorthOutsideYOffset;
         minimumBottom=ax.Position(2)+ax.Position(4)+style.legendMinimumGap;
