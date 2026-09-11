@@ -1,23 +1,18 @@
 function style = reviewer2_paper_style()
 %REVIEWER2_PAPER_STYLE Shared journal-figure styling for Reviewer 2 results.
 %
-% Manuscript formatting is applied while figures are constructed. Export
-% functions must not resize/reflow completed figures or modify their axes,
-% legends, cameras, clipping, or paper geometry.
+% The figure geometry intentionally follows the last known-good manuscript
+% layout. Readability is improved with a moderate font increase and shorter
+% labels rather than oversized text or export-time reformatting.
 
 style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
 
-% Manuscript readability. These values intentionally reproduce the larger
-% visual scale of the earlier readable figures while leaving room for ticks,
-% labels, and legends inside the exported canvas.
-style.manuscriptPanelWidth = 3.3;
-style.metricPlotPosition = [0.18 0.23 0.76 0.52];
-style.legendMaxColumns = 8;  % start row-oriented; wrap only when space requires it
-style.groupedBarWidth = 0.64;
-style.categoryLabelAngle = 25;
-style.fontSize = 22;
-style.labelFontSize = 24;
+% Typography: larger than the original 12/14 pt manuscript figures, but
+% small enough that tick labels and axis labels remain inside the EPS canvas.
+style.fontSize = 16;
+style.labelFontSize = 18;
+style.legendFontSize = 15;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -25,12 +20,19 @@ style.capSize = 7;
 style.alphaBand = 0.16;
 style.exportDpi = 300;
 
+% Dense categorical figures retain enough margin for labels while using more
+% of the available canvas than the previous oversized-font layout.
+style.manuscriptPanelWidth = 3.3;
+style.metricPlotPosition = [0.16 0.18 0.80 0.62];
+style.legendMaxColumns = 8;  % prefer a single row; wrap only when necessary
+style.groupedBarWidth = 0.64;
+style.categoryLabelAngle = 18;
+
 % -------------------------------------------------------------------------
-% Export-size classes. Figures intended to line up in LaTeX share exactly
-% the same outer paper size within each class.
+% Export-size classes. These return to the working original proportions.
 % -------------------------------------------------------------------------
 style.metricFigureWidth = 6.5;
-style.metricFigureHeight = 5.8;
+style.metricFigureHeight = 4.6;
 style.figureWidth = style.metricFigureWidth;
 style.figureHeight = style.metricFigureHeight;
 style.panelFigureHeight = 6.2; % retained only for backward compatibility
@@ -44,19 +46,19 @@ style.orbitFamilyFigureHeight = style.geometryFigureHeight;
 style.slotPhaseFigureWidth = style.geometryFigureWidth;
 style.slotPhaseFigureHeight = style.geometryFigureHeight;
 
-% Keep the occlusion/keepout schematic at its established size. The
-% definition renderer also pins that schematic to its existing 12 pt text.
+% Keep the occlusion/keepout schematic exactly on its established canvas.
 style.visibilityFigureWidth = 7.2;
 style.visibilityFigureHeight = 5.1;
 
-% RA and Dec deliberately share the same outer canvas and axes geometry.
-style.measurementFigureWidth = style.metricFigureWidth;
-style.measurementFigureHeight = style.metricFigureHeight;
-style.monteCarloFigureWidth = style.metricFigureWidth;
-style.monteCarloFigureHeight = style.metricFigureHeight;
+% RA and Dec remain matched, but use a compact manuscript panel rather than
+% the oversized metric canvas introduced during the failed formatting pass.
+style.measurementFigureWidth = 5.2;
+style.measurementFigureHeight = 4.8;
+style.monteCarloFigureWidth = 4.8;
+style.monteCarloFigureHeight = 4.2;
 
-% Shared 3-D layout and fallback camera.
-style.geometryPlotPosition = [0.14 0.23 0.72 0.54];
+% Shared 3-D layout restored from the known-good manuscript geometry.
+style.geometryPlotPosition = [0.12 0.20 0.76 0.64];
 style.geometryLegendGap = 0.012;
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
