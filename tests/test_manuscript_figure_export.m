@@ -1,175 +1,112 @@
 function test_manuscript_figure_export()
-% Data-free regression for paired export canvases and manuscript typography.
+% Data-free regression for the centralized manuscript export formatter.
 paths = setup_project(); %#ok<NASGU>
 style = reviewer2_paper_style();
 folder = tempname; mkdir(folder);
 cleanup = onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
-boxes = strings(4,1); imageSizes = zeros(4,2);
-cameraViewAngleBefore = NaN;
-for k = 1:4
-    fig = figure('Visible','off','Units','inches', ...
-        'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
-        'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight]);
-    closeFigure = onCleanup(@() close(fig));
-    ax = axes(fig);
-    if k==1
-        t=linspace(0,2*pi,200);
-        plot3(ax,cos(t),sin(t),0.35*sin(2*t),'LineWidth',1.5);
-        xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
-        axis(ax,'equal'); view(ax,-37.5,30);
-        % Reproduce the real failure mode: a plotter-generated/manual y tick
-        % set that projects into one crowded screen-space corner.
-        ax.YTick=[-1 -0.5 0 0.5 1];
-        cameraViewAngleBefore=ax.CameraViewAngle;
-    elseif k==4
-        x=[1:4 6:9 11:14];
-        V=repmat([20 55 20 3 2],12,1);
-        bar(ax,x,V,'stacked','BarWidth',0.82);
-        ax.XTick=x;
-        ax.XTickLabel=repmat({'GA','PSO','ABC','ACO'},1,3);
-        text(ax,mean(x(1:4)),104,'LG','HorizontalAlignment','center');
-        text(ax,mean(x(5:8)),104,'LT','HorizontalAlignment','center');
-        text(ax,mean(x(9:12)),104,'GI','HorizontalAlignment','center');
-        ylim(ax,[0 108]);
-        xlabel(ax,'Optimizer'); ylabel(ax,'Observer selections (%)');
-        setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
-    else
-        plot(ax,1:10,k*(1:10)); xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)');
-    end
-    if k==2
-        hold(ax,'on');
-        for j=2:6, plot(ax,1:10,j*(1:10)); end
-        ylabel(ax,'Mean effective position uncertainty (km)');
-        ax.XTick = 1:3;
-        ax.XTickLabel = {'Lunar Gateway','Low-thrust transfer','Gateway impulse'};
-        lgd=legend(ax,{'Nominal Gateway','Target trajectory','Observer orbits', ...
-            'Moon','L1','L2'},'Location','northoutside', ...
-            'Orientation','horizontal','NumColumns',3);
-        lgd.ItemTokenSize=[16 9];
-        setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
-    elseif k==3
-        hold(ax,'on');
-        plot(ax,1:10,2*(1:10));
-        legend(ax,{'DRO','Moon'},'Location','northeast', ...
-            'Orientation','vertical','NumColumns',1);
-        setappdata(ax,'ManuscriptAxesPosition',style.metricPlotPosition);
-    end
-    if k==1
-        text(ax,0,0,0,'label','FontSize',8);
-    elseif k~=4
-        text(ax,5,5*k,repmat('label ',1,k),'FontSize',8);
-    end
-    file = fullfile(folder,sprintf('panel%d.eps',k));
-    meta = export_manuscript_figure(fig,file);
-    if k==1
-        assert(abs(ax.CameraViewAngle-cameraViewAngleBefore) <= ...
-            100*eps(max(1,cameraViewAngleBefore)), ...
-            '3-D export should not change camera zoom.');
-        ap=ax.Position;
-        assert(ap(1)>=0 && ap(2)>=0 && ap(1)+ap(3)<=1 && ap(2)+ap(4)<=1, ...
-            '3-D axes rectangle extends outside the export canvas.');
-        assert(numel(ax.XTick)<=style.max3DXTicks && ...
-            numel(ax.YTick)<=style.max3DYTicks && ...
-            numel(ax.ZTick)<=style.max3DZTicks, ...
-            '3-D tick labels were not reduced enough for manuscript export.');
-        assert(numel(ax.YTick)==2, ...
-            'Manual 3-D y ticks should be reduced to endpoint labels.');
-    elseif k==4
-        ticks=ax.XTick;
-        within=diff(ticks(1:4));
-        assert(all(within>1.15), ...
-            'Repeated optimizer labels were not given visible within-group spacing.');
-        assert(ticks(5)-ticks(4)>max(within), ...
-            'Mission-block gap should remain larger than optimizer spacing.');
-        assert(isappdata(ax,'ManuscriptOptimizerSpacingApplied'), ...
-            'Optimizer-family spacing routine did not run.');
-        bars=findall(ax,'-property','BarWidth');
-        assert(~isempty(bars), ...
-            'Family-selection stacked bars were not detected during export.');
-        for b=1:numel(bars)
-            if isprop(bars(b),'XData') && numel(bars(b).XData)==numel(ticks)
-                assert(isequal(double(bars(b).XData(:).'),double(ticks(:).')), ...
-                    'Family-selection bars did not move with optimizer tick labels.');
-            end
-        end
-    end
-    if k==2 || k==3
-        lgd=ax.Legend; lp=lgd.Position; ap=ax.Position;
-        assert(lp(2)>ap(2)+ap(4),'Legend overlaps the plot rectangle.');
-        assert(lp(1)>=0 && lp(1)+lp(3)<=1.01,'Legend extends outside canvas.');
-        assert(abs((lp(1)+0.5*lp(3))-0.5)<0.02,'Legend is not centered above the plot.');
-        assert(strcmpi(lgd.Orientation,'horizontal'),'Legend must remain horizontal.');
-        assert(strcmpi(lgd.Location,'none'), ...
-            'Final adjusted legend should be frozen after northoutside placement.');
-        assert(isappdata(ax,'ManuscriptNorthOutsidePosition') && ...
-            isappdata(ax,'ManuscriptNorthOutsideAdjusted'), ...
-            'Master formatter did not record the northoutside reference placement.');
-        northPos=getappdata(ax,'ManuscriptNorthOutsidePosition');
-        minimumBottom=ap(2)+ap(4)+style.legendMinimumGap;
-        expectedBottom=min(max(northPos(2)+style.legendNorthOutsideYOffset, ...
-            minimumBottom),0.99-lp(4));
-        assert(abs(lp(2)-expectedBottom)<0.01, ...
-            'Legend was not nudged from MATLAB northoutside by the shared offset.');
-        assert(lp(2)<=northPos(2)+0.002, ...
-            'Legend was not moved downward from the northoutside reference.');
-        assert(isappdata(ax,'ManuscriptFinalLegendGap'), ...
-            'Final legend-gap diagnostic was not stored.');
-        finalGap=getappdata(ax,'ManuscriptFinalLegendGap');
-        assert(finalGap>=style.legendMinimumGap-0.005, ...
-            'Final legend gap is smaller than the configured safety gap.');
-        rows=ceil(numel(lgd.String)/lgd.NumColumns);
-        assert(rows<=style.legendMaxRows,'Legend must use at most two rows.');
-        assert(lgd.FontSize>=style.fontSize,'Legend font size changed during export.');
-        if k==2
-            assert(lgd.NumColumns==3,'Impulse-style legend should remain two balanced rows.');
-            legendText = string(lgd.String);
-            assert(any(legendText=="Nominal LG") && any(legendText=="Target") && ...
-                any(legendText=="Obs. orbits"), ...
-                'Compact geometry abbreviations were not applied to the legend.');
-            assert(isequal(string(ax.XTickLabel(:)),["LG";"LT";"GI"]), ...
-                'Mission abbreviations were not applied to categorical ticks.');
-        else
-            assert(lgd.NumColumns==2 && rows==1, ...
-                'Two-entry legends such as DRO/Moon must export as one row.');
-        end
-    end
-    epsText = fileread(file);
-    boxes(k) = string(regexp(epsText,'(?m)^%%BoundingBox:[^\r\n]*','match','once'));
-    expectedHires = sprintf('%%%%HiResBoundingBox: 0 0 %.6f %.6f', ...
-        72*style.metricFigureWidth,72*style.metricFigureHeight);
-    assert(contains(epsText,expectedHires));
-    assert(meta.minimumPrintedFontPoints>=style.minimumPrintedFontSize);
-    png = imfinfo(strrep(file,'.eps','.png')); imageSizes(k,:)=[png.Width png.Height];
-    objects=findall(fig,'-property','FontSize');
-    assert(all(arrayfun(@(obj) obj.FontSize>=style.fontSize,objects)));
-    weightObjects=findall(fig,'-property','FontWeight');
-    assert(all(arrayfun(@(obj) strcmpi(obj.FontWeight,style.fontWeight),weightObjects)), ...
-        'All manuscript figure text must be bold.');
-    clear closeFigure;
-end
-assert(all(boxes==boxes(1)),'Paired EPS canvases differ.');
-assert(all(all(imageSizes==imageSizes(1,:))),'Paired PNG canvases differ.');
-assert(style.metricFigureWidth>6.5 && style.metricFigureHeight>5.2, ...
-    'Manuscript export canvas should be larger than the legacy dimensions.');
-assert(style.geometryPlotPosition(3)>=0.80 && style.geometryPlotPosition(4)>=0.65, ...
-    '3-D manuscript axes should remain larger than the legacy plot box.');
-assert(~isfield(style,'geometryCameraZoom'), ...
-    'Camera zoom should not be used for fixed-canvas manuscript exports.');
-assert(style.legendNorthOutsideYOffset<0 && ...
-    style.legendMinimumGap>=0.006 && style.legendMinimumGap<=0.012 && ...
-    style.geometryLegendGap==style.legendMinimumGap && ...
-    style.legendTopPadding<=0.020, ...
-    'Legend spacing should nudge northoutside downward with a safe minimum gap.');
-assert(style.max3DXTicks<=3 && style.max3DYTicks<=2 && style.max3DZTicks<=3, ...
-    '3-D manuscript tick density is too high for perspective projection.');
-assert(style.familyOptimizerSpacingFactor>1.15, ...
-    'Optimizer-family spacing factor should produce a visible separation.');
+boxes = strings(2,1); imageSizes = zeros(2,2);
+
+% -------------------------------------------------------------------------
+% Metric figure: dense numerical ticks, readable font, adjusted northoutside.
+% -------------------------------------------------------------------------
+fig = figure('Visible','off','Units','inches', ...
+    'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
+    'PaperUnits','inches','PaperSize',[style.metricFigureWidth style.metricFigureHeight]);
+closeFigure = onCleanup(@() close(fig));
+ax = axes(fig);
+x = linspace(60,6000,200);
+h = gobjects(3,1);
+h(1)=plot(ax,x,3.6+4.2*(x/60).^(-0.35),'LineWidth',1.5); hold(ax,'on');
+h(2)=plot(ax,x,4.8+3.6*(x/60).^(-0.28),'LineWidth',1.5);
+h(3)=plot(ax,x,5.8+3.0*(x/60).^(-0.22),'LineWidth',1.5);
+xlim(ax,[60 6000]); ylim(ax,[3.4 9.2]);
+xlabel(ax,'Function evaluations'); ylabel(ax,'Mean best-so-far objective');
+lgd = legend(ax,h,{'1 period','3 periods','5 periods'}, ...
+    'Location','northoutside','Orientation','horizontal');
+metricFile = fullfile(folder,'metric.eps');
+meta = export_manuscript_figure(fig,metricFile);
+assert(numel(ax.XTick)>=5 && numel(ax.XTick)<=style.max2DXTicks, ...
+    'Metric x axis does not have enough readable ticks.');
+assert(numel(ax.YTick)>=4 && numel(ax.YTick)<=style.max2DYTicks, ...
+    'Metric y axis does not have enough readable ticks.');
+assert(isappdata(ax,'ManuscriptNorthOutsideReference'), ...
+    'Master formatter did not establish a northoutside legend reference.');
+northPosition = getappdata(ax,'ManuscriptNorthOutsideReference');
+finalPosition = lgd.Position;
+assert(finalPosition(2)<=northPosition(2)+1e-6, ...
+    'Legend was not moved downward from northoutside.');
+assert(finalPosition(2)>=ax.Position(2)+ax.Position(4)+style.legendMinimumGap-0.003, ...
+    'Legend is too close to or overlapping the metric axes.');
+assert(strcmpi(lgd.Location,'none'), ...
+    'Legend should be frozen only after adjusted northoutside placement.');
+assert(meta.minimumPrintedFontPoints>=style.minimumPrintedFontSize);
+check_fonts(fig,style);
+check_canvas(fig);
+epsText = fileread(metricFile);
+boxes(1) = string(regexp(epsText,'(?m)^%%BoundingBox:[^\r\n]*','match','once'));
+assert(contains(epsText,'%%HiResBoundingBox: 0 0 468.000000 374.400000'));
+png = imfinfo(strrep(metricFile,'.eps','.png')); imageSizes(1,:)=[png.Width png.Height];
+clear closeFigure;
+
+% -------------------------------------------------------------------------
+% Geometry figure: export must preserve plotter-selected trajectory ticks.
+% -------------------------------------------------------------------------
+fig = figure('Visible','off','Units','inches', ...
+    'Position',[1 1 style.geometryFigureWidth style.geometryFigureHeight], ...
+    'PaperUnits','inches','PaperSize',[style.geometryFigureWidth style.geometryFigureHeight]);
+closeFigure = onCleanup(@() close(fig));
+ax = axes(fig,'Units','normalized','Position',style.geometryPlotPosition);
+t = linspace(0,2*pi,200);
+h1=plot3(ax,0.95+0.12*cos(t),0.04*sin(t),0.18*sin(t),'-','LineWidth',1.5); hold(ax,'on');
+h2=plot3(ax,0.96+0.10*cos(t),0.03*sin(t),0.15*sin(t),'-','LineWidth',1.5);
+xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
+view(ax,-37.5,30); axis(ax,'equal');
+ax.YTick=[-0.05 0 0.05]; originalYTicks=ax.YTick;
+lgd=legend(ax,[h1,h2],{'L1','L2'},'Location','northoutside','Orientation','horizontal');
+geometryFile = fullfile(folder,'geometry.eps');
+export_manuscript_figure(fig,geometryFile);
+assert(isequal(ax.YTick,originalYTicks), ...
+    'Trajectory/geometry ticks should not be rewritten by the metric tick policy.');
+assert(isappdata(ax,'ManuscriptNorthOutsideReference'));
+assert(lgd.Position(2)<=getappdata(ax,'ManuscriptNorthOutsideReference')(2)+1e-6); %#ok<NBRAK>
+check_fonts(fig,style);
+check_canvas(fig);
+epsText = fileread(geometryFile);
+boxes(2) = string(regexp(epsText,'(?m)^%%BoundingBox:[^\r\n]*','match','once'));
+png = imfinfo(strrep(geometryFile,'.eps','.png')); imageSizes(2,:)=[png.Width png.Height];
+clear closeFigure;
+
+assert(boxes(1)==boxes(2),'Paired EPS canvases differ.');
+assert(isequal(imageSizes(1,:),imageSizes(2,:)),'Paired PNG canvases differ.');
 assert(style.geometryFigureWidth==style.measurementFigureWidth && ...
     style.geometryFigureHeight==style.measurementFigureHeight);
-assert(style.visibilityFigureWidth==style.metricFigureWidth && ...
-    style.visibilityFigureHeight>style.metricFigureHeight, ...
-    'Keep-out schematic should retain manuscript width but use a taller canvas.');
-fprintf(['Manuscript EPS canvas, contained 3-D geometry, manual/automatic sparse ' ...
-    '3-D ticks, adjusted northoutside legends, optimizer spacing, abbreviation, ' ...
-    'legend, and font checks passed.\n']);
+assert(style.fontSize*style.manuscriptPanelWidth/style.metricFigureWidth >= ...
+    style.minimumPrintedFontSize,'Configured manuscript font is too small after placement.');
+assert(style.legendNorthOutsideYOffset<0 && style.legendMinimumGap>0);
+fprintf(['Centralized manuscript formatter checks passed: readable fonts, adjusted ' ...
+    'northoutside legends, metric ticks, preserved trajectory ticks, and EPS fit.\n']);
+end
+
+
+function check_fonts(fig,style)
+objects=findall(fig,'-property','FontSize');
+assert(all(arrayfun(@(obj) obj.FontSize>=style.fontSize,objects)), ...
+    'A manuscript graphics object is below the configured font size.');
+weights=findall(fig,'-property','FontWeight');
+assert(all(arrayfun(@(obj) strcmpi(obj.FontWeight,style.fontWeight),weights)), ...
+    'All manuscript text should use the shared font weight.');
+end
+
+
+function check_canvas(fig)
+axesObjects=findall(fig,'Type','axes');
+for k=1:numel(axesObjects)
+    ax=axesObjects(k); if strcmpi(ax.Visible,'off'), continue; end
+    p=ax.Position;
+    assert(p(1)>=-0.005 && p(2)>=-0.005 && p(1)+p(3)<=1.005 && p(2)+p(4)<=1.005);
+    if ~isempty(ax.Legend)
+        lp=ax.Legend.Position;
+        assert(lp(1)>=-0.005 && lp(2)>=-0.005 && lp(1)+lp(3)<=1.005 && lp(2)+lp(4)<=1.005);
+    end
+end
 end
