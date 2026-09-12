@@ -50,6 +50,20 @@ for k = 1:height(summary)
     hRef = yline(ax,s.ReferenceObjective,'-','Color',[1.00 0.30 0.30], ...
         'LineWidth',1.5);
 
+    % Keep the optimized-reference line visibly separated from the x axis.
+    % MATLAB's automatic limits can place the minimum reference exactly on the
+    % lower axes boundary when it is the smallest plotted value. Reserve a
+    % small data-relative margin below and above every MC distribution so the
+    % reference line remains distinct in both EPS and PNG exports.
+    plotValues = [double(rows.TotalCost(:));double(s.ReferenceObjective)];
+    plotValues = plotValues(isfinite(plotValues));
+    assert(~isempty(plotValues),'Monte Carlo plot contains no finite objective values.');
+    plotMin = min(plotValues);
+    plotMax = max(plotValues);
+    plotSpan = max(plotMax-plotMin,0.05*max(1,max(abs(plotValues))));
+    yPadding = 0.08*plotSpan;
+    ylim(ax,[plotMin-yPadding,plotMax+yPadding]);
+
     xlim(ax,[0.55 1.45]);
     xticks(ax,[]);
     xlabel(ax,'Monte Carlo samples','FontWeight','bold');
