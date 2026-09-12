@@ -9,11 +9,15 @@ style.fontName = 'Times New Roman';
 style.fontWeight = 'bold';
 
 % Typography.
-style.fontSize = 16;
-style.labelFontSize = 18;
-style.legendFontSize = 14;
-style.geometryLegendFontSize = 15;
-style.legendMinFontSize = 12;
+% The source fonts are intentionally larger than ordinary screen defaults
+% because the full-size EPS panels are reduced when placed in LaTeX grids.
+style.fontSize = 18;
+style.labelFontSize = 21;
+style.geometryFontSize = 20;
+style.geometryLabelFontSize = 22;
+style.legendFontSize = 16;
+style.geometryLegendFontSize = 18;
+style.legendMinFontSize = 14;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -47,6 +51,14 @@ style.monteCarloFigureWidth = style.figureWidth;
 style.monteCarloFigureHeight = style.figureHeight;
 style.panelFigureHeight = style.figureHeight; % backward compatibility
 style.manuscriptPanelWidth = 3.3;
+
+% Final construction-time fit rules. The outer EPS/PNG canvas never changes;
+% if larger manuscript text would extend outside that canvas, only the inner
+% axes rectangle is reduced enough to keep labels and legends visible.
+style.fitMarginFraction = 0.03;
+style.fitShrinkFactor = 0.97;
+style.fitMinimumAxesScale = 0.58;
+style.fitMaxIterations = 28;
 
 % -------------------------------------------------------------------------
 % Standard 2-D layout.
