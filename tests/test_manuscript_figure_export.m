@@ -1,5 +1,5 @@
 function test_manuscript_figure_export()
-% Verify final content centering and a non-mutating writer; no catalog required.
+% Verify full content centering and a non-mutating writer; no catalog required.
 setup_project(); style=reviewer2_paper_style();
 folder=tempname; mkdir(folder);
 cleanup=onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
@@ -19,8 +19,8 @@ format_manuscript_legend(ax,lgd,style,style.geometryPlotPosition);
 assert(strcmp(lgd.FontWeight,'bold') && lgd.FontSize==style.geometryLegendFontSize);
 
 % Measure the final rendered content in figure pixels. The legend itself must
-% be figure-centered, and the union of legend + axes/ticks/labels must have
-% equal left/right margins on the standard export canvas.
+% be figure-centered horizontally, and the union of legend + axes/ticks/labels
+% must have equal left/right AND top/bottom margins on the export canvas.
 figUnits=fig.Units; axUnits=ax.Units; legendUnits=lgd.Units;
 fig.Units='pixels'; ax.Units='pixels'; lgd.Units='pixels'; drawnow;
 figPosition=fig.Position; axesPosition=ax.Position; inset=ax.TightInset; legendPosition=lgd.Position;
@@ -30,10 +30,17 @@ assert(abs(legendCenter-0.5*figPosition(3)) <= 1, ...
 contentLeft=min(axesPosition(1)-inset(1),legendPosition(1));
 contentRight=max(axesPosition(1)+axesPosition(3)+inset(3), ...
     legendPosition(1)+legendPosition(3));
+contentBottom=min(axesPosition(2)-inset(2),legendPosition(2));
+contentTop=max(axesPosition(2)+axesPosition(4)+inset(4), ...
+    legendPosition(2)+legendPosition(4));
 leftMargin=contentLeft;
 rightMargin=figPosition(3)-contentRight;
+bottomMargin=contentBottom;
+topMargin=figPosition(4)-contentTop;
 assert(abs(leftMargin-rightMargin) <= 1, ...
     'Final visible content does not have equal left/right margins.');
+assert(abs(bottomMargin-topMargin) <= 1, ...
+    'Final visible content does not have equal top/bottom margins.');
 fig.Units=figUnits; ax.Units=axUnits; lgd.Units=legendUnits; drawnow;
 
 properties={'Position','XLim','YLim','ZLim','XTick','YTick','ZTick', ...
@@ -46,5 +53,5 @@ assert(isequaln(before,after),'Export reformatted the scene.');
 assert(isequal(legendBefore,lgd.Position) && isequal(paperBefore,fig.PaperPosition));
 assert(isfile(file) && isfile(fullfile(folder,'scene.png')));
 assert(startsWith(fileread(file),'%!PS-Adobe'));
-fprintf('Content-centering and non-mutating export checks passed.\n');
+fprintf('Full content-centering and non-mutating export checks passed.\n');
 end
