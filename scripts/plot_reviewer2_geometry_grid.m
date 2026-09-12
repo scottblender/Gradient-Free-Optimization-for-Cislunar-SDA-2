@@ -6,8 +6,9 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 % tiled grids. The construction matches plot_study_definition_figures.m:
 %   7.6 x 7.0 inch canvas
 %   centered inner axes box [0.12 0.20 0.76 0.64]
-%   maneuver-specific camera from reviewer2_paper_style, axis equal/vis3d
-%   8/10/10 percent x/y/z padding
+%   maneuver-specific camera from reviewer2_paper_style
+%   panel-specific padded limits expanded to an equal-span cube
+%   fixed 1:1:1 data and plot-box aspect ratios
 %   centered north-outside legend with the axes restored afterward
 %   Times New Roman, 12-point minimum text and 14-point axis labels
 %   no grid lines and no surrounding axes box
@@ -42,25 +43,19 @@ orbitIndices = strings(n,1);
 slotIndices = strings(n,1);
 figureStem = strings(n,1);
 
-% Load all panels first so every comparison within one mission uses the
-% same dynamically determined limits.
-missionLimits = containers.Map('KeyType','char','ValueType','any');
-for mission = unique(string(selection.Mission),'stable')'
-    idx = find(string(selection.Mission) == mission);
-    allPoints = zeros(0,3);
-    for q = 1:numel(idx)
-        k = idx(q);
-        panelCells{k} = load_geometry_panel(string(selection.RunFile(k)));
-        panel = panelCells{k};
-        assert(panel.mission == mission, ...
-            'Selection mission does not match saved run mission.');
-        allPoints = [allPoints;panel.allPoints];
-        numObservers(k) = height(panel.observers);
-        families(k) = strjoin(string(panel.observers.orbit_family),';');
-        orbitIndices(k) = strjoin(string(panel.observers.orbit_index),';');
-        slotIndices(k) = strjoin(string(panel.observers.slot_index),';');
-    end
-    missionLimits(char(mission)) = common_geometry_limits(allPoints,style);
+% Load every panel once. Plot limits are computed from each panel's complete
+% rendered geometry so a wide orbit in another configuration cannot compress
+% the visible content of this panel inside the common EPS canvas.
+for k = 1:n
+    panelCells{k} = load_geometry_panel(string(selection.RunFile(k)));
+    panel = panelCells{k};
+    mission = string(selection.Mission(k));
+    assert(panel.mission == mission, ...
+        'Selection mission does not match saved run mission.');
+    numObservers(k) = height(panel.observers);
+    families(k) = strjoin(string(panel.observers.orbit_family),';');
+    orbitIndices(k) = strjoin(string(panel.observers.orbit_index),';');
+    slotIndices(k) = strjoin(string(panel.observers.slot_index),';');
 end
 
 for k = 1:n
@@ -73,8 +68,10 @@ for k = 1:n
 
     prepare_reference_axes(ax,style,mission);
     [legendHandles,legendLabels] = render_geometry_panel(ax,panel,style);
-    limits = missionLimits(char(mission));
+    limits = equal_span_geometry_limits(common_geometry_limits(panel.allPoints,style));
     xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    daspect(ax,[1 1 1]);
+    pbaspect(ax,[1 1 1]);
     axis(ax,'vis3d');
 
     legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
@@ -313,6 +310,17 @@ for k = 1:3
     end
     limits(k,:) = [lo-padding(k)*span,hi+padding(k)*span];
 end
+end
+
+
+function limits = equal_span_geometry_limits(limits)
+%EQUAL_SPAN_GEOMETRY_LIMITS Expand padded limits to a centered cube.
+spans = limits(:,2)-limits(:,1);
+maxSpan = max(spans);
+assert(isfinite(maxSpan) && maxSpan > 0, ...
+    'Geometry limits must have positive finite span.');
+centers = mean(limits,2);
+limits = [centers-0.5*maxSpan,centers+0.5*maxSpan];
 end
 
 
