@@ -10,38 +10,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Route EPS writers through shared finalizer
+      - name: Route remaining EPS writers through shared finalizer
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
           changed=[]
-          pattern=re.compile(r"^(\s*)print\(([^,]+),(.*'-depsc2'.*'-loose'.*)$")
           for p in Path('.').rglob('*.m'):
               if p.name == 'finalize_manuscript_figure.m':
                   continue
               lines=p.read_text(encoding='utf-8').splitlines(True)
               out=[]; dirty=False
               for line in lines:
-                  m=pattern.match(line.rstrip('\n'))
-                  if m:
-                      fig=m.group(2).strip()
-                      call=f"{m.group(1)}finalize_manuscript_figure({fig});\n"
-                      if not out or call.strip() not in out[-1]:
-                          out.append(call); dirty=True
+                  if "print(" in line and "'-depsc2'" in line and "'-loose'" in line and 'finalize_manuscript_figure(' not in line:
+                      m=re.search(r"print\(([^,]+),",line)
+                      if m:
+                          fig=m.group(1).strip()
+                          line=line.replace('print(',f'finalize_manuscript_figure({fig}); print(',1)
+                          dirty=True
                   out.append(line)
               if dirty:
                   p.write_text(''.join(out),encoding='utf-8'); changed.append(str(p))
-          if not changed:
-              raise SystemExit('No EPS writers found.')
-          print('\n'.join(changed))
+          print('\n'.join(changed) if changed else 'No remaining inline writers.')
           PY
           git diff --check
-      - name: Commit
+      - name: Commit if needed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -u
-          git commit -m "Route manuscript exports through shared finalizer"
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Route remaining manuscript exports through shared finalizer"
           git push origin HEAD:main
