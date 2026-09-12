@@ -37,12 +37,10 @@ end
 if isfield(reports,'runtime')
     r = reports.runtime;
     out = prepare_output(r.analysisDirectory,saveFigures);
-    baseline = matched_baseline(baselineResults,"LUNAR_GATEWAY",3,1);
-
     plot_runtime_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
-        "runtime_1200_objective",out,saveFigures,style,false,baseline);
+        "runtime_1200_objective",out,saveFigures,style,false,table());
     manifest = add_manifest(manifest,"runtime","runtime_1200_objective", ...
-        "Equal-1200-FE mean final-best objective with matched GA baseline.");
+        "Equal-1200-FE mean final-best objective comparison.");
 
     plot_runtime_metric(r,'BudgetRuntimeMean_s','BudgetRuntimeStd_s', ...
         'Mean runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
