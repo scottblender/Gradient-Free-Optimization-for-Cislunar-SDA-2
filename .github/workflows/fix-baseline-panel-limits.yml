@@ -1,0 +1,103 @@
+name: Fix baseline geometry panel limits
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/fix-baseline-panel-limits.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use panel-specific geometry limits
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/plot_reviewer2_geometry_grid.m')
+          text = path.read_text(encoding='utf-8')
+
+          old_load = '''% Load all panels first so every comparison within one mission uses the
+% same dynamically determined limits.
+missionLimits = containers.Map('KeyType','char','ValueType','any');
+for mission = unique(string(selection.Mission),'stable')'
+    idx = find(string(selection.Mission) == mission);
+    allPoints = zeros(0,3);
+    for q = 1:numel(idx)
+        k = idx(q);
+        panelCells{k} = load_geometry_panel(string(selection.RunFile(k)));
+        panel = panelCells{k};
+        assert(panel.mission == mission, ...
+            'Selection mission does not match saved run mission.');
+        allPoints = [allPoints;panel.allPoints];
+        numObservers(k) = height(panel.observers);
+        families(k) = strjoin(string(panel.observers.orbit_family),';');
+        orbitIndices(k) = strjoin(string(panel.observers.orbit_index),';');
+        slotIndices(k) = strjoin(string(panel.observers.slot_index),';');
+    end
+    missionLimits(char(mission)) = common_geometry_limits(allPoints,style);
+end
+'''
+          new_load = '''% Load all panels once. Each panel is scaled from its own complete plotted
+% geometry so a wide observer orbit in another baseline case cannot compress
+% the visible trajectories in this panel.
+for k = 1:n
+    panelCells{k} = load_geometry_panel(string(selection.RunFile(k)));
+    panel = panelCells{k};
+    mission = string(selection.Mission(k));
+    assert(panel.mission == mission, ...
+        'Selection mission does not match saved run mission.');
+    numObservers(k) = height(panel.observers);
+    families(k) = strjoin(string(panel.observers.orbit_family),';');
+    orbitIndices(k) = strjoin(string(panel.observers.orbit_index),';');
+    slotIndices(k) = strjoin(string(panel.observers.slot_index),';');
+end
+'''
+          if text.count(old_load) != 1:
+              raise SystemExit(f'Expected one mission-wide load/limit block, found {text.count(old_load)}.')
+          text = text.replace(old_load, new_load, 1)
+
+          old_limits = '''    limits = missionLimits(char(mission));
+    xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    axis(ax,'vis3d');
+'''
+          new_limits = '''    limits = common_geometry_limits(panel.allPoints,style);
+    xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    axis(ax,'vis3d');
+'''
+          if text.count(old_limits) != 1:
+              raise SystemExit(f'Expected one mission-limit application block, found {text.count(old_limits)}.')
+          text = text.replace(old_limits, new_limits, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+          updated = path.read_text(encoding='utf-8')
+          if 'missionLimits = containers.Map' in updated:
+              raise SystemExit('Mission-wide geometry limits still remain.')
+          if 'limits = common_geometry_limits(panel.allPoints,style);' not in updated:
+              raise SystemExit('Panel-specific geometry limits were not applied.')
+          PY
+
+      - name: Validate diff
+        shell: bash
+        run: git diff --check
+
+      - name: Commit panel-limit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/plot_reviewer2_geometry_grid.m
+          git commit -m "Use panel-specific limits for baseline geometry figures"
+          git push origin HEAD:main
