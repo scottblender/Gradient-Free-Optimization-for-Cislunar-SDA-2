@@ -76,7 +76,7 @@ for kind=1:2
     format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
     drawnow;
-    print(fig,char(files(kind)),'-depsc2','-painters','-r600');
+    print(fig,char(files(kind)),'-depsc2','-painters','-r600','-loose');
     print(fig,char(replace(files(kind),'.eps','.png')),'-dpng', ...
         sprintf('-r%d',style.exportDpi));
     clear cleanup;

@@ -423,7 +423,7 @@ if ~saveFigures
 end
 base = fullfile(char(figureDir),char(stem));
 set(fig,'Renderer','painters','PaperPositionMode','manual');
-print(fig,[base '.eps'],'-depsc2','-painters','-r600');
+print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
 exportgraphics(fig,[base '.png'],'Resolution',dpi);
 close(fig);
 end
