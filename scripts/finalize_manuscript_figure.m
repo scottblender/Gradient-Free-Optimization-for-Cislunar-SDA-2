@@ -38,14 +38,32 @@ for k = 1:numel(legends)
     lgd.FontName = style.fontName;
     lgd.FontWeight = style.fontWeight;
     lgd.FontSize = target;
-    lgd.Units = 'normalized'; drawnow;
-    while lgd.Position(3) > style.legendMaxWidth && lgd.FontSize > style.legendMinFontSize
-        lgd.FontSize = lgd.FontSize-1; drawnow;
+    lgd.Orientation = 'horizontal';
+    lgd.NumColumns = manuscript_legend_columns(lgd,style);
+    lgd.Units = 'normalized';
+    drawnow;
+
+    % Keep the two-row layout whenever possible. Reduce font size first if a
+    % long legend is still wider than the standardized manuscript canvas.
+    while lgd.Position(3) > style.legendMaxWidth && ...
+            lgd.FontSize > style.legendMinFontSize
+        lgd.FontSize = lgd.FontSize-1;
+        drawnow;
+    end
+
+    % Last-resort wrapping prevents clipping while preserving the common
+    % canvas. This may introduce a third row only when two rows cannot fit.
+    columns = lgd.NumColumns;
+    while lgd.Position(3) > style.legendMaxWidth && columns > 1
+        columns = columns-1;
+        lgd.NumColumns = columns;
+        drawnow;
     end
 end
 
 if numel(axesList) == 1
-    ax = axesList(1); format_manuscript_ticks(ax);
+    ax = axesList(1);
+    format_manuscript_ticks(ax);
     if isempty(legends), lgd = []; else, lgd = legends(1); end
     center_manuscript_content(fig,ax,lgd);
 end
@@ -59,7 +77,8 @@ objects = findall(ax,'-property','ZData');
 for k = 1:numel(objects)
     z = objects(k).ZData;
     if isnumeric(z) && ~isempty(z) && any(isfinite(z(:)))
-        tf = true; return;
+        tf = true;
+        return;
     end
 end
 end
