@@ -11,10 +11,10 @@ style.fontWeight = 'bold';
 % Typography.
 % The source fonts are intentionally larger than ordinary screen defaults
 % because the full-size EPS panels are reduced when placed in LaTeX grids.
-style.fontSize = 18;
-style.labelFontSize = 21;
-style.geometryFontSize = 20;
-style.geometryLabelFontSize = 22;
+style.fontSize = 20;
+style.labelFontSize = 23;
+style.geometryFontSize = 22;
+style.geometryLabelFontSize = 24;
 style.legendFontSize = 20;
 style.geometryLegendFontSize = 21;
 style.legendMinFontSize = 17;
@@ -55,22 +55,20 @@ style.panelFigureHeight = style.figureHeight; % backward compatibility
 style.manuscriptPanelWidth = 3.3;
 
 % Final construction-time fit rules. The outer EPS/PNG canvas never changes;
-% if larger manuscript text would extend outside that canvas, only the inner
-% axes rectangle is reduced enough to keep labels and legends visible.
-style.fitMarginFraction = 0.03;
+% larger tick/axis fonts are protected by a larger safe export margin and a
+% final post-centering bounds check. Only the inner axes box may contract.
+style.fitMarginFraction = 0.05;
 style.fitShrinkFactor = 0.97;
-style.fitMinimumAxesScale = 0.58;
-style.fitMaxIterations = 28;
+style.fitMinimumAxesScale = 0.50;
+style.fitMaxIterations = 36;
 
 % -------------------------------------------------------------------------
 % Standard 2-D layout.
-% The inner plot box is centered horizontally so the left/right whitespace is
-% visually balanced on every EPS export. A 13% margin on each side retains
-% enough room for large y tick labels and vertical axis labels without the
-% severe left-heavy whitespace of the previous [0.15 ... 0.82 ...] layout.
-% The plot top remains below the centered legend row so labels do not collide.
+% The inner plot box is centered horizontally with deliberately larger margins
+% for the enlarged paper typography. The final fit pass can contract this
+% rectangle further when a specific legend/label combination needs more room.
 % -------------------------------------------------------------------------
-style.metricPlotPosition = [0.13 0.17 0.74 0.56];
+style.metricPlotPosition = [0.15 0.18 0.70 0.53];
 style.legend2DGap = 0.08;
 style.legendMaxColumns = 8;
 style.legendMaxWidth = 0.96;
@@ -80,12 +78,12 @@ style.categoryLabelAngle = 30;
 
 % -------------------------------------------------------------------------
 % Standard 3-D layout.
-% The axes are exactly centered horizontally. The legend intentionally sits
-% inside the otherwise-unused top portion of the 3-D axes box so it stays
-% visually close to the trajectories without reducing the data region.
+% The axes retain balanced margins for large x/y/z labels. Dense geometry-grid
+% panels use their own legend-free rectangle while the same bounds check keeps
+% all exported tick and axis labels inside the fixed canvas.
 % -------------------------------------------------------------------------
-style.geometryPlotPosition = [0.10 0.14 0.80 0.70];
-style.geometryGridPlotPosition = [0.09 0.10 0.82 0.82];
+style.geometryPlotPosition = [0.12 0.15 0.76 0.66];
+style.geometryGridPlotPosition = [0.11 0.12 0.78 0.78];
 style.geometryLegendGap = -0.04;
 style.geometryLegendItemTokenSize = [20 9];
 style.geometryAzimuth = -37.5;
