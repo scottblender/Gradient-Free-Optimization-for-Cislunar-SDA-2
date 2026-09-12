@@ -8,13 +8,11 @@ function report = run_reviewer2_baseline_monte_carlo(varargin)
 %   * 250 samples are evaluated per baseline case by default;
 %   * sample 1 is exactly the optimized reference design.
 %
-% The no-argument default reproduces both baseline AO validation sets used
-% in the paper:
+% The no-argument default reproduces all three baseline AO validation sets:
 %   * LOW_THRUST_TRANSFER: 3/5/7/10 observers, one trajectory each;
-%   * LUNAR_GATEWAY:       3/5/7/10 observers x 1/3/5 periods.
-% This gives 16 cases total (4000 objective evaluations at 250 samples/case).
-% GATEWAY_IMPULSE remains available as an optional mission but is not part
-% of the default Monte Carlo validation set.
+%   * LUNAR_GATEWAY:       3/5/7/10 observers x 1/3/5 periods;
+%   * GATEWAY_IMPULSE:     3/5/7/10 observers, one trajectory each.
+% This gives 20 cases total (5000 objective evaluations at 250 samples/case).
 %
 % The reference design for each configuration is the best observed 6000-FE
 % GA baseline realization among the 20 seeds. This seed-specific design is
@@ -27,12 +25,12 @@ function report = run_reviewer2_baseline_monte_carlo(varargin)
 %   report = run_reviewer2_baseline_monte_carlo( ...
 %       'Mission',"LUNAR_GATEWAY",'GatewayPeriods',[1 3 5]);
 %   report = run_reviewer2_baseline_monte_carlo( ...
-%       'Mission',["LOW_THRUST_TRANSFER","LUNAR_GATEWAY"]);
+%       'Mission',["LOW_THRUST_TRANSFER","LUNAR_GATEWAY","GATEWAY_IMPULSE"]);
 %
 % Name-value options:
 %   Mission            string/string vector; default is
-%                      [LOW_THRUST_TRANSFER, LUNAR_GATEWAY].
-%                      GATEWAY_IMPULSE is also supported.
+%                      [LOW_THRUST_TRANSFER, LUNAR_GATEWAY,
+%                       GATEWAY_IMPULSE].
 %   Measurement        ANGLES_ONLY (default) or ANGLES_RANGE
 %   ObserverCounts     [3 5 7 10] (default)
 %   GatewayPeriods     [1 3 5] (used only for Lunar Gateway)
@@ -44,7 +42,7 @@ function report = run_reviewer2_baseline_monte_carlo(varargin)
 %   SaveFigures        true
 
 p = inputParser;
-addParameter(p,'Mission',["LOW_THRUST_TRANSFER","LUNAR_GATEWAY"]);
+addParameter(p,'Mission',["LOW_THRUST_TRANSFER","LUNAR_GATEWAY","GATEWAY_IMPULSE"]);
 addParameter(p,'Measurement',"ANGLES_ONLY");
 addParameter(p,'ObserverCounts',[3 5 7 10]);
 addParameter(p,'GatewayPeriods',[1 3 5]);
