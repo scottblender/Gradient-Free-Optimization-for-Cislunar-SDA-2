@@ -2,7 +2,8 @@ name: Apply comparison baseline and slot marker updates
 on:
   push:
     branches: [main]
-    paths: [.github/workflows/apply-comparison-baseline-slot-markers.yml]
+    paths:
+      - '.github/workflows/apply-comparison-baseline-slot-markers.yml'
 permissions:
   contents: write
 jobs:
@@ -18,119 +19,99 @@ jobs:
 
           def replace_once(text, old, new, label):
               if old not in text:
-                  raise SystemExit(f'Missing expected text for {label}:\n{old}')
+                  raise SystemExit('Missing expected text for ' + label)
               return text.replace(old, new, 1)
 
-          # -----------------------------------------------------------------
-          # Comparison plots: use the matched GA baseline for every metric.
-          # -----------------------------------------------------------------
           path = Path('scripts/make_reviewer2_curated_figures.m')
           text = path.read_text(encoding='utf-8')
-
-          text = replace_once(
-              text,
+          text = replace_once(text,
               '    refs = matched_baselines(baselineResults,missions,3,1);',
               "    refs = matched_baselines(baselineResults,missions,3,1,'BestJMean','BestJStd');",
-              'comparison objective baseline')
-
-          old = '''    for q = 1:size(specs,1)
-        plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...
-            string(specs{q,4}),out,saveFigures,style,table());
-        manifest = add_manifest(manifest,"comparison",string(specs{q,4}), ...
-            "Case-wise optimizer metric, mean +/- sample std.");
-    end'''
-          new = '''    for q = 1:size(specs,1)
-        metricRefs = matched_baselines(baselineResults,missions,3,1, ...
-            specs{q,1},specs{q,2});
-        plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...
-            string(specs{q,4}),out,saveFigures,style,metricRefs);
-        manifest = add_manifest(manifest,"comparison",string(specs{q,4}), ...
-            "Case-wise optimizer metric, mean +/- sample std., with matched GA baseline.");
-    end'''
-          text = replace_once(text, old, new, 'comparison metric baselines')
-
-          text = replace_once(
-              text,
+              'objective baseline')
+          old = ("    for q = 1:size(specs,1)\n"
+                 "        plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...\n"
+                 "            string(specs{q,4}),out,saveFigures,style,table());\n"
+                 "        manifest = add_manifest(manifest,\"comparison\",string(specs{q,4}), ...\n"
+                 "            \"Case-wise optimizer metric, mean +/- sample std.\");\n"
+                 "    end")
+          new = ("    for q = 1:size(specs,1)\n"
+                 "        metricRefs = matched_baselines(baselineResults,missions,3,1, ...\n"
+                 "            specs{q,1},specs{q,2});\n"
+                 "        plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...\n"
+                 "            string(specs{q,4}),out,saveFigures,style,metricRefs);\n"
+                 "        manifest = add_manifest(manifest,\"comparison\",string(specs{q,4}), ...\n"
+                 "            \"Case-wise optimizer metric, mean +/- sample std., with matched GA baseline.\");\n"
+                 "    end")
+          text = replace_once(text, old, new, 'metric baselines')
+          text = replace_once(text,
               'function ref = matched_baseline(B,mission,numObservers,nPeriods)\nref = table();',
               "function ref = matched_baseline(B,mission,numObservers,nPeriods,valueField,stdField)\nif nargin < 6, stdField = 'BestJStd'; end\nif nargin < 5, valueField = 'BestJMean'; end\nref = table();",
               'matched_baseline signature')
-
-          text = replace_once(
-              text,
+          text = replace_once(text,
               'ref = table(string(mission),rows.BestJMean,rows.BestJStd, ...',
               'ref = table(string(mission),rows.(valueField),rows.(stdField), ...',
-              'matched_baseline fields')
-
-          text = replace_once(
-              text,
-              'function refs = matched_baselines(B,missions,numObservers,nPeriods)\nrefs = table();\nfor mission = string(missions(:)\')\n    row = matched_baseline(B,mission,numObservers,nPeriods);',
-              "function refs = matched_baselines(B,missions,numObservers,nPeriods,valueField,stdField)\nif nargin < 6, stdField = 'BestJStd'; end\nif nargin < 5, valueField = 'BestJMean'; end\nrefs = table();\nfor mission = string(missions(:)')\n    row = matched_baseline(B,mission,numObservers,nPeriods,valueField,stdField);",
-              'matched_baselines signature')
-
+              'matched baseline fields')
+          old = ("function refs = matched_baselines(B,missions,numObservers,nPeriods)\n"
+                 "refs = table();\n"
+                 "for mission = string(missions(:)')\n"
+                 "    row = matched_baseline(B,mission,numObservers,nPeriods);")
+          new = ("function refs = matched_baselines(B,missions,numObservers,nPeriods,valueField,stdField)\n"
+                 "if nargin < 6, stdField = 'BestJStd'; end\n"
+                 "if nargin < 5, valueField = 'BestJMean'; end\n"
+                 "refs = table();\n"
+                 "for mission = string(missions(:)')\n"
+                 "    row = matched_baseline(B,mission,numObservers,nPeriods,valueField,stdField);")
+          text = replace_once(text, old, new, 'matched_baselines signature')
           text = text.replace("'6000-FE GA reference'", "'GA baseline'")
           text = text.replace('"6000-FE GA reference"', '"GA baseline"')
           text = text.replace('matched 6000-FE GA reference.', 'matched GA baseline.')
           text = text.replace('matched 6000-FE GA references.', 'matched GA baselines.')
           path.write_text(text, encoding='utf-8')
 
-          # -----------------------------------------------------------------
-          # Equal-time slot geometry: do not rely on marker face fills in EPS.
-          # Use large hollow colored markers plus black center symbols.
-          # -----------------------------------------------------------------
           path = Path('scripts/plot_study_definition_figures.m')
           text = path.read_text(encoding='utf-8')
-          old = '''hSelected = plot3(ax,slotState(selectedSlot,1), ...
-    slotState(selectedSlot,2),slotState(selectedSlot,3), ...
-    'o','MarkerSize',9,'MarkerFaceColor',selectedColor, ...
-    'MarkerEdgeColor','k','LineWidth',1.2);
-hNext = plot3(ax,slotState(nextSlot,1), ...
-    slotState(nextSlot,2),slotState(nextSlot,3), ...
-    's','MarkerSize',9,'MarkerFaceColor',nextColor, ...
-    'MarkerEdgeColor','k','LineWidth',1.2);'''
-          new = '''hSelected = plot3(ax,slotState(selectedSlot,1), ...
-    slotState(selectedSlot,2),slotState(selectedSlot,3), ...
-    'o','MarkerSize',13,'MarkerFaceColor','w', ...
-    'MarkerEdgeColor',selectedColor,'LineWidth',2.8);
-plot3(ax,slotState(selectedSlot,1),slotState(selectedSlot,2), ...
-    slotState(selectedSlot,3),'+','MarkerSize',9,'Color','k', ...
-    'LineWidth',1.8,'HandleVisibility','off');
-hNext = plot3(ax,slotState(nextSlot,1), ...
-    slotState(nextSlot,2),slotState(nextSlot,3), ...
-    's','MarkerSize',13,'MarkerFaceColor','w', ...
-    'MarkerEdgeColor',nextColor,'LineWidth',2.8);
-plot3(ax,slotState(nextSlot,1),slotState(nextSlot,2), ...
-    slotState(nextSlot,3),'x','MarkerSize',9,'Color','k', ...
-    'LineWidth',1.8,'HandleVisibility','off');'''
-          text = replace_once(text, old, new, 'equal-time selected slot markers')
+          old = ("hSelected = plot3(ax,slotState(selectedSlot,1), ...\n"
+                 "    slotState(selectedSlot,2),slotState(selectedSlot,3), ...\n"
+                 "    'o','MarkerSize',9,'MarkerFaceColor',selectedColor, ...\n"
+                 "    'MarkerEdgeColor','k','LineWidth',1.2);\n"
+                 "hNext = plot3(ax,slotState(nextSlot,1), ...\n"
+                 "    slotState(nextSlot,2),slotState(nextSlot,3), ...\n"
+                 "    's','MarkerSize',9,'MarkerFaceColor',nextColor, ...\n"
+                 "    'MarkerEdgeColor','k','LineWidth',1.2);")
+          new = ("hSelected = plot3(ax,slotState(selectedSlot,1), ...\n"
+                 "    slotState(selectedSlot,2),slotState(selectedSlot,3), ...\n"
+                 "    'o','MarkerSize',13,'MarkerFaceColor','w', ...\n"
+                 "    'MarkerEdgeColor',selectedColor,'LineWidth',2.8);\n"
+                 "plot3(ax,slotState(selectedSlot,1),slotState(selectedSlot,2), ...\n"
+                 "    slotState(selectedSlot,3),'+','MarkerSize',9,'Color','k', ...\n"
+                 "    'LineWidth',1.8,'HandleVisibility','off');\n"
+                 "hNext = plot3(ax,slotState(nextSlot,1), ...\n"
+                 "    slotState(nextSlot,2),slotState(nextSlot,3), ...\n"
+                 "    's','MarkerSize',13,'MarkerFaceColor','w', ...\n"
+                 "    'MarkerEdgeColor',nextColor,'LineWidth',2.8);\n"
+                 "plot3(ax,slotState(nextSlot,1),slotState(nextSlot,2), ...\n"
+                 "    slotState(nextSlot,3),'x','MarkerSize',9,'Color','k', ...\n"
+                 "    'LineWidth',1.8,'HandleVisibility','off');")
+          text = replace_once(text, old, new, 'equal-time slot markers')
           path.write_text(text, encoding='utf-8')
 
-          # -----------------------------------------------------------------
-          # Configuration audit for the two requested manuscript behaviors.
-          # -----------------------------------------------------------------
           path = Path('tests/test_reviewer2_paper_figures_configuration.m')
           text = path.read_text(encoding='utf-8')
-          anchor = '''assert(contains(parallelText,'style.figureWidth style.figureHeight') && ...
-    contains(parallelText,'format_manuscript_legend'), ...
-    'Parallel figures must use the common canvas and legend formatter.');
-'''
-          addition = '''assert(contains(parallelText,'style.figureWidth style.figureHeight') && ...
-    contains(parallelText,'format_manuscript_legend'), ...
-    'Parallel figures must use the common canvas and legend formatter.');
-
-% Every optimizer-comparison metric uses its matched GA baseline reference.
-assert(contains(curatedText,'metricRefs = matched_baselines(baselineResults,missions,3,1, ...') && ...
-    contains(curatedText,'style,metricRefs)') && ...
-    count(curatedText,'GA baseline') >= 2, ...
-    'Comparison metrics must include the matched GA baseline with consistent labeling.');
-
-% Selected equal-time slots must remain visible in vector EPS exports without
-% relying on filled marker faces.
-assert(count(studyText,"'MarkerSize',13,'MarkerFaceColor','w'") >= 2 && ...
-    contains(studyText,"'MarkerEdgeColor',selectedColor,'LineWidth',2.8") && ...
-    contains(studyText,"'MarkerEdgeColor',nextColor,'LineWidth',2.8") && ...
-    contains(studyText,"'HandleVisibility','off'") , ...
-    'Equal-time Slot j / Slot j+1 markers must use large EPS-safe outlines.');
-'''
+          anchor = ("assert(contains(parallelText,'style.figureWidth style.figureHeight') && ...\n"
+                    "    contains(parallelText,'format_manuscript_legend'), ...\n"
+                    "    'Parallel figures must use the common canvas and legend formatter.');\n")
+          addition = (anchor + "\n"
+              "% Every optimizer-comparison metric uses its matched GA baseline reference.\n"
+              "assert(contains(curatedText,'metricRefs = matched_baselines(baselineResults,missions,3,1, ...') && ...\n"
+              "    contains(curatedText,'style,metricRefs)') && ...\n"
+              "    count(curatedText,'GA baseline') >= 2, ...\n"
+              "    'Comparison metrics must include the matched GA baseline with consistent labeling.');\n\n"
+              "% Selected equal-time slots must remain visible in vector EPS exports without\n"
+              "% relying on filled marker faces.\n"
+              "assert(count(studyText,\"'MarkerSize',13,'MarkerFaceColor','w'\") >= 2 && ...\n"
+              "    contains(studyText,\"'MarkerEdgeColor',selectedColor,'LineWidth',2.8\") && ...\n"
+              "    contains(studyText,\"'MarkerEdgeColor',nextColor,'LineWidth',2.8\"), ...\n"
+              "    'Equal-time Slot j / Slot j+1 markers must use large EPS-safe outlines.');\n")
           text = replace_once(text, anchor, addition, 'configuration assertions')
           path.write_text(text, encoding='utf-8')
           PY
@@ -141,8 +122,6 @@ assert(count(studyText,"'MarkerSize',13,'MarkerFaceColor','w'") >= 2 && ...
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/apply-comparison-baseline-slot-markers.yml
-          git add scripts/make_reviewer2_curated_figures.m \
-                  scripts/plot_study_definition_figures.m \
-                  tests/test_reviewer2_paper_figures_configuration.m
+          git add scripts/make_reviewer2_curated_figures.m scripts/plot_study_definition_figures.m tests/test_reviewer2_paper_figures_configuration.m
           git commit -m "Add GA baselines and clarify slot markers"
           git push origin HEAD:main
