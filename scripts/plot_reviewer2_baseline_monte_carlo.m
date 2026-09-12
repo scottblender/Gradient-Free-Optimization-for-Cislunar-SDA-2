@@ -26,6 +26,8 @@ figureDir = string(fullfile(char(outDir),'figures'));
 if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
 
 figureStem = strings(height(summary),1);
+sharedLegendStem = "baseline_mc_shared_legend";
+export_mc_shared_legend(figureDir,sharedLegendStem,saveFigures,style);
 for k = 1:height(summary)
     s = summary(k,:);
     rows = samples(samples.Mission == s.Mission & ...
@@ -75,13 +77,6 @@ for k = 1:height(summary)
     ax.XLabel.FontSize = style.labelFontSize;
     ax.YLabel.FontSize = style.labelFontSize;
 
-    lgd = legend(ax,[hBox hRef],{'Monte Carlo samples','Optimized reference'}, ...
-        'Location','northoutside','Orientation','horizontal','Box','off');
-    lgd.FontName = style.fontName;
-    lgd.FontSize = style.fontSize;
-    lgd.FontWeight = 'bold';
-    format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
-
     stem = "baseline_mc_"+mission_code(s.Mission)+"_"+ ...
         measurement_code(s.Measurement)+"_o"+string(s.NumObservers);
     if s.Mission == "LUNAR_GATEWAY"
@@ -105,6 +100,45 @@ details = summary(:,intersect(summary.Properties.VariableNames, ...
     'ImprovedNeighborCount','StrictLocalMinimumPass'},'stable'));
 details.FigureStem = figureStem;
 details.FigureDirectory = repmat(figureDir,height(details),1);
+details.SharedLegendStem = repmat(sharedLegendStem,height(details),1);
+end
+
+
+function export_mc_shared_legend(figureDir,stem,saveFigures,style)
+if ~saveFigures, return; end
+widthIn = style.figureWidth;
+heightIn = style.sharedLegendFigureHeight;
+fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
+    'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
+    'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
+    'Renderer','painters','InvertHardcopy','off');
+ax = axes(fig,'Units','normalized','Position',[0.01 0.01 0.98 0.98], ...
+    'Visible','off');
+hold(ax,'on');
+hSamples = plot(ax,nan,nan,'s','LineStyle','none','MarkerSize',12, ...
+    'MarkerFaceColor',style.optimizerColors(1,:), ...
+    'MarkerEdgeColor',style.optimizerColors(1,:));
+hReference = plot(ax,nan,nan,'-','Color',[1.00 0.30 0.30],'LineWidth',1.8);
+labels = ["Monte Carlo samples","Optimized reference"];
+lgd = legend(ax,[hSamples hReference],cellstr(labels),'Location','none', ...
+    'Orientation','horizontal','NumColumns',2,'Box','off');
+lgd.FontName = style.fontName;
+lgd.FontSize = style.sharedLegendFontSize;
+lgd.FontWeight = style.fontWeight;
+lgd.ItemTokenSize = style.legendItemTokenSize;
+lgd.Units = 'normalized';
+drawnow;
+pos = lgd.Position;
+pos(1) = 0.5-pos(3)/2;
+pos(2) = 0.5-pos(4)/2;
+lgd.Position = pos;
+lgd.AutoUpdate = 'off';
+axis(ax,'off');
+drawnow;
+base = fullfile(char(figureDir),char(stem));
+print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
+exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
+close(fig);
 end
 
 

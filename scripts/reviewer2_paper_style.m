@@ -15,9 +15,11 @@ style.fontSize = 18;
 style.labelFontSize = 21;
 style.geometryFontSize = 20;
 style.geometryLabelFontSize = 22;
-style.legendFontSize = 16;
-style.geometryLegendFontSize = 18;
-style.legendMinFontSize = 14;
+style.legendFontSize = 20;
+style.geometryLegendFontSize = 21;
+style.legendMinFontSize = 17;
+style.sharedLegendFontSize = 22;
+style.sharedLegendFigureHeight = 1.05;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -72,7 +74,7 @@ style.metricPlotPosition = [0.13 0.17 0.74 0.56];
 style.legend2DGap = 0.08;
 style.legendMaxColumns = 8;
 style.legendMaxWidth = 0.96;
-style.legendItemTokenSize = [18 8];
+style.legendItemTokenSize = [22 9];
 style.groupedBarWidth = 0.64;
 style.categoryLabelAngle = 30;
 
@@ -83,8 +85,9 @@ style.categoryLabelAngle = 30;
 % visually close to the trajectories without reducing the data region.
 % -------------------------------------------------------------------------
 style.geometryPlotPosition = [0.10 0.14 0.80 0.70];
+style.geometryGridPlotPosition = [0.09 0.10 0.82 0.82];
 style.geometryLegendGap = -0.04;
-style.geometryLegendItemTokenSize = [16 8];
+style.geometryLegendItemTokenSize = [20 9];
 style.geometryAzimuth = -37.5;
 style.geometryElevation = 30;
 style.geometryProjection = 'perspective';

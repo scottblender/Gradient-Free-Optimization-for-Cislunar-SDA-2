@@ -111,6 +111,13 @@ if ismember("monte_carlo",sections)
         summary = readtable(fullfile(mcDir,'baseline_monte_carlo_summary.csv'),'TextType','string');
         details = plot_reviewer2_baseline_monte_carlo(samples,summary,mcDir,true);
         sources = [sources;fullfile(details.FigureDirectory,details.FigureStem+".eps")];
+        if ismember('SharedLegendStem',details.Properties.VariableNames)
+            sharedStems = unique(string(details.SharedLegendStem),'stable');
+            sharedStems = sharedStems(strlength(sharedStems) > 0);
+            if ~isempty(sharedStems)
+                sources = [sources;fullfile(details.FigureDirectory(1),sharedStems+".eps")];
+            end
+        end
     else
         warning('Manuscript:MissingMC','No saved Monte Carlo samples found; skipped that section.');
     end

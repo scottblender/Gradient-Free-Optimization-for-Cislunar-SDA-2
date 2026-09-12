@@ -58,26 +58,31 @@ for k = 1:n
     slotIndices(k) = strjoin(string(panel.observers.slot_index),';');
 end
 
+selectionMissions = string(selection.Mission);
+sharedLegendStem = strings(n,1);
+legendMissions = unique(selectionMissions,'stable');
+for mission = legendMissions(:)'
+    idx = find(selectionMissions == mission,1,'first');
+    legendStem = stemPrefix + "_legend_" + mission_code(mission);
+    export_shared_geometry_legend(panelCells{idx},figureDir,legendStem,saveFigures,style);
+    sharedLegendStem(selectionMissions == mission) = legendStem;
+end
+
 for k = 1:n
     mission = string(selection.Mission(k));
     panel = panelCells{k};
     fig = publication_figure(style.geometryFigureWidth,style.geometryFigureHeight);
-    plotPosition = style.geometryPlotPosition;
+    plotPosition = style.geometryGridPlotPosition;
     ax = axes(fig,'Units','normalized','Position',plotPosition);
     ax.PositionConstraint = 'innerposition';
 
     prepare_reference_axes(ax,style,mission);
-    [legendHandles,legendLabels] = render_geometry_panel(ax,panel,style);
+    render_geometry_panel(ax,panel,style);
     limits = equal_span_geometry_limits(common_geometry_limits(panel.allPoints,style));
     xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
     daspect(ax,[1 1 1]);
     pbaspect(ax,[1 1 1]);
     axis(ax,'vis3d');
-
-    legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
-        'Location','northoutside','Orientation','horizontal');
-    format_case_legend(legendHandle,panel.mission,style);
-    center_reference_legend(ax,legendHandle,plotPosition,style);
 
     stem = stemPrefix + "_" + mission_code(mission) + "_" + ...
         sanitize_key(string(selection.PanelKey(k)));
@@ -96,11 +101,11 @@ end
 details = table(string(selection.Mission),string(selection.PanelKey), ...
     string(selection.PanelLabel),representativeObjective,groupMeanObjective, ...
     groupStdObjective,representativeSeed,string(selection.RunFile), ...
-    numObservers,families,orbitIndices,slotIndices,figureStem,figureStem, ...
+    numObservers,families,orbitIndices,slotIndices,figureStem,figureStem,sharedLegendStem, ...
     'VariableNames',{'Mission','PanelKey','PanelLabel','RepresentativeObjective', ...
     'GroupMeanObjective','GroupStdObjective','RepresentativeSeed','RunFile', ...
     'NumObservers','OrbitFamilies','OrbitIndices','SlotIndices', ...
-    'FigureStem','GridFigureStem'});
+    'FigureStem','GridFigureStem','SharedLegendStem'});
 end
 
 
@@ -273,6 +278,72 @@ else
     handles = [hTarget hObserver hMoon hL1 hL2];
     labels = ["Target trajectory","Observer orbits","Moon","L1","L2"];
 end
+end
+
+
+function export_shared_geometry_legend(panel,figureDir,stem,saveFigures,style)
+if ~saveFigures, return; end
+fig = publication_figure(style.figureWidth,style.sharedLegendFigureHeight);
+ax = axes(fig,'Units','normalized','Position',[0.01 0.01 0.98 0.98], ...
+    'Visible','off');
+hold(ax,'on');
+obsColor = lines(1);
+obsColor = obsColor(1,:);
+moonColor = [0.72 0.72 0.72];
+pointColor = [0.80 0.80 0.80];
+
+if panel.mission == "LOW_THRUST_TRANSFER"
+    handles = [ ...
+        plot(ax,nan,nan,'-','Color',[0.70 0.70 0.70],'LineWidth',1.4), ...
+        plot(ax,nan,nan,'-','Color',panel.targetColor,'LineWidth',2.8), ...
+        plot(ax,nan,nan,'-','Color',obsColor,'LineWidth',1.8), ...
+        plot(ax,nan,nan,'o','MarkerSize',9,'MarkerFaceColor',reviewer2_target_color("LUNAR_GATEWAY"),'MarkerEdgeColor','k'), ...
+        plot(ax,nan,nan,'s','MarkerSize',9,'MarkerFaceColor',panel.targetColor,'MarkerEdgeColor','k'), ...
+        plot(ax,nan,nan,'s','MarkerSize',9,'MarkerFaceColor',moonColor,'MarkerEdgeColor','none'), ...
+        plot(ax,nan,nan,'^','MarkerSize',9,'MarkerFaceColor',pointColor,'MarkerEdgeColor','k'), ...
+        plot(ax,nan,nan,'v','MarkerSize',9,'MarkerFaceColor',pointColor,'MarkerEdgeColor','k')];
+    labels = ["Endpt.","LT","Obs.","Start","End","Moon","L1","L2"];
+elseif panel.mission == "GATEWAY_IMPULSE"
+    gatewayColor = reviewer2_target_color("LUNAR_GATEWAY");
+    nominalColor = 0.45*gatewayColor + 0.55*[1 1 1];
+    handles = [ ...
+        plot(ax,nan,nan,'--','Color',nominalColor,'LineWidth',2.2), ...
+        plot(ax,nan,nan,'-','Color',panel.targetColor,'LineWidth',2.8), ...
+        plot(ax,nan,nan,'-','Color',obsColor,'LineWidth',1.8), ...
+        plot(ax,nan,nan,'s','MarkerSize',9,'MarkerFaceColor',moonColor,'MarkerEdgeColor','none'), ...
+        plot(ax,nan,nan,'^','MarkerSize',9,'MarkerFaceColor',pointColor,'MarkerEdgeColor','k'), ...
+        plot(ax,nan,nan,'v','MarkerSize',9,'MarkerFaceColor',pointColor,'MarkerEdgeColor','k')];
+    labels = ["Nominal LG","GI","Obs.","Moon","L1","L2"];
+else
+    handles = [ ...
+        plot(ax,nan,nan,'-','Color',panel.targetColor,'LineWidth',2.8), ...
+        plot(ax,nan,nan,'-','Color',obsColor,'LineWidth',1.8), ...
+        plot(ax,nan,nan,'s','MarkerSize',9,'MarkerFaceColor',moonColor,'MarkerEdgeColor','none'), ...
+        plot(ax,nan,nan,'^','MarkerSize',9,'MarkerFaceColor',pointColor,'MarkerEdgeColor','k'), ...
+        plot(ax,nan,nan,'v','MarkerSize',9,'MarkerFaceColor',pointColor,'MarkerEdgeColor','k')];
+    labels = ["LG","Obs.","Moon","L1","L2"];
+end
+
+lgd = legend(ax,handles,cellstr(labels),'Location','none', ...
+    'Orientation','horizontal','Box','off');
+lgd.FontName = style.fontName;
+lgd.FontSize = style.sharedLegendFontSize;
+lgd.FontWeight = style.fontWeight;
+lgd.ItemTokenSize = style.geometryLegendItemTokenSize;
+lgd.NumColumns = manuscript_legend_columns(labels,style);
+lgd.Units = 'normalized';
+drawnow;
+pos = lgd.Position;
+pos(1) = 0.5-pos(3)/2;
+pos(2) = 0.5-pos(4)/2;
+lgd.Position = pos;
+lgd.AutoUpdate = 'off';
+axis(ax,'off');
+drawnow;
+base = fullfile(char(figureDir),char(stem));
+print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
+exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
+close(fig);
 end
 
 

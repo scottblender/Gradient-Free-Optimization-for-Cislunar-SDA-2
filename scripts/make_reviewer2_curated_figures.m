@@ -580,34 +580,67 @@ end
 
 function plot_family_grouped_all_cases(T,groupAxisLabel,stem,out,saveFigures,style)
 missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
-families = ["NHO","SHO","NNRHO","SNRHO","DRO"]; groupKeys = unique(T.GroupKey,'stable');
+families = ["NHO","SHO","NNRHO","SNRHO","DRO"];
 % Preserve the first mission's group ordering and reuse it for all missions.
-first = T(T.Mission == missions(1),:); groupKeys = unique(first.GroupKey,'stable');
-nPer = numel(groupKeys); x = []; V = []; tickLabels = strings(0,1); centers = zeros(3,1);
+first = T(T.Mission == missions(1),:);
+groupKeys = unique(first.GroupKey,'stable');
+nPer = numel(groupKeys);
+
+% Dense optimizer labels are spaced explicitly rather than rotated or shrunk.
+% This keeps GA/PSO/ABC/ACO legible at manuscript scale while retaining clear
+% visual separation between the LG, LT, and GI target-case groups.
+withinGroupSpacing = 1.35;
+caseGap = 2.20;
+x = [];
+V = [];
+tickLabels = strings(0,1);
+centers = zeros(3,1);
 for m = 1:3
-    xs = (m-1)*(nPer+1)+(1:nPer); centers(m) = mean(xs); x = [x xs];
+    startX = 1 + (m-1)*((nPer-1)*withinGroupSpacing + caseGap + withinGroupSpacing);
+    xs = startX + (0:nPer-1)*withinGroupSpacing;
+    centers(m) = mean(xs);
+    x = [x xs];
     for g = 1:nPer
         rows = T(T.Mission == missions(m) & T.GroupKey == groupKeys(g),:);
         assert(height(rows) == 5,'Family summary must contain all five families.');
         values = zeros(1,5);
-        for f = 1:5, values(f) = 100*rows.Fraction(rows.Family == families(f)); end
-        V = [V;values];
+        for f = 1:5
+            row = rows(rows.Family == families(f),:);
+            assert(height(row) == 1,'Missing family-selection fraction.');
+            values(f) = row.Fraction;
+        end
+        V(end+1,:) = 100*values;
         tickLabels(end+1,1) = rows.GroupLabel(1);
     end
 end
+
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
-b = bar(ax,x,V,'stacked','BarWidth',0.82); colors = lines(5);
+b = bar(ax,x,V,'stacked','BarWidth',0.66); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
-ax.XTick = x; ax.XTickLabel = cellstr(tickLabels); ylim(ax,[0 108]);
-xlabel(ax,groupAxisLabel,'FontWeight','bold'); ylabel(ax,'Observer selections (%)','FontWeight','bold');
+ax.XTick = x;
+ax.XTickLabel = cellstr(tickLabels);
+xlabel(ax,groupAxisLabel,'FontWeight','bold');
+ylabel(ax,'Observer selections (%)','FontWeight','bold');
+style_axes(ax,style);
+
+% space_manuscript_bars applies the general dense-category rotation rule;
+% override it here because the explicit x spacing makes horizontal optimizer
+% labels readable and avoids the previous PSO/ABC/ACO overlap.
+ax.XTick = x;
+ax.XTickLabel = cellstr(tickLabels);
+ax.XTickLabelRotation = 0;
+xlim(ax,[min(x)-0.80*withinGroupSpacing,max(x)+0.80*withinGroupSpacing]);
+ylim(ax,[0 112]);
 for m = 1:3
-    text(ax,centers(m),104,mission_short_label(missions(m)), ...
+    text(ax,centers(m),106,mission_short_label(missions(m)), ...
         'HorizontalAlignment','center','VerticalAlignment','middle', ...
         'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
 end
-style_axes(ax,style); lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
-    'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,ax,style);
+
+lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
+    'Orientation','horizontal','NumColumns',5,'Box','off');
+style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -704,7 +737,7 @@ space_manuscript_bars(ax,style);
 end
 
 function style_legend(lgd,ax,style)
-lgd.FontName = style.fontName; lgd.FontSize = style.fontSize; lgd.FontWeight = 'bold';
+lgd.FontName = style.fontName; lgd.FontSize = style.legendFontSize; lgd.FontWeight = 'bold';
 format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
 end
 
