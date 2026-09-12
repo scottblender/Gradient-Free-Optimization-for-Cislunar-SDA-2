@@ -8,6 +8,7 @@ if isempty(folder), folder=pwd; end
 if ~isfolder(folder), mkdir(folder); end
 base=fullfile(folder,stem);
 drawnow;
+finalize_manuscript_figure(fig);
 print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
 print(fig,[base '.png'],'-dpng',sprintf('-r%d',style.exportDpi));
 assert(isfile([base '.eps']) && dir([base '.eps']).bytes>0,'EPS export failed: %s',base);

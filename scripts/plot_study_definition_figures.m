@@ -1400,6 +1400,7 @@ function export_publication_eps(fig,fileName)
 
 drawnow;
 set(fig,'Renderer','painters','PaperPositionMode','manual');
+finalize_manuscript_figure(fig);
 print(fig,char(fileName),'-depsc2','-painters','-r600','-loose');
 [folder,stem] = fileparts(char(fileName));
 print(fig,fullfile(folder,[stem '.png']),'-dpng','-r300');
