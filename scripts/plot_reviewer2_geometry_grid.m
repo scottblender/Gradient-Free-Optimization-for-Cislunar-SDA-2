@@ -330,7 +330,13 @@ lgd.FontName = style.fontName;
 lgd.FontSize = style.sharedLegendFontSize;
 lgd.FontWeight = style.fontWeight;
 lgd.ItemTokenSize = style.geometryLegendItemTokenSize;
-lgd.NumColumns = manuscript_legend_columns(labels,style);
+if panel.mission == "LOW_THRUST_TRANSFER"
+    lgd.NumColumns = 3; % 8 entries -> 3 rows
+elseif panel.mission == "GATEWAY_IMPULSE"
+    lgd.NumColumns = 2; % 6 entries -> 3 rows
+else
+    lgd.NumColumns = 2; % 5 entries -> 3 rows
+end
 lgd.Units = 'normalized';
 drawnow;
 pos = lgd.Position;
