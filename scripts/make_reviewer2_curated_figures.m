@@ -587,11 +587,21 @@ first = T(T.Mission == missions(1),:);
 groupKeys = unique(first.GroupKey,'stable');
 nPer = numel(groupKeys);
 
-% Dense optimizer labels are spaced explicitly rather than rotated or shrunk.
-% This keeps GA/PSO/ABC/ACO legible at manuscript scale while retaining clear
-% visual separation between the LG, LT, and GI target-case groups.
-withinGroupSpacing = 1.65;
-caseGap = 1.60;
+% Use separate spacing rules for the baseline observer-count plot and the
+% denser four-optimizer comparison. The latter needs substantially more
+% horizontal room for GA/PSO/ABC/ACO at the large manuscript tick size.
+isOptimizerPlot = strcmpi(string(groupAxisLabel),"Optimizer");
+if isOptimizerPlot
+    withinGroupSpacing = 1.90;
+    caseGap = 2.80;
+    barWidth = 0.54;
+    tickRotation = 45;
+else
+    withinGroupSpacing = 1.35;
+    caseGap = 2.50;
+    barWidth = 0.60;
+    tickRotation = 0;
+end
 x = [];
 V = [];
 tickLabels = strings(0,1);
@@ -617,7 +627,7 @@ end
 
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
-b = bar(ax,x,V,'stacked','BarWidth',0.60); colors = lines(5);
+b = bar(ax,x,V,'stacked','BarWidth',barWidth); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = x;
 ax.XTickLabel = cellstr(tickLabels);
@@ -625,17 +635,23 @@ xlabel(ax,groupAxisLabel,'FontWeight','bold');
 ylabel(ax,'Observer selections (%)','FontWeight','bold');
 style_axes(ax,style);
 
-% Retain the large manuscript tick font and use the shared modest rotation
-% for dense four-optimizer groups so GA/PSO/ABC/ACO remain distinct.
+% Re-apply the final tick labels after style_axes so no generic bar-axis
+% formatting can overwrite the orbit-family layout. Optimizer names use a
+% fixed 45-degree angle; observer-count labels remain horizontal.
 ax.XTick = x;
 ax.XTickLabel = cellstr(tickLabels);
-ax.XTickLabelRotation = style.categoryLabelAngle;
-xlim(ax,[min(x)-0.80*withinGroupSpacing,max(x)+0.80*withinGroupSpacing]);
-ylim(ax,[0 112]);
+ax.XTickLabelRotation = tickRotation;
+xlim(ax,[min(x)-0.75*withinGroupSpacing,max(x)+0.75*withinGroupSpacing]);
+ylim(ax,[0 116]);
+
+% Use explicit manuscript abbreviations here rather than the general mission
+% label helper. This guarantees LG/LT/GI even if other figures retain the
+% expanded target names.
 for m = 1:3
-    text(ax,centers(m),106,caseLabels(m), ...
+    text(ax,centers(m),108,char(caseLabels(m)), ...
         'HorizontalAlignment','center','VerticalAlignment','middle', ...
-        'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
+        'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
+        'Interpreter','none');
 end
 
 lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
