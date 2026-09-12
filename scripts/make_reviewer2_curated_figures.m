@@ -42,7 +42,7 @@ if isfield(reports,'runtime')
     plot_runtime_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
         "runtime_1200_objective",out,saveFigures,style,false,baseline);
     manifest = add_manifest(manifest,"runtime","runtime_1200_objective", ...
-        "Equal-1200-FE mean final-best objective with matched 6000-FE GA reference.");
+        "Equal-1200-FE mean final-best objective with matched GA baseline.");
 
     plot_runtime_metric(r,'BudgetRuntimeMean_s','BudgetRuntimeStd_s', ...
         'Mean runtime to 1200 FE (s)',"runtime_1200_runtime",out,saveFigures,style,true,table());
@@ -59,22 +59,24 @@ if isfield(reports,'comparison')
     r = reports.comparison;
     out = prepare_output(r.analysisDirectory,saveFigures);
     missions = string(r.missions);
-    refs = matched_baselines(baselineResults,missions,3,1);
+    refs = matched_baselines(baselineResults,missions,3,1,'BestJMean','BestJStd');
 
     plot_comparison_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
         "comparison_6000_objective",out,saveFigures,style,refs);
     manifest = add_manifest(manifest,"comparison","comparison_6000_objective", ...
-        "Case-wise mean final-best objective with matched 6000-FE GA references.");
+        "Case-wise mean final-best objective with matched GA baselines.");
 
     specs = { ...
         'RMSEPosMean_km','RMSEPosStd_km','Mean position RMSE (km)','comparison_6000_position_rmse'; ...
         'EffectiveSigmaPosMean_km','EffectiveSigmaPosStd_km','Mean effective position sigma (km)','comparison_6000_effective_sigma'; ...
         'MeanStabilityMean','MeanStabilityStd','Mean observer stability index','comparison_6000_stability'};
     for q = 1:size(specs,1)
+        metricRefs = matched_baselines(baselineResults,missions,3,1, ...
+            specs{q,1},specs{q,2});
         plot_comparison_metric(r,specs{q,1},specs{q,2},specs{q,3}, ...
-            string(specs{q,4}),out,saveFigures,style,table());
+            string(specs{q,4}),out,saveFigures,style,metricRefs);
         manifest = add_manifest(manifest,"comparison",string(specs{q,4}), ...
-            "Case-wise optimizer metric, mean +/- sample std.");
+            "Case-wise optimizer metric, mean +/- sample std., with matched GA baseline.");
     end
 
     for mission = missions
@@ -252,20 +254,24 @@ end
 
 
 %% Baseline references
-function ref = matched_baseline(B,mission,numObservers,nPeriods)
+function ref = matched_baseline(B,mission,numObservers,nPeriods,valueField,stdField)
+if nargin < 6, stdField = 'BestJStd'; end
+if nargin < 5, valueField = 'BestJMean'; end
 ref = table();
 if isempty(B), return; end
 rows = B(B.Mission == mission & B.Measurement == "ANGLES_ONLY" & ...
     B.NumObservers == numObservers & B.NPeriods == nPeriods,:);
 if height(rows) ~= 1, return; end
-ref = table(string(mission),rows.BestJMean,rows.BestJStd, ...
+ref = table(string(mission),rows.(valueField),rows.(stdField), ...
     'VariableNames',{'Mission','Mean','Std'});
 end
 
-function refs = matched_baselines(B,missions,numObservers,nPeriods)
+function refs = matched_baselines(B,missions,numObservers,nPeriods,valueField,stdField)
+if nargin < 6, stdField = 'BestJStd'; end
+if nargin < 5, valueField = 'BestJMean'; end
 refs = table();
 for mission = string(missions(:)')
-    row = matched_baseline(B,mission,numObservers,nPeriods);
+    row = matched_baseline(B,mission,numObservers,nPeriods,valueField,stdField);
     if ~isempty(row), refs = [refs;row]; end
 end
 end
@@ -288,9 +294,9 @@ legendHandles = b; legendLabels = optimizer_labels(R.Optimizer);
 if ~isempty(baseline)
     hBase = plot(ax,[0.55 height(R)+0.45],[baseline.Mean baseline.Mean],'--', ...
         'Color',[0.30 0.30 0.30],'LineWidth',1.5, ...
-        'DisplayName','6000-FE GA reference');
+        'DisplayName','GA baseline');
     legendHandles = [legendHandles;hBase];
-    legendLabels = [legendLabels;"6000-FE GA reference"];
+    legendLabels = [legendLabels;"GA baseline"];
 end
 % Keep the BO bar uncluttered. The runtime scale and standard-deviation bars
 % already show the computational penalty without a ratio callout.
@@ -340,9 +346,9 @@ if ~isempty(baselineRefs)
         if ~isgraphics(hBase), hBase = h; end
     end
     if isgraphics(hBase)
-        set(hBase,'HandleVisibility','on','DisplayName','6000-FE GA reference');
+        set(hBase,'HandleVisibility','on','DisplayName','GA baseline');
         legendHandles = [legendHandles;hBase];
-        legendLabels = [legendLabels;"6000-FE GA reference"];
+        legendLabels = [legendLabels;"GA baseline"];
     end
 end
 lgd = legend(ax,legendHandles,cellstr(legendLabels),'Location','northoutside', ...
