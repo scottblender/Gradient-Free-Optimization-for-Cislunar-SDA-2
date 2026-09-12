@@ -74,8 +74,10 @@ format_manuscript_ticks(ax);
 drawnow;
 
 % One final construction-time pass is used for BOTH 2-D and 3-D plots. The
-% legend is centered on the figure bounding box, then the axes are shifted so
-% the union of legend + ticks + axis labels has equal left/right margins.
+% legend is centered horizontally on the figure bounding box; the axes are
+% shifted to equalize the complete left/right visible margins; then the axes
+% and legend move together vertically so the complete top/bottom visible
+% margins are equal while the configured legend-to-plot spacing is preserved.
 fig = ancestor(ax,'figure');
 center_manuscript_content(fig,ax,lgd);
 drawnow;
