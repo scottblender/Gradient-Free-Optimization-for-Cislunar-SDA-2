@@ -283,7 +283,7 @@ end
 
 function export_shared_geometry_legend(panel,figureDir,stem,saveFigures,style)
 if ~saveFigures, return; end
-fig = publication_figure(style.figureWidth,style.sharedLegendFigureHeight);
+fig = publication_figure(style.sharedGeometryLegendWidth,style.sharedGeometryLegendHeight);
 ax = axes(fig,'Units','normalized','Position',[0.01 0.01 0.98 0.98], ...
     'Visible','off');
 hold(ax,'on');

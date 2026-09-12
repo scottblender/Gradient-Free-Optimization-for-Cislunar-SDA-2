@@ -581,6 +581,7 @@ end
 function plot_family_grouped_all_cases(T,groupAxisLabel,stem,out,saveFigures,style)
 missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
 families = ["NHO","SHO","NNRHO","SNRHO","DRO"];
+caseLabels = ["LG","LT","GI"];
 % Preserve the first mission's group ordering and reuse it for all missions.
 first = T(T.Mission == missions(1),:);
 groupKeys = unique(first.GroupKey,'stable');
@@ -589,14 +590,14 @@ nPer = numel(groupKeys);
 % Dense optimizer labels are spaced explicitly rather than rotated or shrunk.
 % This keeps GA/PSO/ABC/ACO legible at manuscript scale while retaining clear
 % visual separation between the LG, LT, and GI target-case groups.
-withinGroupSpacing = 1.35;
-caseGap = 2.20;
+withinGroupSpacing = 1.65;
+caseGap = 1.60;
 x = [];
 V = [];
 tickLabels = strings(0,1);
 centers = zeros(3,1);
 for m = 1:3
-    startX = 1 + (m-1)*((nPer-1)*withinGroupSpacing + caseGap + withinGroupSpacing);
+    startX = 1 + (m-1)*((nPer-1)*withinGroupSpacing + caseGap);
     xs = startX + (0:nPer-1)*withinGroupSpacing;
     centers(m) = mean(xs);
     x = [x xs];
@@ -616,7 +617,7 @@ end
 
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
 ax = axes(fig); hold(ax,'on'); box(ax,'off'); grid(ax,'off');
-b = bar(ax,x,V,'stacked','BarWidth',0.66); colors = lines(5);
+b = bar(ax,x,V,'stacked','BarWidth',0.60); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = x;
 ax.XTickLabel = cellstr(tickLabels);
@@ -624,16 +625,15 @@ xlabel(ax,groupAxisLabel,'FontWeight','bold');
 ylabel(ax,'Observer selections (%)','FontWeight','bold');
 style_axes(ax,style);
 
-% space_manuscript_bars applies the general dense-category rotation rule;
-% override it here because the explicit x spacing makes horizontal optimizer
-% labels readable and avoids the previous PSO/ABC/ACO overlap.
+% Retain the large manuscript tick font and use the shared modest rotation
+% for dense four-optimizer groups so GA/PSO/ABC/ACO remain distinct.
 ax.XTick = x;
 ax.XTickLabel = cellstr(tickLabels);
-ax.XTickLabelRotation = 0;
+ax.XTickLabelRotation = style.categoryLabelAngle;
 xlim(ax,[min(x)-0.80*withinGroupSpacing,max(x)+0.80*withinGroupSpacing]);
 ylim(ax,[0 112]);
 for m = 1:3
-    text(ax,centers(m),106,mission_short_label(missions(m)), ...
+    text(ax,centers(m),106,caseLabels(m), ...
         'HorizontalAlignment','center','VerticalAlignment','middle', ...
         'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold');
 end
