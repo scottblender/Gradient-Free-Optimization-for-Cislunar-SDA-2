@@ -1,0 +1,74 @@
+name: Remove MATLAB analyzer suppression comments
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/remove-matlab-analyzer-suppressions.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove MATLAB Code Analyzer suppression comments
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          pattern = re.compile(r'[ \t]*%#ok<[^>\r\n]+>')
+          changed_files = []
+          removed = 0
+
+          for path in sorted(Path('.').rglob('*.m')):
+              if '.git' in path.parts:
+                  continue
+              text = path.read_text(encoding='utf-8')
+              cleaned, count = pattern.subn('', text)
+              if count:
+                  path.write_text(cleaned, encoding='utf-8')
+                  changed_files.append((str(path), count))
+                  removed += count
+
+          print(f'Removed {removed} MATLAB Code Analyzer suppression comment(s) from {len(changed_files)} file(s).')
+          for path, count in changed_files:
+              print(f'  {path}: {count}')
+
+          remaining = []
+          for path in sorted(Path('.').rglob('*.m')):
+              if '.git' in path.parts:
+                  continue
+              text = path.read_text(encoding='utf-8')
+              if pattern.search(text):
+                  remaining.append(str(path))
+
+          if remaining:
+              raise SystemExit('Suppression comments remain in: ' + ', '.join(remaining))
+          PY
+
+      - name: Validate diff
+        shell: bash
+        run: git diff --check
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No MATLAB Code Analyzer suppression comments found."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          git commit -m "Remove MATLAB Code Analyzer suppression comments"
+          git push origin HEAD:main
