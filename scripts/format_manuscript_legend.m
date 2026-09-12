@@ -53,7 +53,7 @@ end
 
 % Position is controlled explicitly rather than by MATLAB's northoutside
 % heuristic. Setting Location to none prevents MATLAB from shifting the legend
-% relative to the axes after we center it on the common export canvas.
+% relative to the axes after we place it on the common export canvas.
 pos = lgd.Position;
 lgd.Location = 'none';
 pos(1) = 0.5-pos(3)/2;
@@ -62,53 +62,23 @@ pos(2) = min(pos(2),0.985-pos(4));
 lgd.Position = pos;
 lgd.AutoUpdate = 'off';
 
-% Restore the central axes rectangle after legend construction. This makes
-% every 2-D plot share the same top/bottom margins and every 3-D plot share the
-% same horizontal center regardless of the order in which MATLAB created it.
+% Restore the shared axes rectangle after legend construction.
 ax.Units = 'normalized';
 ax.PositionConstraint = 'innerposition';
 ax.Position = plotPosition;
 drawnow;
 
-% For 3-D figures, perform one final centering pass in figure-pixel
-% coordinates after MATLAB has finished sizing the legend and after the axes
-% rectangle has been restored. This centers short and long legend rows against
-% the actual figure bounding box rather than against the axes or a stale
-% normalized legend position.
-if is3D
-    center_legend_on_figure(lgd);
-end
-
+% Finalize tick density before measuring TightInset so the centering pass uses
+% the exact tick-label geometry that will be exported.
 format_manuscript_ticks(ax);
-end
-
-
-function center_legend_on_figure(lgd)
-%CENTER_LEGEND_ON_FIGURE Center a finished legend on the figure canvas.
-fig = ancestor(lgd,'figure');
-if isempty(fig) || ~isgraphics(fig)
-    return;
-end
-
-figUnits = fig.Units;
-legendUnits = lgd.Units;
-cleanup = onCleanup(@() restore_units(fig,lgd,figUnits,legendUnits)); %#ok<NASGU>
-
-fig.Units = 'pixels';
-lgd.Units = 'pixels';
 drawnow;
 
-figPosition = fig.Position;
-legendPosition = lgd.Position;
-legendPosition(1) = 0.5*(figPosition(3)-legendPosition(3));
-lgd.Position = legendPosition;
+% One final construction-time pass is used for BOTH 2-D and 3-D plots. The
+% legend is centered on the figure bounding box, then the axes are shifted so
+% the union of legend + ticks + axis labels has equal left/right margins.
+fig = ancestor(ax,'figure');
+center_manuscript_content(fig,ax,lgd);
 drawnow;
-end
-
-
-function restore_units(fig,lgd,figUnits,legendUnits)
-if isgraphics(fig), fig.Units = figUnits; end
-if isgraphics(lgd), lgd.Units = legendUnits; end
 end
 
 
