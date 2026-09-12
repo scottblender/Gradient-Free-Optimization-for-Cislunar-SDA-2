@@ -37,7 +37,13 @@ if ~isfolder(outputDir)
     mkdir(outputDir);
 end
 
-outputs = plot_study_definition_figures(inspectFigures);
+% Use the established renderer for the catalog, slot, measurement, and
+% target-case figures. The visibility schematic has its own renderer so it
+% can also be regenerated independently without rerunning the other plots.
+outputs = plot_study_definition_figures( ...
+    inspectFigures,["catalog","slots","measurement","cases"]);
+outputs.visibilityGeometry = plot_visibility_keepout_geometry( ...
+    inspectFigures,outputDir);
 outputs.outputDirectory = string(outputDir);
 outputs.clearedDirectory = clearDirectory;
 end
