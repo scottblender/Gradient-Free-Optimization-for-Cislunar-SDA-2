@@ -1,5 +1,5 @@
 function test_manuscript_figure_export()
-% Verify the writer leaves a completed scene unchanged; no catalog required.
+% Verify final content centering and a non-mutating writer; no catalog required.
 setup_project(); style=reviewer2_paper_style();
 folder=tempname; mkdir(folder);
 cleanup=onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
@@ -17,8 +17,25 @@ xlabel(ax,'x (LU)'); ylabel(ax,'y (LU)'); zlabel(ax,'z (LU)');
 lgd=legend(ax,'Orbit','Location','northoutside','FontWeight','bold'); drawnow;
 format_manuscript_legend(ax,lgd,style,style.geometryPlotPosition);
 assert(strcmp(lgd.FontWeight,'bold') && lgd.FontSize==style.geometryLegendFontSize);
-assert(abs((lgd.Position(1)+0.5*lgd.Position(3))-0.5) < 1e-10, ...
-    '3-D legend is not centered on the common export canvas.');
+
+% Measure the final rendered content in figure pixels. The legend itself must
+% be figure-centered, and the union of legend + axes/ticks/labels must have
+% equal left/right margins on the standard export canvas.
+figUnits=fig.Units; axUnits=ax.Units; legendUnits=lgd.Units;
+fig.Units='pixels'; ax.Units='pixels'; lgd.Units='pixels'; drawnow;
+figPosition=fig.Position; axesPosition=ax.Position; inset=ax.TightInset; legendPosition=lgd.Position;
+legendCenter=legendPosition(1)+0.5*legendPosition(3);
+assert(abs(legendCenter-0.5*figPosition(3)) <= 1, ...
+    'Legend is not centered on the figure bounding box.');
+contentLeft=min(axesPosition(1)-inset(1),legendPosition(1));
+contentRight=max(axesPosition(1)+axesPosition(3)+inset(3), ...
+    legendPosition(1)+legendPosition(3));
+leftMargin=contentLeft;
+rightMargin=figPosition(3)-contentRight;
+assert(abs(leftMargin-rightMargin) <= 1, ...
+    'Final visible content does not have equal left/right margins.');
+fig.Units=figUnits; ax.Units=axUnits; lgd.Units=legendUnits; drawnow;
+
 properties={'Position','XLim','YLim','ZLim','XTick','YTick','ZTick', ...
     'FontSize','FontWeight','View','Projection','DataAspectRatio','Clipping'};
 before=cellfun(@(p) get(ax,p),properties,'UniformOutput',false);
@@ -29,5 +46,5 @@ assert(isequaln(before,after),'Export reformatted the scene.');
 assert(isequal(legendBefore,lgd.Position) && isequal(paperBefore,fig.PaperPosition));
 assert(isfile(file) && isfile(fullfile(folder,'scene.png')));
 assert(startsWith(fileread(file),'%!PS-Adobe'));
-fprintf('Non-mutating export checks passed.\n');
+fprintf('Content-centering and non-mutating export checks passed.\n');
 end
