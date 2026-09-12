@@ -85,7 +85,7 @@ for k = 1:numel(labels)
                             per = string(period); if mission~="LUNAR_GATEWAY", per = "--"; end
                             rows(end+1,:) = [mission_code(mission),string(count),per, ...
                                 metric(r,'BestJ'),metric(r,'RMSEPos','_km'), ...
-                                metric(r,'EffectiveSigmaPos','_km')]; %#ok<AGROW>
+                                metric(r,'EffectiveSigmaPos','_km')];
                         end
                     end
                 end
@@ -97,7 +97,7 @@ for k = 1:numel(labels)
                     r = one(R,R.Optimizer==optimizer);
                     m = M(M.optimizer==optimizer,:); check_calls(m,1200);
                     rows(end+1,:) = [optimizer_label(optimizer),"1200", ...
-                        range_text(m.solver_calls),metric(r,'BestJ'),metric(r,'BudgetRuntime','_s')]; %#ok<AGROW>
+                        range_text(m.solver_calls),metric(r,'BestJ'),metric(r,'BudgetRuntime','_s')];
                 end
             case "comparison_summary_ao_j111"
                 folder = analysis_directory(opts,'comparison','comparison_6000_results.csv');
@@ -121,7 +121,7 @@ for k = 1:numel(labels)
                         rows(end+1,:) = [mission_code(mission),optimizer_label(optimizer), ...
                             range_text(group.solver_calls),metric(r,'BestJ'), ...
                             metric(r,'RMSEPos','_km'),metric(r,'EffectiveSigmaPos','_km'), ...
-                            metric(r,'MeanStability')]; %#ok<AGROW>
+                            metric(r,'MeanStability')];
                     end
                 end
             case {"screening_events_only","cost_component_metric_winners"}
@@ -139,7 +139,7 @@ for k = 1:numel(labels)
                         row = [mission_code(mission),names(j),metric(r,'RMSEPos','_km'), ...
                             metric(r,'EffectiveSigmaPos','_km'),metric(r,'MeanStability')];
                         if label=="screening_events_only", row(end+1) = metric(r,'Screening'); end
-                        rows(end+1,:) = row; %#ok<AGROW>
+                        rows(end+1,:) = row;
                     end
                 end
         end
@@ -272,6 +272,6 @@ end
 
 function write_text(file,content)
 fid = fopen(file,'w'); assert(fid>=0,'Cannot write %s.',file);
-cleanup = onCleanup(@() fclose(fid)); %#ok<NASGU>
+cleanup = onCleanup(@() fclose(fid));
 fprintf(fid,'%s',content);
 end

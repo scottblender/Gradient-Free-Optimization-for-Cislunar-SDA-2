@@ -23,7 +23,7 @@ envNames = {'MAX_EVALS','USE_PARALLEL_OPT','MISSION_TYPE','MEAS_MODEL', ...
     'SEED','MEAS_NOISE_SEED','MAKE_PLOTS','OPTIMIZER_MODE','STUDY_ID','RUN_DIR', ...
     'IMPULSE_DV_MPS','IMPULSE_DIRECTION','IMPULSE_DURATION_TU'};
 oldValues = cellfun(@getenv,envNames,'UniformOutput',false);
-cleanup = onCleanup(@() restore_environment(envNames,oldValues)); %#ok<NASGU>
+cleanup = onCleanup(@() restore_environment(envNames,oldValues));
 values = {'6000','0',char(missionType),'ANGLES_ONLY','3','1','1','1','1','1', ...
     '0','1001','0','GA','parallel_speed_test','', '10','PROGRADE','1.5'};
 for k = 1:numel(envNames), setenv(envNames{k},values{k}); end
@@ -86,7 +86,7 @@ summary = sprintf(['GA %s | %d FE | %d fixed-seed timing repetitions per mode\n'
 fprintf('%s\nSaved benchmark: %s\n',summary,testRoot);
 fid=fopen(fullfile(testRoot,'parallel_speed_summary.txt'),'w');
 assert(fid>=0,'Cannot write benchmark summary.');
-fileCleanup=onCleanup(@() fclose(fid)); %#ok<NASGU>
+fileCleanup=onCleanup(@() fclose(fid));
 fprintf(fid,'%s',summary);
 end
 

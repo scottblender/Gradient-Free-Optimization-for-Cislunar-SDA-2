@@ -263,14 +263,14 @@ for k = 1:height(results)
         assert(isfield(S.runState,'observers') && istable(S.runState.observers), ...
             'Run is missing selected observer data.');
         raw = string(S.runState.observers.orbit_family);
-        for u = 1:numel(raw), familyValues(end+1,1) = family_group(raw(u)); end %#ok<AGROW>
+        for u = 1:numel(raw), familyValues(end+1,1) = family_group(raw(u)); end
     end
     for f = 1:numel(families)
-        missionColumn(end+1,1) = results.Mission(k); %#ok<AGROW>
-        configuration(end+1,1) = string(results.Configuration(k)); %#ok<AGROW>
-        familyColumn(end+1,1) = families(f); %#ok<AGROW>
-        count(end+1,1) = sum(familyValues == families(f)); %#ok<AGROW>
-        fraction(end+1,1) = count(end)/numel(familyValues); %#ok<AGROW>
+        missionColumn(end+1,1) = results.Mission(k);
+        configuration(end+1,1) = string(results.Configuration(k));
+        familyColumn(end+1,1) = families(f);
+        count(end+1,1) = sum(familyValues == families(f));
+        fraction(end+1,1) = count(end)/numel(familyValues);
     end
 end
 familySelection = table(missionColumn,configuration,familyColumn,count,fraction, ...

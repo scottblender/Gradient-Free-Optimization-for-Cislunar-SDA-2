@@ -63,7 +63,7 @@ envNames = [settings(:,1); {'RUN_DIR';'SAFE_FALLBACK_FILE'}];
 oldValues = cellfun(@getenv,envNames,'UniformOutput',false);
 oldFolder = pwd;
 cleanup = onCleanup(@() restore_environment( ...
-    envNames,oldValues,oldFolder)); %#ok<NASGU>
+    envNames,oldValues,oldFolder));
 
 for k = 1:size(settings,1)
     setenv(settings{k,1},settings{k,2});

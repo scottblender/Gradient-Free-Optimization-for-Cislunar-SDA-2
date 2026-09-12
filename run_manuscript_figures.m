@@ -93,7 +93,7 @@ if ~isempty(selected)
     for section = selected
         sourceDir = fullfile(reports.(section).analysisDirectory,'figures');
         files = dir(fullfile(sourceDir,'*.eps'));
-        sources = [sources;string(fullfile({files.folder},{files.name}))']; %#ok<AGROW>
+        sources = [sources;string(fullfile({files.folder},{files.name}))'];
     end
 end
 if ismember("monte_carlo",sections)
@@ -178,7 +178,7 @@ function files = definition_files(value)
 files = strings(0,1);
 if isstruct(value)
     fields = fieldnames(value);
-    for k = 1:numel(fields), files = [files;definition_files(value.(fields{k}))]; end %#ok<AGROW>
+    for k = 1:numel(fields), files = [files;definition_files(value.(fields{k}))]; end
 elseif isstring(value) || ischar(value)
     candidates = string(value(:));
     if ischar(value), candidates = string(value); end

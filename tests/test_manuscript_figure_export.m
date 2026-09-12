@@ -2,13 +2,13 @@ function test_manuscript_figure_export()
 % Verify full content centering and a non-mutating writer; no catalog required.
 setup_project(); style=reviewer2_paper_style();
 folder=tempname; mkdir(folder);
-cleanup=onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
+cleanup=onCleanup(@() rmdir(folder,'s'));
 fig=figure('Visible','off','Color','w','Units','inches', ...
     'Position',[1 1 style.figureWidth style.figureHeight], ...
     'PaperUnits','inches','PaperSize',[style.figureWidth style.figureHeight], ...
     'PaperPosition',[0 0 style.figureWidth style.figureHeight], ...
     'PaperPositionMode','manual','Renderer','painters');
-closeFigure=onCleanup(@() close(fig)); %#ok<NASGU>
+closeFigure=onCleanup(@() close(fig));
 ax=axes(fig,'Position',style.geometryPlotPosition,'FontSize',style.fontSize,'FontWeight','bold');
 theta=linspace(0,2*pi,401);
 plot3(ax,1+0.1*cos(theta),0.1*sin(theta),0.2*cos(theta));

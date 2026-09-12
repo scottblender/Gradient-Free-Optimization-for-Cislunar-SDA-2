@@ -1,7 +1,7 @@
 function test_parallel_speed_figures()
 % Synthetic saved histories verify both exports without running an optimizer.
 setup_project(); folder=tempname; mkdir(folder);
-cleanup=onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
+cleanup=onCleanup(@() rmdir(folder,'s'));
 Mode=["Serial";"Parallel";"Serial";"Parallel"];
 Repeat=[1;1;2;2]; SearchFE=6000*ones(4,1);
 results=table(Mode,Repeat,SearchFE);

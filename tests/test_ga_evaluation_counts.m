@@ -11,7 +11,7 @@ pop = 60;
 assert(mod(budget,pop) == 0,'Budget must be divisible by 60.');
 
 oldRng = rng;
-cleanup = onCleanup(@() rng(oldRng)); %#ok<NASGU>
+cleanup = onCleanup(@() rng(oldRng));
 rng(0,'twister');
 
 lb = repmat([1 1],1,3);

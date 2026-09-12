@@ -1,7 +1,7 @@
 function test_manuscript_table_formatting()
 % Synthetic runtime summaries verify row order, SD formatting, and call range.
 setup_project(); folder=tempname; mkdir(folder);
-cleanup=onCleanup(@() rmdir(folder,'s')); %#ok<NASGU>
+cleanup=onCleanup(@() rmdir(folder,'s'));
 Optimizer=["GA";"PSO";"BAYESIAN";"ABC";"ACO"];
 NRuns=20*ones(5,1); SearchFE=1200*ones(5,1);
 BestJMean=(1:5)'; BestJStd=0.25*ones(5,1);

@@ -367,7 +367,7 @@ assert(valueMax > valueMin, ...
 valueNormalized = (value - valueMin) ./ (valueMax - valueMin);
 
 previousRng = rng;
-cleanup = onCleanup(@() rng(previousRng)); %#ok<NASGU>
+cleanup = onCleanup(@() rng(previousRng));
 rng(seed, "twister");
 
 % Draw one target in every equal-width stratum of [0,1]. The nearest

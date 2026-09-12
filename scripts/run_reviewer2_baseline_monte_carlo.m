@@ -117,7 +117,7 @@ end
 cacheFile = fullfile(paths.orbitCache, ...
     sprintf('orbit_database_slots_%d.mat',slotsPerOrbit));
 assert(isfile(cacheFile),'Missing orbit database cache: %s',cacheFile);
-C = load(cacheFile,'orbit_database','cacheMeta'); %#ok<NASGU>
+C = load(cacheFile,'orbit_database','cacheMeta');
 orbitDatabase = C.orbit_database;
 numOrbits = numel(orbitDatabase);
 
@@ -198,7 +198,7 @@ for k = 1:numel(files)
         rows{end+1,1} = table(string(file),mission,measurement,nObs,nPeriods, ...
             double(r.optimizerSeed),double(r.bestJ), ...
             'VariableNames',{'RunFile','Mission','Measurement','NumObservers', ...
-            'NPeriods','Seed','BestObjective'}); %#ok<AGROW>
+            'NPeriods','Seed','BestObjective'});
     catch
         % Ignore incomplete/non-schema files; the selected groups are
         % explicitly checked for all 20 valid seeds below.
@@ -219,7 +219,7 @@ for mission = opts.Mission
                 'Expected 20 baseline seeds for %s/o%d/p%d; found %d.', ...
                 mission,nObs,nPeriods,height(group));
             [~,idx] = min(group.BestObjective);
-            references = [references;group(idx,:)]; %#ok<AGROW>
+            references = [references;group(idx,:)];
         end
     end
 end

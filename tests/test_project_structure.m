@@ -4,7 +4,7 @@ function test_project_structure()
     projectDir = fileparts(fileparts(mfilename('fullpath')));
     originalPath = path;
     originalFolder = pwd;
-    cleanup = onCleanup(@() restoreEnvironment(originalFolder, originalPath)); %#ok<NASGU>
+    cleanup = onCleanup(@() restoreEnvironment(originalFolder, originalPath));
 
     addpath(projectDir);
     cd(tempdir);

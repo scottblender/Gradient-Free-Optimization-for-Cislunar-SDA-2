@@ -47,7 +47,7 @@ fprintf('Reported performance statistics: 20-run mean +/- sample standard deviat
 % Historical per-pipeline preview routines are hidden. Only the centralized
 % curated renderer is intended for manuscript inspection.
 originalFigureVisible = get(groot,'defaultFigureVisible');
-visibilityCleanup = onCleanup(@() set(groot,'defaultFigureVisible',originalFigureVisible)); %#ok<NASGU>
+visibilityCleanup = onCleanup(@() set(groot,'defaultFigureVisible',originalFigureVisible));
 set(groot,'defaultFigureVisible','off');
 
 for study = studies

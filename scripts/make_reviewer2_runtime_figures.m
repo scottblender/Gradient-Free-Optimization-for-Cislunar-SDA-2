@@ -117,7 +117,7 @@ for k = 1:numel(curves)
     y = double(c.mean(valid));
     handles(k) = stairs(ax,x,y,'Color',colors(k,:), ...
         'LineWidth',style.lineWidth,'DisplayName',string(labels(k)));
-    allY = [allY;y]; %#ok<AGROW>
+    allY = [allY;y];
 end
 allY = allY(isfinite(allY));
 lo = min(allY); hi = max(allY);

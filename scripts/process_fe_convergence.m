@@ -164,7 +164,7 @@ for key = keys'
         reason = "Missing, duplicate, failed, or invalid runs; see inventory";
     end
     groupStatus = [groupStatus; table(key,complete,reason, ...
-        'VariableNames',{'comparison_key','complete','reason'})]; %#ok<AGROW>
+        'VariableNames',{'comparison_key','complete','reason'})];
     if ~complete, continue; end
 
     % Preserve early BO data. Values before another algorithm's first
@@ -211,7 +211,7 @@ for key = keys'
                 'parallel_overflow_evals','optimization_runtime_s', ...
                 'budget_runtime_s','solver_wall_runtime_s', ...
                 'validation_runtime_s','run_file'});
-            runMetrics = [runMetrics; [identity struct2table(r.metrics)]]; %#ok<AGROW>
+            runMetrics = [runMetrics; [identity struct2table(r.metrics)]];
         end
         curves(a).optimizer = opt;
         curves(a).seeds = seeds;
@@ -235,7 +235,7 @@ for key = keys'
             'num_observers','n_runs','fe_budget','bestJ_mean','bestJ_std', ...
             'bestJ_median','runtime_mean_s','runtime_std_s', ...
             'solver_calls_min','solver_calls_max'});
-        summary = [summary; row]; %#ok<AGROW>
+        summary = [summary; row];
     end
     save(fullfile(outDir,"convergence_"+key+".mat"),'comparison','curves','-v7');
     if makePlots

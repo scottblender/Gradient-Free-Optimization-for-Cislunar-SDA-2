@@ -11,12 +11,12 @@ if numel(s)<=maxChars, return; end
 words = strsplit(s); lines = {}; current = '';
 for k = 1:numel(words)
     if ~isempty(current) && numel(current)+1+numel(words{k})>maxChars
-        lines{end+1} = current; %#ok<AGROW>
+        lines{end+1} = current;
         current = words{k};
     elseif isempty(current)
         current = words{k};
     else
-        current = [current ' ' words{k}]; %#ok<AGROW>
+        current = [current ' ' words{k}];
     end
 end
 lines{end+1} = current;

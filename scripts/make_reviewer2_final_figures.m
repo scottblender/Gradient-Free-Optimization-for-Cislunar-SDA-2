@@ -30,13 +30,13 @@ if isfield(reports,'runtime')
     end
     runtimeManifest = make_reviewer2_runtime_figures( ...
         reports.runtime,baselineResults,saveFigures);
-    manifest = [manifest;runtimeManifest]; %#ok<AGROW>
+    manifest = [manifest;runtimeManifest];
     remaining = rmfield(remaining,'runtime');
 end
 
 if ~isempty(fieldnames(remaining))
     otherManifest = make_reviewer2_curated_figures(remaining,saveFigures);
-    manifest = [manifest;otherManifest]; %#ok<AGROW>
+    manifest = [manifest;otherManifest];
 end
 
 if saveFigures

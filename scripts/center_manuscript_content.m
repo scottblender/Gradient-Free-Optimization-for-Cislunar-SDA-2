@@ -26,7 +26,7 @@ if hasLegend
 else
     legendUnits = '';
 end
-cleanup = onCleanup(@() restore_units(fig,ax,lgd,figUnits,axUnits,legendUnits)); %#ok<NASGU>
+cleanup = onCleanup(@() restore_units(fig,ax,lgd,figUnits,axUnits,legendUnits));
 
 fig.Units = 'pixels';
 ax.Units = 'pixels';

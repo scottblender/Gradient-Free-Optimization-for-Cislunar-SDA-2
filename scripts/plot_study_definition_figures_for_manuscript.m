@@ -33,7 +33,7 @@ outputs = struct();
 legacySections = requested(requested ~= "visibility");
 if ~isempty(legacySections)
     transcript = evalc( ...
-        'legacyOutputs = plot_study_definition_figures(inspectFigures,legacySections);'); %#ok<NASGU>
+        'legacyOutputs = plot_study_definition_figures(inspectFigures,legacySections);');
     outputs = legacyOutputs;
 end
 if ismember("visibility",requested)

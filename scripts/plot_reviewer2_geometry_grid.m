@@ -54,7 +54,7 @@ for mission = unique(string(selection.Mission),'stable')'
         panel = panelCells{k};
         assert(panel.mission == mission, ...
             'Selection mission does not match saved run mission.');
-        allPoints = [allPoints;panel.allPoints]; %#ok<AGROW>
+        allPoints = [allPoints;panel.allPoints];
         numObservers(k) = height(panel.observers);
         families(k) = strjoin(string(panel.observers.orbit_family),';');
         orbitIndices(k) = strjoin(string(panel.observers.orbit_index),';');
@@ -143,7 +143,7 @@ for u = 1:numel(panel.uniqueOrbitKeys)
     initialState = double(panel.observers.initial_state(member,:))';
     [~,state] = ode45(@(t,s) cr3bp_dynamics(t,s,panel.mu),tPlot,initialState,opts);
     panel.orbitTrajectories{u} = state(:,1:3);
-    observerPoints = [observerPoints;state(:,1:3)]; %#ok<AGROW>
+    observerPoints = [observerPoints;state(:,1:3)];
 end
 
 panel.endpointOrbitPoints = zeros(0,3);

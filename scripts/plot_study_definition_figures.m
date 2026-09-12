@@ -294,8 +294,8 @@ for groupIndex = 1:numel(familyGroups)
             statePlot = state(1:step:end,:);
             handle = plot(ax,statePlot(:,1),statePlot(:,2),'-', ...
                 'Color',cL1,'LineWidth',1.45);
-            allX = [allX;statePlot(:,1)]; %#ok<AGROW>
-            allY = [allY;statePlot(:,2)]; %#ok<AGROW>
+            allX = [allX;statePlot(:,1)];
+            allY = [allY;statePlot(:,2)];
             if plotted==1
                 droHandle = handle;
             end
@@ -1212,7 +1212,7 @@ function write_latex_state_rows(fileName,stateTable)
 
 fid = fopen(fileName,'w');
 assert(fid>=0,'Could not create LaTeX state-row file: %s',fileName);
-cleanup = onCleanup(@() fclose(fid)); %#ok<NASGU>
+cleanup = onCleanup(@() fclose(fid));
 
 for k = 1:height(stateTable)
     state = [ ...
@@ -1306,8 +1306,8 @@ end
 
 function place_legend_above(legendHandle,numColumns,fontSize)
 
-style = reviewer2_paper_style(); %#ok<NASGU>
-fontSize = max(fontSize,12); %#ok<NASGU>
+style = reviewer2_paper_style();
+fontSize = max(fontSize,12);
 format_study_legend(legendHandle,numColumns,[16 9]);
 legendHandle.Location = 'northoutside';
 legendHandle.Orientation = 'horizontal';

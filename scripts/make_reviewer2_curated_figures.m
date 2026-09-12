@@ -230,7 +230,7 @@ end
 
 function manifest = add_manifest(manifest,study,stem,purpose)
 manifest = [manifest;table(string(study),string(stem),string(purpose), ...
-    'VariableNames',manifest.Properties.VariableNames)]; %#ok<AGROW>
+    'VariableNames',manifest.Properties.VariableNames)];
 end
 
 function manifest = add_geometry_manifest(manifest,study,details,purpose)
@@ -266,7 +266,7 @@ function refs = matched_baselines(B,missions,numObservers,nPeriods)
 refs = table();
 for mission = string(missions(:)')
     row = matched_baseline(B,mission,numObservers,nPeriods);
-    if ~isempty(row), refs = [refs;row]; end %#ok<AGROW>
+    if ~isempty(row), refs = [refs;row]; end
 end
 end
 
@@ -492,7 +492,7 @@ for mission = missions
         key = row.ComparisonKey;
         runs = r.runMetrics(r.runMetrics.comparison_key == key & r.runMetrics.optimizer == optimizer,:);
         assert(height(runs) == 20,'Expected 20 comparison runs for family summary.');
-        T = [T; family_rows(mission,optimizer,optimizer,runs.run_file)]; %#ok<AGROW>
+        T = [T; family_rows(mission,optimizer,optimizer,runs.run_file)];
     end
 end
 end
@@ -508,7 +508,7 @@ for mission = missions
         runs = r.runMetrics(r.runMetrics.comparison_key == row.ComparisonKey,:);
         assert(height(runs) == 20,'Expected 20 baseline runs for family summary.');
         key = "o"+string(nObs); label = string(nObs);
-        T = [T; family_rows(mission,key,label,runs.run_file)]; %#ok<AGROW>
+        T = [T; family_rows(mission,key,label,runs.run_file)];
     end
 end
 end
@@ -522,7 +522,7 @@ for mission = missions
         row = objective_result(r.results,mission,configs(k));
         runs = r.runMetrics(r.runMetrics.comparison_key == row.ComparisonKey,:);
         assert(height(runs) == 20,'Expected 20 objective-component runs for family summary.');
-        T = [T; family_rows(mission,configs(k),labels(k),runs.run_file)]; %#ok<AGROW>
+        T = [T; family_rows(mission,configs(k),labels(k),runs.run_file)];
     end
 end
 end
@@ -546,14 +546,14 @@ for j = 1:numel(runFiles)
     else
         error('Family:MissingObserverFamily','Selected observer table has no orbit-family field.');
     end
-    for u = 1:numel(raw), selected(end+1,1) = manuscript_family(raw(u)); end %#ok<AGROW>
+    for u = 1:numel(raw), selected(end+1,1) = manuscript_family(raw(u)); end
 end
 assert(~isempty(selected),'No selected observer families were found.');
 T = empty_family_table();
 for f = 1:numel(families)
     n = sum(selected == families(f));
     T = [T;table(string(mission),string(key),string(label),families(f),n,n/numel(selected), ...
-        'VariableNames',T.Properties.VariableNames)]; %#ok<AGROW>
+        'VariableNames',T.Properties.VariableNames)];
 end
 end
 
@@ -581,14 +581,14 @@ families = ["NHO","SHO","NNRHO","SNRHO","DRO"]; groupKeys = unique(T.GroupKey,'s
 first = T(T.Mission == missions(1),:); groupKeys = unique(first.GroupKey,'stable');
 nPer = numel(groupKeys); x = []; V = []; tickLabels = strings(0,1); centers = zeros(3,1);
 for m = 1:3
-    xs = (m-1)*(nPer+1)+(1:nPer); centers(m) = mean(xs); x = [x xs]; %#ok<AGROW>
+    xs = (m-1)*(nPer+1)+(1:nPer); centers(m) = mean(xs); x = [x xs];
     for g = 1:nPer
         rows = T(T.Mission == missions(m) & T.GroupKey == groupKeys(g),:);
         assert(height(rows) == 5,'Family summary must contain all five families.');
         values = zeros(1,5);
         for f = 1:5, values(f) = 100*rows.Fraction(rows.Family == families(f)); end
-        V = [V;values]; %#ok<AGROW>
-        tickLabels(end+1,1) = rows.GroupLabel(1); %#ok<AGROW>
+        V = [V;values];
+        tickLabels(end+1,1) = rows.GroupLabel(1);
     end
 end
 fig = paper_figure(style.metricFigureWidth,style.metricFigureHeight,style);
@@ -637,7 +637,7 @@ for k = 1:numel(curves)
     c = curves{k}; valid = c.fe >= 60 & isfinite(c.mean); assert(any(valid),'No convergence FE >= 60.');
     x = double(c.fe(valid)); y = double(c.mean(valid));
     handles(k) = stairs(ax,x,y,'Color',colors(k,:),'LineWidth',style.lineWidth,'DisplayName',string(labels(k)));
-    allY = [allY;y]; %#ok<AGROW>
+    allY = [allY;y];
 end
 allY = allY(isfinite(allY)); lo = min(allY); hi = max(allY); span = max(hi-lo,0.05*max(1,abs(hi)));
 ylim(ax,[lo-0.06*span hi+0.08*span]); xlim(ax,[60 budget]);
