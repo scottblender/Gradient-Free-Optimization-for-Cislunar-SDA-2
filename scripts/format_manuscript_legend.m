@@ -1,11 +1,10 @@
 function format_manuscript_legend(ax,lgd,style,~)
 %FORMAT_MANUSCRIPT_LEGEND Apply the shared manuscript legend/layout rules.
 %
-% All layout values come from reviewer2_paper_style. Two-dimensional legends
-% use one common centered row above the common 2-D axes rectangle. Three-
-% dimensional legends are also centered, use the slightly larger 3-D legend
-% font, and sit close to the trajectories by overlapping only the otherwise
-% unused upper portion of the centered 3-D axes box.
+% All layout values come from reviewer2_paper_style. Legends with three or
+% more entries are arranged in two centered rows by default. Two-dimensional
+% and three-dimensional legends use the same wrapping rule, while 3-D plots
+% retain the slightly larger legend font and tighter trajectory spacing.
 
 labels = string(lgd.String);
 labels = contextual_legend_labels(labels);
@@ -30,24 +29,25 @@ else
     legendGap = style.legend2DGap;
 end
 
-% Prefer a single row. Only introduce additional rows when the complete row
-% does not fit the common manuscript canvas.
+% Use two centered rows whenever there are at least three legend entries.
+% Examples: 4 entries -> 2 columns x 2 rows; 8 entries -> 4 columns x 2 rows.
 lgd.Orientation = 'horizontal';
-columns = min(numel(labels),style.legendMaxColumns);
-lgd.NumColumns = max(columns,1);
+columns = manuscript_legend_columns(labels,style);
+lgd.NumColumns = columns;
 lgd.Units = 'normalized';
 drawnow;
-while lgd.Position(3) > style.legendMaxWidth && columns > 1
-    columns = columns-1;
-    lgd.NumColumns = columns;
-    drawnow;
-end
 
-% If a very long label still exceeds the standard canvas, reduce the legend
-% font only as a last resort. The configured 2-D/3-D sizes are otherwise kept.
+% Preserve the requested two-row layout while possible. If a very long
+% legend still exceeds the common canvas, reduce the font first. Only if the
+% minimum font still does not fit do we allow an additional wrapped row.
 while lgd.Position(3) > style.legendMaxWidth && ...
         lgd.FontSize > style.legendMinFontSize
     lgd.FontSize = lgd.FontSize-1;
+    drawnow;
+end
+while lgd.Position(3) > style.legendMaxWidth && columns > 1
+    columns = columns-1;
+    lgd.NumColumns = columns;
     drawnow;
 end
 
