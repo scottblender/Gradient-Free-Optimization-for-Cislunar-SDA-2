@@ -1,4 +1,4 @@
-name: Fix baseline geometry panel limits
+name: Fix manuscript geometry panel sizing
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Use panel-specific geometry limits
+      - name: Standardize visible geometry plot boxes
         shell: bash
         run: |
           python - <<'PY'
@@ -49,9 +49,9 @@ for mission = unique(string(selection.Mission),'stable')'
     missionLimits(char(mission)) = common_geometry_limits(allPoints,style);
 end
 '''
-          new_load = '''% Load all panels once. Each panel is scaled from its own complete plotted
-% geometry so a wide observer orbit in another baseline case cannot compress
-% the visible trajectories in this panel.
+          new_load = '''% Load all panels once. The outer EPS canvas is already standardized; each
+% 3-D panel is therefore scaled from its own complete plotted geometry so the
+% visible plot box also fills that common canvas consistently.
 for k = 1:n
     panelCells{k} = load_geometry_panel(string(selection.RunFile(k)));
     panel = panelCells{k};
@@ -73,31 +73,63 @@ end
     axis(ax,'vis3d');
 '''
           new_limits = '''    limits = common_geometry_limits(panel.allPoints,style);
+    limits = equal_span_geometry_limits(limits);
     xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    pbaspect(ax,[1 1 1]);
     axis(ax,'vis3d');
 '''
           if text.count(old_limits) != 1:
               raise SystemExit(f'Expected one mission-limit application block, found {text.count(old_limits)}.')
           text = text.replace(old_limits, new_limits, 1)
 
+          marker = '\n\nfunction values = optional_numeric(T,name)\n'
+          helper = '''
+
+function limits = equal_span_geometry_limits(limits)
+%EQUAL_SPAN_GEOMETRY_LIMITS Standardize the physical 3-D plot-box footprint.
+% The EPS canvas and axes rectangle are common across manuscript figures. A
+% cubic set of data limits, together with axis equal and a cubic plot-box
+% aspect ratio, prevents MATLAB from shrinking one panel merely because its
+% x/y/z ranges differ from another panel.
+spans = limits(:,2)-limits(:,1);
+maxSpan = max(spans);
+assert(isfinite(maxSpan) && maxSpan > 0, ...
+    'Geometry limits must have positive finite span.');
+centers = mean(limits,2);
+limits = [centers-0.5*maxSpan,centers+0.5*maxSpan];
+end
+'''
+          if marker not in text:
+              raise SystemExit('Could not find helper insertion point.')
+          if 'function limits = equal_span_geometry_limits' in text:
+              raise SystemExit('equal_span_geometry_limits already exists unexpectedly.')
+          text = text.replace(marker, helper + marker, 1)
+
           path.write_text(text, encoding='utf-8')
 
           updated = path.read_text(encoding='utf-8')
+          required = [
+              'limits = common_geometry_limits(panel.allPoints,style);',
+              'limits = equal_span_geometry_limits(limits);',
+              'pbaspect(ax,[1 1 1]);',
+              'function limits = equal_span_geometry_limits(limits)'
+          ]
+          for token in required:
+              if token not in updated:
+                  raise SystemExit(f'Missing expected geometry-sizing token: {token}')
           if 'missionLimits = containers.Map' in updated:
               raise SystemExit('Mission-wide geometry limits still remain.')
-          if 'limits = common_geometry_limits(panel.allPoints,style);' not in updated:
-              raise SystemExit('Panel-specific geometry limits were not applied.')
           PY
 
       - name: Validate diff
         shell: bash
         run: git diff --check
 
-      - name: Commit panel-limit fix
+      - name: Commit geometry sizing fix
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/plot_reviewer2_geometry_grid.m
-          git commit -m "Use panel-specific limits for baseline geometry figures"
+          git commit -m "Standardize manuscript geometry plot-box sizing"
           git push origin HEAD:main
