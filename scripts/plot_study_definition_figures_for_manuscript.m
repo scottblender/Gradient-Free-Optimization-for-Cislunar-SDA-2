@@ -2,8 +2,8 @@ function outputs = plot_study_definition_figures_for_manuscript( ...
     inspectFigures,sections,outputDirectory)
 %PLOT_STUDY_DEFINITION_FIGURES_FOR_MANUSCRIPT Use the proven definition renderer.
 % The established plot_study_definition_figures renderer creates the figures;
-% this wrapper only routes its completed products into MANUSCRIPT_OUTPUT and
-% removes the historical results/study_definition_figures staging directory.
+% this wrapper routes its completed products into MANUSCRIPT_OUTPUT and uses
+% the dedicated visibility renderer for the occultation/keepout schematic.
 
 if nargin<1 || isempty(inspectFigures), inspectFigures = false; end
 if nargin<2 || isempty(sections), sections = "all"; end
@@ -18,9 +18,29 @@ if ~isfolder(outputDirectory), mkdir(outputDirectory); end
 legacyDirectory = fullfile(paths.results,'study_definition_figures');
 if isfolder(legacyDirectory), rmdir(legacyDirectory,'s'); end
 
-% Generate every requested definition figure with the original renderer that
-% produced the known-good manuscript EPS files before the export-stack rewrite.
-transcript = evalc('outputs = plot_study_definition_figures(inspectFigures,sections);'); %#ok<NASGU>
+requested = lower(string(sections(:)'));
+available = ["catalog","slots","visibility","measurement","cases"];
+if isequal(requested,"all"), requested = available; end
+assert(all(ismember(requested,available)), ...
+    'Unknown definition figure section.');
+requested = unique(requested,'stable');
+
+% Keep the established renderer for every definition figure except the
+% visibility schematic. The standalone visibility renderer is intentionally
+% used here so the final target-label placement is shared by the manuscript
+% runner and by the one-figure regeneration command.
+outputs = struct();
+legacySections = requested(requested ~= "visibility");
+if ~isempty(legacySections)
+    transcript = evalc( ...
+        'legacyOutputs = plot_study_definition_figures(inspectFigures,legacySections);'); %#ok<NASGU>
+    outputs = legacyOutputs;
+end
+if ismember("visibility",requested)
+    outputs.visibilityGeometry = plot_visibility_keepout_geometry( ...
+        inspectFigures,legacyDirectory);
+end
+
 outputs = relocate_output_paths(outputs,legacyDirectory,outputDirectory);
 
 % Move side products not explicitly referenced by the returned structure.
