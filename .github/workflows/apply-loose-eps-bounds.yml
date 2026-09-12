@@ -1,0 +1,56 @@
+name: Apply loose EPS bounds
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-loose-eps-bounds.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Standardize EPS bounding boxes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          changed = []
+          for path in Path('.').rglob('*.m'):
+              text = path.read_text(encoding='utf-8')
+              new = text.replace("'-depsc2','-painters','-r600'", "'-depsc2','-painters','-r600','-loose'")
+              if new != text:
+                  path.write_text(new, encoding='utf-8')
+                  changed.append(str(path))
+
+          if not changed:
+              raise SystemExit('No EPS print calls matched the standardized export pattern.')
+
+          print('Updated EPS exporters:')
+          for path in changed:
+              print('  ' + path)
+          PY
+
+      - name: Validate diff
+        shell: bash
+        run: git diff --check
+
+      - name: Commit export fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '*.m' 'scripts/*.m' 'tests/*.m' 2>/dev/null || true
+          git add -u
+          git commit -m "Preserve common EPS canvas bounding boxes"
+          git push origin HEAD:main
