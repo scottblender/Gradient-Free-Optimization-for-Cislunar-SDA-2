@@ -1,0 +1,90 @@
+name: Fix manuscript geometry panel scaling
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/fix-geometry-panel-scaling.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Normalize geometry limits to an equal-span cube
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/plot_reviewer2_geometry_grid.m')
+          text = path.read_text(encoding='utf-8')
+
+          old = """    limits = missionLimits(char(mission));
+    xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    axis(ax,'vis3d');
+"""
+          new = """    limits = equal_span_geometry_limits(missionLimits(char(mission)));
+    xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
+    axis(ax,'vis3d');
+"""
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected one geometry-limit block, found {text.count(old)}.')
+          text = text.replace(old, new, 1)
+
+          old_comment = 'maneuver-specific camera from reviewer2_paper_style, axis equal/vis3d'
+          new_comment = 'maneuver-specific camera with equal-axis, equal-span cube limits'
+          if old_comment in text:
+              text = text.replace(old_comment, new_comment, 1)
+
+          marker = '\n\nfunction values = optional_numeric(T,name)\n'
+          helper = """
+
+function limits = equal_span_geometry_limits(limits)
+%EQUAL_SPAN_GEOMETRY_LIMITS Give every 3-D panel the same visual plot-box fill.
+% Expand the already padded mission limits to a cube centered on the original
+% ranges. Combined with axis equal/vis3d, this preserves undistorted geometry
+% while preventing missions with unequal x/y/z spans from rendering as a
+% physically smaller plot box inside the common manuscript canvas.
+spans = limits(:,2)-limits(:,1);
+maxSpan = max(spans);
+assert(isfinite(maxSpan) && maxSpan > 0,'Geometry limits must have positive finite span.');
+centers = mean(limits,2);
+limits = [centers-0.5*maxSpan,centers+0.5*maxSpan];
+end
+"""
+          if marker not in text:
+              raise SystemExit('Could not find optional_numeric insertion point.')
+          if 'function limits = equal_span_geometry_limits' in text:
+              raise SystemExit('equal_span_geometry_limits already exists unexpectedly.')
+          text = text.replace(marker, helper + marker, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+          updated = path.read_text(encoding='utf-8')
+          if 'limits = equal_span_geometry_limits(missionLimits(char(mission)));' not in updated:
+              raise SystemExit('Geometry panels are not using equal-span limits.')
+          if 'function limits = equal_span_geometry_limits' not in updated:
+              raise SystemExit('Equal-span helper was not added.')
+          PY
+
+      - name: Validate diff
+        shell: bash
+        run: git diff --check
+
+      - name: Commit scaling fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/plot_reviewer2_geometry_grid.m
+          git commit -m "Normalize manuscript geometry panel scaling"
+          git push origin HEAD:main
