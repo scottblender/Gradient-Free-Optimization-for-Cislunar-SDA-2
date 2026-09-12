@@ -77,7 +77,7 @@ for kind=1:2
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
     drawnow;
     finalize_manuscript_figure(fig);
-    print(fig,char(files(kind)),'-depsc2','-painters','-r600','-loose');
+    finalize_manuscript_figure(fig); print(fig,char(files(kind)),'-depsc2','-painters','-r600','-loose');
     print(fig,char(replace(files(kind),'.eps','.png')),'-dpng', ...
         sprintf('-r%d',style.exportDpi));
     clear cleanup;

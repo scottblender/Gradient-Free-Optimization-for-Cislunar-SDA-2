@@ -424,7 +424,7 @@ end
 base = fullfile(char(figureDir),char(stem));
 set(fig,'Renderer','painters','PaperPositionMode','manual');
 finalize_manuscript_figure(fig);
-print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
+finalize_manuscript_figure(fig); print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
 exportgraphics(fig,[base '.png'],'Resolution',dpi);
 close(fig);
 end

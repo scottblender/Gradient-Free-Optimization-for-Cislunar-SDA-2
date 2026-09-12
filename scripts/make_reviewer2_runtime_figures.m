@@ -206,7 +206,7 @@ drawnow;
 if ~saveFigures, return; end
 base = fullfile(char(out),char(stem));
 finalize_manuscript_figure(fig);
-print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
+finalize_manuscript_figure(fig); print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
 exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
 close(fig);
 end

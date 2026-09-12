@@ -712,7 +712,7 @@ end
 
 function export_figure(fig,out,stem,saveFigures,style)
 drawnow; if ~saveFigures, return; end
-base = fullfile(char(out),char(stem)); print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
+base = fullfile(char(out),char(stem)); finalize_manuscript_figure(fig); print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
 exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi); close(fig);
 end
 
