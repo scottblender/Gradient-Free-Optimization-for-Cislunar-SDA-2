@@ -1,0 +1,55 @@
+name: Include GI in default Monte Carlo study
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/include-gi-mc-default.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update Monte Carlo defaults
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path('scripts/run_reviewer2_baseline_monte_carlo.m')
+          text = runner.read_text(encoding='utf-8')
+          replacements = {
+              '% The no-argument default reproduces both baseline AO validation sets used\n% in the paper:\n%   * LOW_THRUST_TRANSFER: 3/5/7/10 observers, one trajectory each;\n%   * LUNAR_GATEWAY:       3/5/7/10 observers x 1/3/5 periods.\n% This gives 16 cases total (4000 objective evaluations at 250 samples/case).\n% GATEWAY_IMPULSE remains available as an optional mission but is not part\n% of the default Monte Carlo validation set.':
+              '% The no-argument default reproduces all three baseline AO validation sets:\n%   * LOW_THRUST_TRANSFER: 3/5/7/10 observers, one trajectory each;\n%   * LUNAR_GATEWAY:       3/5/7/10 observers x 1/3/5 periods;\n%   * GATEWAY_IMPULSE:     3/5/7/10 observers, one trajectory each.\n% This gives 20 cases total (5000 objective evaluations at 250 samples/case).',
+              '%       ''Mission'',\["LOW_THRUST_TRANSFER","LUNAR_GATEWAY"\]);':
+              '%       ''Mission'',\["LOW_THRUST_TRANSFER","LUNAR_GATEWAY","GATEWAY_IMPULSE"\]);',
+              '%   Mission            string/string vector; default is\n%                      [LOW_THRUST_TRANSFER, LUNAR_GATEWAY].\n%                      GATEWAY_IMPULSE is also supported.':
+              '%   Mission            string/string vector; default is\n%                      [LOW_THRUST_TRANSFER, LUNAR_GATEWAY, GATEWAY_IMPULSE].',
+              'addParameter(p,''Mission'',\["LOW_THRUST_TRANSFER","LUNAR_GATEWAY"\]);':
+              'addParameter(p,''Mission'',\["LOW_THRUST_TRANSFER","LUNAR_GATEWAY","GATEWAY_IMPULSE"\]);',
+          }
+          # MATLAB source does not contain literal backslashes before [; normalize keys/values.
+          replacements = {k.replace('\\[','['): v.replace('\\[','[') for k,v in replacements.items()}
+          for old,new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'Missing expected runner text:\n{old}')
+              text = text.replace(old,new,1)
+          runner.write_text(text,encoding='utf-8')
+
+          test = Path('tests/test_baseline_monte_carlo_configuration.m')
+          text = test.read_text(encoding='utf-8')
+          old = 'addParameter(p,''Mission'',\\["LOW_THRUST_TRANSFER","LUNAR_GATEWAY"\\])'
+          new = 'addParameter(p,''Mission'',\\["LOW_THRUST_TRANSFER","LUNAR_GATEWAY","GATEWAY_IMPULSE"\\])'
+          if old not in text:
+              raise SystemExit('Missing expected test token.')
+          text = text.replace(old,new,1)
+          test.write_text(text,encoding='utf-8')
+          PY
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/run_reviewer2_baseline_monte_carlo.m tests/test_baseline_monte_carlo_configuration.m
+          git commit -m "Include GI in default Monte Carlo study"
+          git push origin HEAD:main
