@@ -6,7 +6,7 @@ function details = plot_reviewer2_geometry_grid(selection,figureDir,stemPrefix,s
 % tiled grids. The construction matches plot_study_definition_figures.m:
 %   7.6 x 7.0 inch canvas
 %   centered inner axes box [0.12 0.20 0.76 0.64]
-%   maneuver-specific camera with equal-axis, equal-span cube limits
+%   maneuver-specific camera from reviewer2_paper_style, axis equal/vis3d
 %   8/10/10 percent x/y/z padding
 %   centered north-outside legend with the axes restored afterward
 %   Times New Roman, 12-point minimum text and 14-point axis labels
@@ -73,7 +73,7 @@ for k = 1:n
 
     prepare_reference_axes(ax,style,mission);
     [legendHandles,legendLabels] = render_geometry_panel(ax,panel,style);
-    limits = equal_span_geometry_limits(missionLimits(char(mission)));
+    limits = missionLimits(char(mission));
     xlim(ax,limits(1,:)); ylim(ax,limits(2,:)); zlim(ax,limits(3,:));
     axis(ax,'vis3d');
 
@@ -313,20 +313,6 @@ for k = 1:3
     end
     limits(k,:) = [lo-padding(k)*span,hi+padding(k)*span];
 end
-end
-
-
-function limits = equal_span_geometry_limits(limits)
-%EQUAL_SPAN_GEOMETRY_LIMITS Give every 3-D panel the same visual plot-box fill.
-% Expand the already padded mission limits to a cube centered on the original
-% ranges. Combined with axis equal/vis3d, this preserves undistorted geometry
-% while preventing missions with unequal x/y/z spans from rendering as a
-% physically smaller plot box inside the common manuscript canvas.
-spans = limits(:,2)-limits(:,1);
-maxSpan = max(spans);
-assert(isfinite(maxSpan) && maxSpan > 0,'Geometry limits must have positive finite span.');
-centers = mean(limits,2);
-limits = [centers-0.5*maxSpan,centers+0.5*maxSpan];
 end
 
 
