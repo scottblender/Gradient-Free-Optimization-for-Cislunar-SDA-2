@@ -83,8 +83,8 @@ for kind=1:2
         xSpan=diff(xl); ySpan=diff(yl);
         serialLabelX=completionX(1)-0.18*xSpan;
         serialLabelY=completionY(1)+0.12*ySpan;
-        parallelLabelX=completionX(2)+0.08*xSpan;
-        parallelLabelY=completionY(2)+0.14*ySpan;
+        parallelLabelX=completionX(2)+0.18*xSpan;
+        parallelLabelY=completionY(2)+0.28*ySpan;
         arrowStartX=[serialLabelX;parallelLabelX];
         arrowStartY=[serialLabelY-0.012*ySpan;parallelLabelY-0.012*ySpan];
 
