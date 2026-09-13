@@ -11,18 +11,16 @@ style.fontWeight = 'bold';
 % Typography.
 % The source fonts are intentionally larger than ordinary screen defaults
 % because the full-size EPS panels are reduced when placed in LaTeX grids.
-% Monte Carlo panels use their own larger fixed sizes in
-% plot_reviewer2_baseline_monte_carlo.m and are intentionally unaffected here.
-style.fontSize = 24;
-style.labelFontSize = 27;
-style.geometryFontSize = 26;
-style.geometryLabelFontSize = 28;
-style.legendFontSize = 24;
-style.geometryLegendFontSize = 25;
-style.legendMinFontSize = 21;
+style.fontSize = 20;
+style.labelFontSize = 23;
+style.geometryFontSize = 22;
+style.geometryLabelFontSize = 24;
+style.legendFontSize = 20;
+style.geometryLegendFontSize = 21;
+style.legendMinFontSize = 17;
 % Shared legends use a slightly smaller font and a wider canvas than the
 % data panels so EPS bounding boxes never clip long entries.
-style.sharedLegendFontSize = 22;
+style.sharedLegendFontSize = 18;
 style.sharedLegendFigureHeight = 1.30;
 style.sharedGeometryLegendWidth = 5.40;
 style.sharedGeometryLegendHeight = 2.00;
