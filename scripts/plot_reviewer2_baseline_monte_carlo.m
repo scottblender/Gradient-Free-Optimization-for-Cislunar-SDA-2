@@ -21,13 +21,18 @@ assert(all(ismember(requiredSamples,string(samples.Properties.VariableNames))));
 assert(all(ismember(requiredSummary,string(summary.Properties.VariableNames))));
 
 style = reviewer2_paper_style();
+% These panels are reduced substantially in the manuscript grids, so give
+% them a dedicated typography increase without changing every paper figure.
+mcFontSize = style.fontSize + 3;
+mcLabelFontSize = style.labelFontSize + 3;
+mcLegendFontSize = style.sharedLegendFontSize + 2;
 outDir = string(outDir);
 figureDir = string(fullfile(char(outDir),'figures'));
 if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
 
 figureStem = strings(height(summary),1);
 sharedLegendStem = "baseline_mc_shared_legend";
-export_mc_shared_legend(figureDir,sharedLegendStem,saveFigures,style);
+export_mc_shared_legend(figureDir,sharedLegendStem,saveFigures,style,mcLegendFontSize);
 for k = 1:height(summary)
     s = summary(k,:);
     rows = samples(samples.Mission == s.Mission & ...
@@ -43,20 +48,15 @@ for k = 1:height(summary)
         'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
         'Renderer','painters','InvertHardcopy','off');
     movegui(fig,'center');
-    ax = axes(fig,'Units','normalized','Position',[0.18 0.18 0.76 0.74]);
+    ax = axes(fig,'Units','normalized','Position',[0.20 0.20 0.72 0.70]);
     hold(ax,'on'); box(ax,'off'); grid(ax,'off');
 
-    hBox = boxchart(ax,ones(height(rows),1),rows.TotalCost, ...
+    boxchart(ax,ones(height(rows),1),rows.TotalCost, ...
         'BoxFaceColor',style.optimizerColors(1,:), ...
         'MarkerStyle','.');
-    hRef = yline(ax,s.ReferenceObjective,'-','Color',[1.00 0.30 0.30], ...
-        'LineWidth',1.5);
+    yline(ax,s.ReferenceObjective,'-','Color',[1.00 0.30 0.30], ...
+        'LineWidth',1.8);
 
-    % Keep the optimized-reference line visibly separated from the x axis.
-    % MATLAB's automatic limits can place the minimum reference exactly on the
-    % lower axes boundary when it is the smallest plotted value. Reserve a
-    % small data-relative margin below and above every MC distribution so the
-    % reference line remains distinct in both EPS and PNG exports.
     plotValues = [double(rows.TotalCost(:));double(s.ReferenceObjective)];
     plotValues = plotValues(isfinite(plotValues));
     assert(~isempty(plotValues),'Monte Carlo plot contains no finite objective values.');
@@ -70,12 +70,12 @@ for k = 1:height(summary)
     xticks(ax,[]);
     xlabel(ax,'Monte Carlo samples','FontWeight','bold');
     ylabel(ax,'Objective value','FontWeight','bold');
-    set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
+    set(ax,'FontName',style.fontName,'FontSize',mcFontSize, ...
         'FontWeight','bold','LineWidth',style.axisLineWidth, ...
         'TickDir','out','Layer','top','Box','off', ...
         'XGrid','off','YGrid','off','ZGrid','off');
-    ax.XLabel.FontSize = style.labelFontSize;
-    ax.YLabel.FontSize = style.labelFontSize;
+    ax.XLabel.FontSize = mcLabelFontSize;
+    ax.YLabel.FontSize = mcLabelFontSize;
 
     stem = "baseline_mc_"+mission_code(s.Mission)+"_"+ ...
         measurement_code(s.Measurement)+"_o"+string(s.NumObservers);
@@ -88,7 +88,8 @@ for k = 1:height(summary)
     if saveFigures
         base = fullfile(char(figureDir),char(stem));
         finalize_manuscript_figure(fig);
-        finalize_manuscript_figure(fig); print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
+        finalize_manuscript_figure(fig);
+        print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
         exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
         close(fig);
     end
@@ -104,7 +105,7 @@ details.SharedLegendStem = repmat(sharedLegendStem,height(details),1);
 end
 
 
-function export_mc_shared_legend(figureDir,stem,saveFigures,style)
+function export_mc_shared_legend(figureDir,stem,saveFigures,style,fontSize)
 if ~saveFigures, return; end
 widthIn = style.figureWidth;
 heightIn = style.sharedLegendFigureHeight;
@@ -115,15 +116,15 @@ fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
 ax = axes(fig,'Units','normalized','Position',[0.01 0.01 0.98 0.98], ...
     'Visible','off');
 hold(ax,'on');
-hSamples = plot(ax,nan,nan,'s','LineStyle','none','MarkerSize',12, ...
+hSamples = plot(ax,nan,nan,'s','LineStyle','none','MarkerSize',13, ...
     'MarkerFaceColor',style.optimizerColors(1,:), ...
     'MarkerEdgeColor',style.optimizerColors(1,:));
-hReference = plot(ax,nan,nan,'-','Color',[1.00 0.30 0.30],'LineWidth',1.8);
+hReference = plot(ax,nan,nan,'-','Color',[1.00 0.30 0.30],'LineWidth',2.0);
 labels = ["Monte Carlo samples","Optimized reference"];
 lgd = legend(ax,[hSamples hReference],cellstr(labels),'Location','none', ...
     'Orientation','horizontal','NumColumns',2,'Box','off');
 lgd.FontName = style.fontName;
-lgd.FontSize = style.sharedLegendFontSize;
+lgd.FontSize = fontSize;
 lgd.FontWeight = style.fontWeight;
 lgd.ItemTokenSize = style.legendItemTokenSize;
 lgd.Units = 'normalized';
