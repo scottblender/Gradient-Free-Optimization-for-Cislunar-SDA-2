@@ -23,13 +23,14 @@ jobs:
       - name: Static checks
         run: |
           git diff --check
-          grep -q 'orbit_catalog_family_legend.eps' scripts/plot_study_definition_figures.m
-          grep -q 'outputs.sharedLegend' scripts/plot_study_definition_figures.m
-          grep -q 'The four paired orbit-family panels share one legend-only EPS' scripts/plot_study_definition_figures.m
+          grep -q 'orbit_family_trajectory_legend' scripts/plot_study_definition_figures.m
+          grep -q 'outputs.sharedLegend = sharedFamilyLegendFiles(1)' scripts/plot_study_definition_figures.m
+          grep -q 'legendHandle = gobjects(0)' scripts/plot_study_definition_figures.m
+          grep -q 'Shared-legend panels intentionally have no local legend' scripts/plot_study_definition_figures.m
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/plot_study_definition_figures.m
-          git commit -m "Separate orbit family shared legend"
+          git commit -m "Fix legend-free orbit family panels"
           git push origin main
