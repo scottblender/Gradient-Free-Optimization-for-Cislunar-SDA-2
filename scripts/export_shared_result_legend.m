@@ -15,7 +15,7 @@ parse(p,varargin{:});
 labels = string(labels(:));
 % Keep the internal optimizer key "ABC" unchanged in saved results while
 % using the manuscript acronym ABCO everywhere readers see a label.
-labels(labels == "ABC") = "ABCO";
+labels = regexprep(labels,'(?<![A-Za-z])ABC(?![A-Za-z])','ABCO');
 colors = double(colors);
 assert(size(colors,1) == numel(labels) && size(colors,2) == 3, ...
     'colors must contain one RGB row per legend label.');
@@ -46,7 +46,7 @@ fig = figure('Visible','off','Color','w','Units','inches', ...
     'PaperPosition',[0 0 style.sharedResultLegendWidth style.sharedResultLegendHeight], ...
     'PaperPositionMode','manual','Renderer','painters','InvertHardcopy','off');
 cleanup = onCleanup(@() close(fig));
-ax = axes(fig,'Units','normalized','Position',[0.01 0.01 0.98 0.98], ...
+ax = axes(fig,'Units','normalized','Position',[0 0 1 1], ...
     'Visible','off');
 hold(ax,'on');
 
@@ -72,12 +72,22 @@ lgd.FontName = style.fontName;
 lgd.FontSize = style.sharedLegendFontSize;
 lgd.FontWeight = style.fontWeight;
 lgd.ItemTokenSize = style.geometryLegendItemTokenSize;
-lgd.Units = 'normalized';
 drawnow;
-pos = lgd.Position;
-pos(1) = 0.5-pos(3)/2;
-pos(2) = 0.5-pos(4)/2;
-lgd.Position = pos;
+
+% Size the legend canvas from the rendered legend rather than assuming the
+% initial paper rectangle is wide enough. This prevents EPS bounding-box
+% clipping while retaining a compact strip for LaTeX scaling.
+lgd.Units = 'inches';
+legendPosition = lgd.Position;
+marginX = 0.22;
+marginY = 0.14;
+figureWidth = max(style.sharedResultLegendWidth,legendPosition(3)+2*marginX);
+figureHeight = max(style.sharedResultLegendHeight,legendPosition(4)+2*marginY);
+fig.Position(3:4) = [figureWidth figureHeight];
+fig.PaperSize = [figureWidth figureHeight];
+fig.PaperPosition = [0 0 figureWidth figureHeight];
+lgd.Position(1) = 0.5*(figureWidth-legendPosition(3));
+lgd.Position(2) = 0.5*(figureHeight-legendPosition(4));
 lgd.AutoUpdate = 'off';
 axis(ax,'off');
 drawnow;
