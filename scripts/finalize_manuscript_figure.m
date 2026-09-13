@@ -8,8 +8,6 @@ style = reviewer2_paper_style();
 axesList = findall(fig,'Type','axes');
 legends = findall(fig,'Type','legend');
 
-% Multi-axes manuscript figures use the largest axes as the primary panel.
-% Smaller axes are inset zooms and should not carry dense numerical tick text.
 areas = zeros(numel(axesList),1);
 for k = 1:numel(axesList)
     oldUnits = axesList(k).Units;
@@ -38,31 +36,23 @@ for k = 1:numel(axesList)
     end
 
     if isInset
-        % Insets are intentionally visual zooms. Suppressing dense decimal
-        % tick labels prevents the inset from becoming less readable than the
-        % original panel after LaTeX reduction.
         tickSize = min(12,tickSize);
         labelSize = tickSize;
         ax.XTickLabel = [];
         ax.YTickLabel = [];
         ax.ZTickLabel = [];
 
-        % Keep slot-definition zooms clear of the north-outside legends. The
-        % 3-D geometry zoom is deliberately large and left-aligned so it does
-        % not cover the right side of the orbit panel.
         if has_zoom_annotation(ax)
             oldUnits = ax.Units;
             ax.Units = 'normalized';
             if is_3d_axes(ax)
-                ax.Position = [0.12 0.36 0.42 0.38];
+                ax.Position = [0.18 0.36 0.38 0.36];
             else
                 ax.Position = [0.63 0.40 0.28 0.20];
             end
             ax.Units = oldUnits;
         end
 
-        % Keep only compact inset annotations such as "Zoom"; reduce their
-        % source size so they do not dominate the small overlay axes.
         insetText = findall(ax,'Type','text');
         for t = 1:numel(insetText)
             try
@@ -73,8 +63,6 @@ for k = 1:numel(axesList)
         end
     elseif numel(axesList) > 1 && k == mainAxesIndex && ...
             is_3d_axes(ax) && numel(ax.XTick) > 2
-        % The representative NRHO slot panel has a short projected x axis.
-        % Retain only the end ticks so large manuscript fonts do not collide.
         ax.XTick = ax.XTick([1 end]);
     end
 
@@ -89,14 +77,11 @@ for k = 1:numel(axesList)
         end
     end
 
-    % Saved data keep the historical internal key ABC, but all manuscript
-    % tick labels display the published acronym ABCO.
     ax.XTickLabel = replace_abc_text(ax.XTickLabel);
     ax.YTickLabel = replace_abc_text(ax.YTickLabel);
     ax.ZTickLabel = replace_abc_text(ax.ZTickLabel);
 end
 
-% Apply the same internal-key cleanup to annotations and legend text.
 textObjects = findall(fig,'-property','String');
 for k = 1:numel(textObjects)
     try
@@ -120,16 +105,12 @@ for k = 1:numel(legends)
     lgd.Units = 'normalized';
     drawnow;
 
-    % Keep the two-row layout whenever possible. Reduce font size first if a
-    % long legend is still wider than the standardized manuscript canvas.
     while lgd.Position(3) > style.legendMaxWidth && ...
             lgd.FontSize > style.legendMinFontSize
         lgd.FontSize = lgd.FontSize-1;
         drawnow;
     end
 
-    % Last-resort wrapping prevents clipping while preserving the common
-    % canvas. This may introduce a third row only when two rows cannot fit.
     columns = lgd.NumColumns;
     while lgd.Position(3) > style.legendMaxWidth && columns > 1
         columns = columns-1;
@@ -196,6 +177,5 @@ try
         value = regexprep(value,'(?<![A-Za-z])ABC(?![A-Za-z])','ABCO');
     end
 catch
-    % Leave unsupported graphics-string types unchanged.
 end
 end
