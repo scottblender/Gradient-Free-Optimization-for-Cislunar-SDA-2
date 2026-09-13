@@ -63,7 +63,7 @@ style.manuscriptPanelWidth = 3.3;
 % Final construction-time fit rules. The outer EPS/PNG canvas never changes;
 % larger tick/axis fonts are protected by a larger safe export margin and a
 % final post-centering bounds check. Only the inner axes box may contract.
-style.fitMarginFraction = 0.05;
+style.fitMarginFraction = 0.08;
 style.fitShrinkFactor = 0.97;
 style.fitMinimumAxesScale = 0.50;
 style.fitMaxIterations = 36;
