@@ -126,6 +126,20 @@ if numel(axesList) == 1
     center_manuscript_content(fig,ax,lgd);
 end
 
+% MATLAB underestimates the rendered extent of the automatically positioned
+% y-axis label for the nominal Lunar Gateway perspective view. Apply a small
+% post-centering nudge only to that case so the shared layout remains unchanged
+% for every other manuscript figure.
+if numel(axesList) == 1 && is_lunar_gateway_case(legends)
+    ax = axesList(1);
+    if is_3d_axes(ax) && isgraphics(ax.YLabel)
+        ax.YLabel.Units = 'normalized';
+        labelPosition = ax.YLabel.Position;
+        labelPosition(2) = labelPosition(2)+0.04;
+        ax.YLabel.Position = labelPosition;
+    end
+end
+
 drawnow;
 end
 
@@ -154,6 +168,16 @@ for k = 1:numel(textObjects)
         end
     catch
     end
+end
+end
+
+function tf = is_lunar_gateway_case(legends)
+tf = false;
+if numel(legends) ~= 1 || ~isgraphics(legends(1)), return; end
+try
+    labels = strtrim(string(legends(1).String(:)));
+    tf = isequal(labels,["Nominal Gateway";"Moon";"L1";"L2"]);
+catch
 end
 end
 
