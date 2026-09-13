@@ -113,7 +113,7 @@ localStart = max(1,selectedSlot-1);
 localEnd = min(numSlots,nextSlot+1);
 localTime = linspace(slotTime(localStart),slotTime(localEnd),160).';
 localState = interpolant(localTime);
-inset = axes(fig,'Units','normalized','Position',[0.59 0.46 0.32 0.29]);
+inset = axes(fig,'Units','normalized','Position',[0.55 0.46 0.32 0.29]);
 prepare_3d_axes(inset,style);
 plot3(inset,localState(:,1),localState(:,2),localState(:,3),'-', ...
     'Color',orbitColor,'LineWidth',2.1,'HandleVisibility','off');
