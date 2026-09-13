@@ -151,10 +151,10 @@ for k = 1:numel(labels)
                 end
         end
         output.tables.(label) = rows;
-        if label=="target_ic_summary"
-            fprintf('\\multicolumn{5}{c}{\\textbf{LT reproduction parameters}} \\\\\n');
-        end
         for j = 1:size(rows,1)
+            if label=="target_ic_summary" && j==7
+                fprintf('\\multicolumn{5}{c}{\\textbf{LT reproduction parameters}} \\\\\n');
+            end
             if label=="target_ic_summary" && j>6
                 fprintf('\\multicolumn{2}{@{}l}{%s} & \\multicolumn{3}{l@{}}{%s} %s\n', ...
                     rows(j,1),rows(j,2),'\\');
