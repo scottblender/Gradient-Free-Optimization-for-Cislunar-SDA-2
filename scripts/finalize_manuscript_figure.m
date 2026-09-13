@@ -8,8 +8,27 @@ style = reviewer2_paper_style();
 axesList = findall(fig,'Type','axes');
 legends = findall(fig,'Type','legend');
 
+% Multi-axes manuscript figures use the largest axes as the primary panel.
+% Smaller axes are inset zooms and should not carry dense numerical tick text.
+areas = zeros(numel(axesList),1);
+for k = 1:numel(axesList)
+    oldUnits = axesList(k).Units;
+    axesList(k).Units = 'normalized';
+    p = axesList(k).Position;
+    areas(k) = p(3)*p(4);
+    axesList(k).Units = oldUnits;
+end
+if isempty(areas)
+    mainAxesIndex = [];
+else
+    [~,mainAxesIndex] = max(areas);
+end
+
 for k = 1:numel(axesList)
     ax = axesList(k);
+    isInset = numel(axesList) > 1 && k ~= mainAxesIndex && ...
+        areas(k) < 0.75*areas(mainAxesIndex);
+
     if is_3d_axes(ax)
         tickSize = style.geometryFontSize;
         labelSize = style.geometryLabelFontSize;
@@ -17,6 +36,23 @@ for k = 1:numel(axesList)
         tickSize = style.fontSize;
         labelSize = style.labelFontSize;
     end
+
+    if isInset
+        % Insets are intentionally visual zooms. Suppressing dense decimal
+        % tick labels prevents the inset from becoming less readable than the
+        % original panel after LaTeX reduction.
+        tickSize = min(12,tickSize);
+        labelSize = tickSize;
+        ax.XTickLabel = [];
+        ax.YTickLabel = [];
+        ax.ZTickLabel = [];
+    elseif numel(axesList) > 1 && k == mainAxesIndex && ...
+            is_3d_axes(ax) && numel(ax.XTick) > 2
+        % The representative NRHO slot panel has a short projected x axis.
+        % Retain only the end ticks so large manuscript fonts do not collide.
+        ax.XTick = ax.XTick([1 end]);
+    end
+
     set(ax,'FontName',style.fontName,'FontWeight',style.fontWeight,'FontSize',tickSize);
     labels = [ax.XLabel ax.YLabel ax.ZLabel];
     for q = 1:numel(labels)
@@ -24,7 +60,23 @@ for k = 1:numel(axesList)
             labels(q).FontName = style.fontName;
             labels(q).FontWeight = style.fontWeight;
             labels(q).FontSize = labelSize;
+            if isInset, labels(q).String = ''; end
         end
+    end
+
+    % Saved data keep the historical internal key ABC, but all manuscript
+    % tick labels display the published acronym ABCO.
+    ax.XTickLabel = replace_abc_text(ax.XTickLabel);
+    ax.YTickLabel = replace_abc_text(ax.YTickLabel);
+    ax.ZTickLabel = replace_abc_text(ax.ZTickLabel);
+end
+
+% Apply the same internal-key cleanup to annotations and legend text.
+textObjects = findall(fig,'-property','String');
+for k = 1:numel(textObjects)
+    try
+        textObjects(k).String = replace_abc_text(textObjects(k).String);
+    catch
     end
 end
 
@@ -80,5 +132,30 @@ for k = 1:numel(objects)
         tf = true;
         return;
     end
+end
+end
+
+function value = replace_abc_text(value)
+%REPLACE_ABC_TEXT Convert the internal solver key ABC to manuscript ABCO.
+if isempty(value), return; end
+try
+    if ischar(value)
+        if isrow(value)
+            value = char(regexprep(string(value), ...
+                '(?<![A-Za-z])ABC(?![A-Za-z])','ABCO'));
+        else
+            s = string(cellstr(value));
+            s = regexprep(s,'(?<![A-Za-z])ABC(?![A-Za-z])','ABCO');
+            value = char(s);
+        end
+    elseif iscell(value)
+        s = string(value);
+        s = regexprep(s,'(?<![A-Za-z])ABC(?![A-Za-z])','ABCO');
+        value = cellstr(s);
+    elseif isstring(value)
+        value = regexprep(value,'(?<![A-Za-z])ABC(?![A-Za-z])','ABCO');
+    end
+catch
+    % Leave unsupported graphics-string types unchanged.
 end
 end
