@@ -25,7 +25,7 @@ assert(B.complete && B.mission=="LUNAR_GATEWAY" && B.budget==6000, ...
     'A completed LG 6000-FE benchmark is required. Rerun test_parallel_speed.');
 R=B.results; modes=["Serial","Parallel"];
 assert(height(R)==2*B.nRepeats && all(R.SearchFE==6000),'Incomplete benchmark.');
-style=reviewer2_paper_style(); files=strings(2,1);
+style=reviewer2_paper_style(); files=strings(3,1);
 for kind=1:2
     fig=figure('Visible','off','Color','w','Units','inches', ...
         'Position',[1 1 style.figureWidth style.figureHeight], ...
@@ -80,9 +80,10 @@ for kind=1:2
         sprintf('-r%d',style.exportDpi));
     clear cleanup;
 end
-export_shared_result_legend(outputDirectory,"parallel_speed_lg_legend", ...
+legendFiles=export_shared_result_legend(outputDirectory,"parallel_speed_lg_legend", ...
     ["Serial";"Parallel"],style.optimizerColors(1:2,:),style, ...
     'LineStyles',["-";"--"],'NumColumns',2);
+files(3)=legendFiles(1);
 % Keep the numeric printout beside the final figures as well as in the raw run.
 writetable(R,fullfile(outputDirectory,'parallel_speed_results.csv'));
 sourceDir=fileparts(sourceFile);

@@ -1,12 +1,10 @@
 function manifest = make_reviewer2_runtime_figures(r,baselineResults,saveFigures)
 %MAKE_REVIEWER2_RUNTIME_FIGURES Render the focused 1200-FE paper figures.
 %
-% The optimizer identity is already explicit on the x-axis of the two bar
-% charts, so those charts intentionally do not create one legend entry per
-% optimizer. MATLAB's bar() returns one Bar object for this flat-colored
-% categorical chart; pairing that single handle with five optimizer labels
-% produces the "Ignoring extra legend entries" warning. The objective chart
-% therefore uses a legend only for the dashed 6000-FE GA reference.
+% The optimizer identity is explicit on the x-axis of the two bar charts,
+% while a single legend-only EPS supplies the common optimizer/reference key
+% for the complete 1200-FE subfigure group. Individual panels contain no
+% embedded legends, matching the trajectory and Monte Carlo grid convention.
 % The convergence chart uses one graphics handle per optimizer curve and
 % intentionally shows only the 20-run mean best-so-far history. Run-to-run
 % variability is reported in the metric summaries/tables rather than as
@@ -26,7 +24,7 @@ if saveFigures
 end
 
 baseline = matched_baseline(baselineResults,"LUNAR_GATEWAY",3,1);
-runtimeOptimizers = style.optimizerOrder(ismember(style.optimizerOrder,r.runtimeResults.Optimizer));
+runtimeOptimizers = style.optimizerOrder(ismember(style.optimizerOrder,string(r.runtimeResults.Optimizer)));
 runtimeColors = colors_for_optimizers(runtimeOptimizers,style);
 export_shared_result_legend(out,"runtime_1200_legend", ...
     [optimizer_labels(runtimeOptimizers);"6000-FE GA reference"], ...
