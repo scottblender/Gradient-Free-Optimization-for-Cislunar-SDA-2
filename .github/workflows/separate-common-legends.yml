@@ -18,35 +18,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Remove obsolete cleanup from one-time patch
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('.github/scripts/separate_common_legends.py')
-          text = p.read_text()
-          start = text.find('# The insertion duplicates the marker comment; collapse it once.')
-          if start >= 0:
-              end = text.find('# -----------------------------------------------------------------------------\n# Static manuscript-figure audit.', start)
-              if end < 0:
-                  raise RuntimeError('Could not locate static-audit marker.')
-              text = text[:start] + text[end:]
-              p.write_text(text)
-          PY
-      - name: Apply common-legend patch
-        run: python .github/scripts/separate_common_legends.py
+      - name: Fix common-legend syntax
+        run: python .github/scripts/fix_common_legend_syntax.py
       - name: Static checks
         run: |
           git diff --check
-          grep -q 'style.metricPlotPositionNoLegend' scripts/reviewer2_paper_style.m
-          grep -q 'comparison_6000_metrics_legend' scripts/make_reviewer2_curated_figures.m
+          ! grep -q 'observerSpecs = { ...$' <(sed -n '115,135p' scripts/make_reviewer2_curated_figures.m)
           grep -q 'baseline_observer_metric_legend' scripts/make_reviewer2_curated_figures.m
-          grep -q 'ga_screening_metric_legend' scripts/make_reviewer2_curated_figures.m
-          grep -q 'runtime_1200_legend' scripts/make_reviewer2_runtime_figures.m
           grep -q 'parallel_speed_lg_legend' scripts/plot_parallel_speed.m
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/scripts/separate_common_legends.py scripts/reviewer2_paper_style.m scripts/make_reviewer2_curated_figures.m scripts/make_reviewer2_runtime_figures.m scripts/plot_parallel_speed.m tests/test_reviewer2_paper_figures_configuration.m
-          git commit -m "Separate shared legends from result panels"
+          git add scripts/make_reviewer2_curated_figures.m scripts/plot_parallel_speed.m
+          git commit -m "Fix shared legend layout syntax"
           git push origin main
