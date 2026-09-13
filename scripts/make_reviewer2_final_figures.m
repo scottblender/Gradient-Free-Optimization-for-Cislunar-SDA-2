@@ -39,16 +39,9 @@ if ~isempty(fieldnames(remaining))
     manifest = [manifest;otherManifest];
 end
 
-% Add an intuitive map of the evaluated 6000-FE study slices when both the
-% optimizer-comparison and objective-component data are available. The cube
-% deliberately omits BO because BO belongs only to the separate 1200-FE pilot.
-if isfield(reports,'comparison') && isfield(reports,'objective_screening')
-    cubeStem = "study_design_cube_6000";
-    plot_study_design_cube(reports.comparison.analysisDirectory,cubeStem,saveFigures);
-    manifest = [manifest;table("study_design",cubeStem, ...
-        "Evaluated target/objective/optimizer combinations at 6000 FE.", ...
-        'VariableNames',manifest.Properties.VariableNames)];
-end
+% The previously added three-dimensional study-design cube was removed from
+% the manuscript pipeline because the sampled study slices are more clearly
+% communicated by the surrounding tables and result figures.
 
 if saveFigures
     collect_rendered_figures(reports);
@@ -82,6 +75,15 @@ for k = 1:numel(fields)
     if saveFigures
         if ~isfolder(r.figureDirectory), mkdir(r.figureDirectory); end
         clear_figure_files(r.figureDirectory);
+        % Remove stale cube exports left by the earlier manuscript pipeline.
+        for extension = [".eps",".png"]
+            stale = fullfile(char(r.analysisDirectory), ...
+                "study_design_cube_6000"+extension);
+            if isfile(stale), delete(stale); end
+            stale = fullfile(char(r.figureDirectory), ...
+                "study_design_cube_6000"+extension);
+            if isfile(stale), delete(stale); end
+        end
     end
 end
 end
@@ -126,56 +128,4 @@ for pattern = ["*.eps","*.png"]
         delete(fullfile(files(k).folder,files(k).name));
     end
 end
-end
-
-
-function plot_study_design_cube(outputDir,stem,saveFigures)
-%PLOT_STUDY_DESIGN_CUBE Visualize the evaluated 6000-FE study combinations.
-
-if ~saveFigures, return; end
-style = reviewer2_paper_style();
-fig = figure('Color','w','Units','inches', ...
-    'Position',[1 1 style.metricFigureWidth style.metricFigureHeight], ...
-    'PaperUnits','inches', ...
-    'PaperSize',[style.metricFigureWidth style.metricFigureHeight], ...
-    'PaperPosition',[0 0 style.metricFigureWidth style.metricFigureHeight], ...
-    'PaperPositionMode','manual','Renderer','painters','InvertHardcopy','off');
-ax = axes(fig,'Units','normalized','Position',[0.17 0.19 0.67 0.67]);
-hold(ax,'on'); box(ax,'on'); grid(ax,'on');
-
-% Extended comparison: J111 x all three targets x GA/PSO/ABCO/ACO.
-[x1,y1,z1] = ndgrid(1:3,1,1:4);
-hBenchmark = scatter3(ax,x1(:),y1(:),z1(:),88,'o','filled');
-
-% Objective-component sweeps: J100/J010/J001 x all three targets x GA.
-[x2,y2] = ndgrid(1:3,2:4);
-z2 = ones(size(x2));
-hComponents = scatter3(ax,x2(:),y2(:),z2(:),92,'d','filled');
-
-xlim(ax,[0.6 3.4]); ylim(ax,[0.6 4.4]); zlim(ax,[0.6 4.4]);
-xticks(ax,1:3); xticklabels(ax,{'LG','LT','GI'});
-yticks(ax,1:4); yticklabels(ax,{'J_{111}','J_{100}','J_{010}','J_{001}'});
-zticks(ax,1:4); zticklabels(ax,{'GA','PSO','ABCO','ACO'});
-xlabel(ax,'Target case','FontWeight','bold');
-ylabel(ax,'Objective','FontWeight','bold');
-zlabel(ax,'Optimizer','FontWeight','bold');
-view(ax,38,24);
-set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
-    'FontWeight','bold','LineWidth',style.axisLineWidth,'TickDir','out', ...
-    'Layer','top','XGrid','on','YGrid','on','ZGrid','on');
-ax.XLabel.FontSize = style.labelFontSize;
-ax.YLabel.FontSize = style.labelFontSize;
-ax.ZLabel.FontSize = style.labelFontSize;
-lgd = legend(ax,[hBenchmark hComponents], ...
-    {'Four-method J_{111} benchmark','GA objective-component sweeps'}, ...
-    'Location','northoutside','Orientation','horizontal','NumColumns',2,'Box','off');
-lgd.FontName = style.fontName;
-lgd.FontSize = style.legendFontSize;
-lgd.FontWeight = 'bold';
-
-base = fullfile(char(outputDir),char(stem));
-finalize_manuscript_figure(fig);
-print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
-exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
-close(fig);
 end
