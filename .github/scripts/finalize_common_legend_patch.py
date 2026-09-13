@@ -9,20 +9,22 @@ def replace_once(path, old, new):
         raise RuntimeError(f"Expected one match in {path}, found {n}: {old[:160]!r}")
     p.write_text(text.replace(old, new, 1))
 
-# Give the two orbit-family study groups unique stems so consolidating baseline
-# and comparison in one manuscript run cannot collide on a duplicate filename.
-p = Path('scripts/make_reviewer2_curated_figures.m')
-text = p.read_text()
-old = 'orbit_family_selection_legend'
-if text.count(old) != 4:
-    raise RuntimeError(f'Expected four generic orbit-family legend references, found {text.count(old)}')
-text = text.replace(old, 'comparison_orbit_family_selection_legend', 2)
-text = text.replace(old, 'baseline_orbit_family_selection_legend', 2)
-p.write_text(text)
+# Give baseline and comparison orbit-family groups unique legend stems so a
+# full manuscript run can consolidate both without duplicate filenames.
+p = 'scripts/make_reviewer2_curated_figures.m'
+replace_once(
+    p,
+    'export_shared_result_legend(out,"orbit_family_selection_legend", ...\n        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...\n        \'Kind\',\'patch\',\'NumColumns\',3);\n    manifest = add_manifest(manifest,"comparison","orbit_family_selection_legend", ...\n',
+    'export_shared_result_legend(out,"comparison_orbit_family_selection_legend", ...\n        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...\n        \'Kind\',\'patch\',\'NumColumns\',3);\n    manifest = add_manifest(manifest,"comparison","comparison_orbit_family_selection_legend", ...\n',
+)
+replace_once(
+    p,
+    'export_shared_result_legend(out,"orbit_family_selection_legend", ...\n        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...\n        \'Kind\',\'patch\',\'NumColumns\',3);\n    manifest = add_manifest(manifest,"baseline","orbit_family_selection_legend", ...\n',
+    'export_shared_result_legend(out,"baseline_orbit_family_selection_legend", ...\n        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...\n        \'Kind\',\'patch\',\'NumColumns\',3);\n    manifest = add_manifest(manifest,"baseline","baseline_orbit_family_selection_legend", ...\n',
+)
 
 # Keep the legacy direct curated-runtime path consistent with the normal final
 # renderer: one shared legend strip and no embedded panel legend.
-p = 'scripts/make_reviewer2_curated_figures.m'
 replace_once(
     p,
     '    r = reports.runtime;\n    out = prepare_output(r.analysisDirectory,saveFigures);\n',
@@ -42,7 +44,8 @@ replace_once(
     "export_figure(fig,out,stem,saveFigures,style);\n",
 )
 
-# Ensure the dedicated runtime renderer compares string types explicitly.
+# Ensure the dedicated runtime renderer compares string types explicitly and
+# documents the new shared-legend convention.
 p = 'scripts/make_reviewer2_runtime_figures.m'
 replace_once(
     p,
@@ -55,8 +58,8 @@ replace_once(
     '% The optimizer identity is explicit on the x-axis of the two bar charts,\n% while a single legend-only EPS supplies the common optimizer/reference key\n% for the complete 1200-FE subfigure group. Individual panels contain no\n% embedded legends, matching the trajectory and Monte Carlo grid convention.\n% The convergence chart uses one graphics handle per optimizer curve and\n',
 )
 
-# Return the new serial/parallel legend EPS so run_manuscript_figures also
-# consolidates it into MANUSCRIPT_OUTPUT/figures/ with the two panels.
+# Return the serial/parallel legend EPS so run_manuscript_figures consolidates
+# it into MANUSCRIPT_OUTPUT/figures/ with the two data panels.
 p = 'scripts/plot_parallel_speed.m'
 replace_once(p, 'style=reviewer2_paper_style(); files=strings(2,1);\n',
              'style=reviewer2_paper_style(); files=strings(3,1);\n')
