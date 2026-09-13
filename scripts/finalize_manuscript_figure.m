@@ -135,7 +135,7 @@ if numel(axesList) == 1 && is_lunar_gateway_case(legends)
     if is_3d_axes(ax) && isgraphics(ax.YLabel)
         ax.YLabel.Units = 'normalized';
         labelPosition = ax.YLabel.Position;
-        labelPosition(2) = max(labelPosition(2),0.12);
+        labelPosition(2) = max(labelPosition(2),0.18);
         ax.YLabel.Position = labelPosition;
     end
 end
