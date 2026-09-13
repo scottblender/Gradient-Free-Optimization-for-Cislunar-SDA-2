@@ -53,8 +53,6 @@ for kind=1:2
             if kind==1, x{j}=h.fe; else, x{j}=h.elapsed_s; end
             y{j}=h.bestJ;
         end
-        % Compare repeats only where all have recorded observations. Do not
-        % fabricate time-zero objectives or extrapolate completed runs.
         first=max(cellfun(@(v) v(1),x)); last=min(cellfun(@(v) v(end),x));
         assert(last>first,'Insufficient common history.');
         grid=unique(vertcat(x{:})); grid=grid(grid>=first & grid<=last);
@@ -73,8 +71,6 @@ for kind=1:2
         xlabel(ax,'Function evaluations','FontWeight','bold','FontSize',style.labelFontSize); xlim(ax,[0 6000]);
         stem='parallel_speed_lg_convergence_fe';
     else
-        % Mark the mean 6000-FE completion point for each mode explicitly so
-        % the elapsed-time comparison shows where the prescribed budget ends.
         markerSymbols={'o','s'};
         for m=1:2
             plot(ax,completionX(m),completionY(m),markerSymbols{m}, ...
@@ -85,9 +81,6 @@ for kind=1:2
         xlim(ax,[0 1.12*max(completionX)]);
         xl=xlim(ax); yl=ylim(ax);
         xSpan=diff(xl); ySpan=diff(yl);
-
-        % Keep the labels clear of the curves. The actual arrows are added
-        % after final figure fitting so their heads land on the 6000-FE points.
         serialLabelX=completionX(1)-0.18*xSpan;
         serialLabelY=completionY(1)+0.12*ySpan;
         parallelLabelX=completionX(2)+0.08*xSpan;
@@ -109,10 +102,6 @@ for kind=1:2
     end
     ylabel(ax,'Best-so-far objective','FontWeight','bold','FontSize',style.labelFontSize);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
-
-    % Finish all axes/layout formatting first. For the elapsed-time figure,
-    % add ordinary MATLAB annotation arrows afterward so they stay aligned
-    % with the final fitted axes and look like normal arrows rather than quivers.
     drawnow;
     finalize_manuscript_figure(fig);
     drawnow;
@@ -120,7 +109,16 @@ for kind=1:2
         for m=1:2
             [xStart,yStart]=data_to_figure_normalized(ax,arrowStartX(m),arrowStartY(m));
             [xEnd,yEnd]=data_to_figure_normalized(ax,completionX(m),completionY(m));
-            annotation(fig,'arrow',[xStart xEnd],[yStart yEnd], ...
+            dx=xEnd-xStart; dy=yEnd-yStart;
+            arrowLength=hypot(dx,dy);
+            gap=0.015;
+            if arrowLength>gap
+                xTip=xEnd-gap*dx/arrowLength;
+                yTip=yEnd-gap*dy/arrowLength;
+            else
+                xTip=xEnd; yTip=yEnd;
+            end
+            annotation(fig,'arrow',[xStart xTip],[yStart yTip], ...
                 'Color',style.optimizerColors(m,:), ...
                 'LineWidth',1.3,'HeadLength',9,'HeadWidth',9);
         end
@@ -135,7 +133,6 @@ legendFiles=export_shared_result_legend(outputDirectory,"parallel_speed_lg_legen
     ["Serial";"Parallel"],style.optimizerColors(1:2,:),style, ...
     'LineStyles',["-";"--"],'NumColumns',2);
 files(3)=legendFiles(1);
-% Keep the numeric printout beside the final figures as well as in the raw run.
 writetable(R,fullfile(outputDirectory,'parallel_speed_results.csv'));
 sourceDir=fileparts(sourceFile);
 summaryFile=fullfile(sourceDir,'parallel_speed_summary.txt');
@@ -144,9 +141,7 @@ if isfile(summaryFile) && ~strcmp(string(sourceDir),string(outputDirectory))
 end
 end
 
-
 function [xFigure,yFigure] = data_to_figure_normalized(ax,xData,yData)
-%DATA_TO_FIGURE_NORMALIZED Convert 2-D axes data coordinates for annotation.
 oldUnits=ax.Units;
 ax.Units='normalized';
 position=ax.Position;
