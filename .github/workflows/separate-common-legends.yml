@@ -1,0 +1,38 @@
+name: Separate common result legends
+
+on:
+  push:
+    paths:
+      - .github/workflows/separate-common-legends.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply common-legend patch
+        run: python .github/scripts/separate_common_legends.py
+      - name: Static checks
+        run: |
+          git diff --check
+          grep -q 'style.metricPlotPositionNoLegend' scripts/reviewer2_paper_style.m
+          grep -q 'comparison_6000_metrics_legend' scripts/make_reviewer2_curated_figures.m
+          grep -q 'baseline_observer_metric_legend' scripts/make_reviewer2_curated_figures.m
+          grep -q 'ga_screening_metric_legend' scripts/make_reviewer2_curated_figures.m
+          grep -q 'runtime_1200_legend' scripts/make_reviewer2_runtime_figures.m
+          grep -q 'parallel_speed_lg_legend' scripts/plot_parallel_speed.m
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/reviewer2_paper_style.m scripts/make_reviewer2_curated_figures.m scripts/make_reviewer2_runtime_figures.m scripts/plot_parallel_speed.m tests/test_reviewer2_paper_figures_configuration.m
+          git commit -m "Separate shared legends from result panels"
+          git push origin main
