@@ -21,11 +21,11 @@ assert(all(ismember(requiredSamples,string(samples.Properties.VariableNames))));
 assert(all(ismember(requiredSummary,string(summary.Properties.VariableNames))));
 
 style = reviewer2_paper_style();
-% These panels are reduced substantially in the manuscript grids, so give
-% them a dedicated typography increase without changing every paper figure.
-mcFontSize = style.fontSize + 3;
-mcLabelFontSize = style.labelFontSize + 3;
-mcLegendFontSize = style.sharedLegendFontSize + 2;
+% Monte Carlo panels are reduced substantially in the manuscript grids, so
+% use dedicated fixed typography without changing any global paper settings.
+mcFontSize = 32;
+mcLabelFontSize = 34;
+mcLegendFontSize = 32;
 outDir = string(outDir);
 figureDir = string(fullfile(char(outDir),'figures'));
 if saveFigures && ~isfolder(figureDir), mkdir(figureDir); end
@@ -70,12 +70,7 @@ for k = 1:height(summary)
     xticks(ax,[]);
     xlabel(ax,'Monte Carlo samples','FontWeight','bold');
     ylabel(ax,'Objective value','FontWeight','bold');
-    set(ax,'FontName',style.fontName,'FontSize',mcFontSize, ...
-        'FontWeight','bold','LineWidth',style.axisLineWidth, ...
-        'TickDir','out','Layer','top','Box','off', ...
-        'XGrid','off','YGrid','off','ZGrid','off');
-    ax.XLabel.FontSize = mcLabelFontSize;
-    ax.YLabel.FontSize = mcLabelFontSize;
+    apply_mc_typography(ax,style,mcFontSize,mcLabelFontSize);
 
     stem = "baseline_mc_"+mission_code(s.Mission)+"_"+ ...
         measurement_code(s.Measurement)+"_o"+string(s.NumObservers);
@@ -89,6 +84,11 @@ for k = 1:height(summary)
         base = fullfile(char(figureDir),char(stem));
         finalize_manuscript_figure(fig);
         finalize_manuscript_figure(fig);
+        % The shared finalizer intentionally applies the normal manuscript
+        % typography, so restore the MC-only 32/34-pt sizing immediately
+        % before writing the files.
+        apply_mc_typography(ax,style,mcFontSize,mcLabelFontSize);
+        drawnow;
         print(fig,[base '.eps'],'-depsc2','-painters','-r600','-loose');
         exportgraphics(fig,[base '.png'],'Resolution',style.exportDpi);
         close(fig);
@@ -105,10 +105,24 @@ details.SharedLegendStem = repmat(sharedLegendStem,height(details),1);
 end
 
 
+function apply_mc_typography(ax,style,fontSize,labelFontSize)
+set(ax,'FontName',style.fontName,'FontSize',fontSize, ...
+    'FontWeight','bold','LineWidth',style.axisLineWidth, ...
+    'TickDir','out','Layer','top','Box','off', ...
+    'XGrid','off','YGrid','off','ZGrid','off');
+ax.XLabel.FontSize = labelFontSize;
+ax.YLabel.FontSize = labelFontSize;
+ax.XLabel.FontWeight = 'bold';
+ax.YLabel.FontWeight = 'bold';
+end
+
+
 function export_mc_shared_legend(figureDir,stem,saveFigures,style,fontSize)
 if ~saveFigures, return; end
-widthIn = style.figureWidth;
-heightIn = style.sharedLegendFigureHeight;
+% Use a dedicated larger legend canvas so the fixed 32-pt MC legend cannot
+% be cropped by the EPS/PNG bounding box. This is local to the MC export.
+widthIn = 8.0;
+heightIn = 1.8;
 fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
     'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
     'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
