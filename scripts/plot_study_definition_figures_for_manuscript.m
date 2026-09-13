@@ -113,7 +113,7 @@ localStart = max(1,selectedSlot-1);
 localEnd = min(numSlots,nextSlot+1);
 localTime = linspace(slotTime(localStart),slotTime(localEnd),160).';
 localState = interpolant(localTime);
-inset = axes(fig,'Units','normalized','Position',[0.55 0.46 0.32 0.29]);
+inset = axes(fig,'Units','normalized','Position',[0.40 0.46 0.32 0.29]);
 prepare_3d_axes(inset,style);
 plot3(inset,localState(:,1),localState(:,2),localState(:,3),'-', ...
     'Color',orbitColor,'LineWidth',2.1,'HandleVisibility','off');
@@ -125,8 +125,9 @@ slot_marker(inset,slotState(nextSlot,:),nextColor,'s');
 set_local_limits(inset,[localState(:,1:3);slotState(localStart:localEnd,1:3)],0.18);
 set(inset,'Box','on','FontSize',max(10,style.fontSize-2));
 xlabel(inset,''); ylabel(inset,''); zlabel(inset,'');
-text(inset,0.04,0.94,'Zoom','Units','normalized','FontName',style.fontName, ...
-    'FontSize',style.fontSize-1,'FontWeight','bold','VerticalAlignment','top');
+text(inset,0.04,1.03,'Zoom','Units','normalized','FontName',style.fontName, ...
+    'FontSize',style.fontSize-1,'FontWeight','bold','VerticalAlignment','bottom', ...
+    'Clipping','off');
 
 geometryFile = fullfile(outputDir,'slot_geometry_equal_time.eps');
 export_figure(fig,geometryFile,inspectFigure,style);
