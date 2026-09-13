@@ -121,8 +121,8 @@ function export_mc_shared_legend(figureDir,stem,saveFigures,style,fontSize)
 if ~saveFigures, return; end
 % Use a dedicated larger legend canvas so the fixed 32-pt MC legend cannot
 % be cropped by the EPS/PNG bounding box. This is local to the MC export.
-widthIn = 8.0;
-heightIn = 1.8;
+widthIn = 9.0;
+heightIn = 2.2;
 fig = figure('Color','w','Units','inches','Position',[1 1 widthIn heightIn], ...
     'PaperUnits','inches','PaperSize',[widthIn heightIn], ...
     'PaperPosition',[0 0 widthIn heightIn],'PaperPositionMode','manual', ...
