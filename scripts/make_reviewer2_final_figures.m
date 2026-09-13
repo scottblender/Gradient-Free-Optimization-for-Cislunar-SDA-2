@@ -39,6 +39,15 @@ if ~isempty(fieldnames(remaining))
     manifest = [manifest;otherManifest];
 end
 
+% Add the two velocity-domain screening diagnostics directly from the saved
+% per-run validation metrics. These plots explain cases where the total
+% objective differs from the position-only screening panels, especially LT.
+if isfield(reports,'objective_screening')
+    velocityManifest = plot_screening_velocity_metrics( ...
+        reports.objective_screening,saveFigures);
+    manifest = [manifest;velocityManifest];
+end
+
 % The previously added three-dimensional study-design cube was removed from
 % the manuscript pipeline because the sampled study slices are more clearly
 % communicated by the surrounding tables and result figures.
