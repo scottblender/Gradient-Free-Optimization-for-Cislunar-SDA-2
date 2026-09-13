@@ -83,9 +83,11 @@ for k = 1:numel(labels)
                             r = one(R,R.Mission==mission & R.Measurement==meas & ...
                                 R.NPeriods==period & R.NumObservers==count);
                             per = string(period); if mission~="LUNAR_GATEWAY", per = "--"; end
-                            rows(end+1,:) = [mission_code(mission),string(count),per, ...
+                            row = [mission_code(mission),string(count),per, ...
                                 metric(r,'BestJ'),metric(r,'RMSEPos','_km'), ...
                                 metric(r,'EffectiveSigmaPos','_km')];
+                            if count==10, row = bold_row(row); end
+                            rows(end+1,:) = row;
                         end
                     end
                 end
@@ -104,6 +106,9 @@ for k = 1:numel(labels)
                 R = read_results(folder,'comparison_6000_results.csv');
                 M = read_results(folder,'final_run_metrics.csv'); rows = strings(0,7);
                 for mission = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"]
+                    missionRows = R(R.Mission==mission,:);
+                    [~,bestIndex] = min(missionRows.BestJMean);
+                    bestOptimizer = missionRows.Optimizer(bestIndex);
                     for optimizer = ["GA","PSO","ABC","ACO"]
                         r = one(R,R.Mission==mission & R.Optimizer==optimizer);
                         % Match the group key; never pool different target cases.
@@ -118,10 +123,12 @@ for k = 1:numel(labels)
                             end
                         end
                         check_calls(group,6000);
-                        rows(end+1,:) = [mission_code(mission),optimizer_label(optimizer), ...
+                        row = [mission_code(mission),optimizer_label(optimizer), ...
                             range_text(group.solver_calls),metric(r,'BestJ'), ...
                             metric(r,'RMSEPos','_km'),metric(r,'EffectiveSigmaPos','_km'), ...
                             metric(r,'MeanStability')];
+                        if optimizer==bestOptimizer, row = bold_row(row); end
+                        rows(end+1,:) = row;
                     end
                 end
             case {"screening_events_only","cost_component_metric_winners"}
@@ -144,6 +151,9 @@ for k = 1:numel(labels)
                 end
         end
         output.tables.(label) = rows;
+        if label=="target_ic_summary"
+            fprintf('\\multicolumn{5}{c}{\\textbf{LT reproduction parameters}} \\\\\n');
+        end
         for j = 1:size(rows,1)
             if label=="target_ic_summary" && j>6
                 fprintf('\\multicolumn{2}{@{}l}{%s} & \\multicolumn{3}{l@{}}{%s} %s\n', ...
@@ -225,12 +235,15 @@ for k = 1:height(T)
 end
 keys=["NHL1","SHL1","NNRHL1","SNRHL1","NHL2","SHL2","NNRHL2","SNRHL2","DRO"];
 labels=["NHO","SHO","NNRHO","SNRHO","NHO","SHO","NNRHO","SNRHO","DRO"];
-ranges=strings(10,6); geometry=strings(9,6);
+ranges=strings(10,6); geometry=strings(9,5);
 for k=1:9
     use=string(T.orbitFamily)==keys(k); assert(any(use),'Missing family %s.',keys(k));
     region="$L_1$"; if k>4, region="$L_2$"; end; if k==9, region="--"; end
     ranges(k,:)=[labels(k),region,string(nnz(use)),range_text(jacobi(use)),range_text(period(use)),range_text(stability(use))];
-    geometry(k,:)=[labels(k),region,range_text(geom(use,1)),range_text(geom(use,2)),range_text(geom(use,3)),range_text(geom(use,4))];
+    familyRegion = labels(k)+" ("+region+")";
+    if k==9, familyRegion = "DRO"; end
+    geometry(k,:)=[familyRegion,range_text(geom(use,1)),range_text(geom(use,2)), ...
+        range_text(geom(use,3)),range_text(geom(use,4))];
 end
 ranges(10,:)=["Total","--",string(height(T)),"--","--","--"];
 end
@@ -267,6 +280,18 @@ try
 catch exception
     fprintf(2,'Converged LT values unavailable: %s\n',exception.message);
     rows(end+1,:)=["Converged duration / costates","UNAVAILABLE (see diagnostic)","","",""];
+end
+end
+
+function row = bold_row(row)
+for k = 1:numel(row)
+    value = string(row(k));
+    if startsWith(value,"$") && endsWith(value,"$")
+        inner = extractBetween(value,2,strlength(value)-1);
+        row(k) = "$\\boldsymbol{"+inner+"}$";
+    else
+        row(k) = "\\textbf{"+value+"}";
+    end
 end
 end
 
