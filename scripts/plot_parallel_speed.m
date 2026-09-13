@@ -86,41 +86,47 @@ for kind=1:2
         xl=xlim(ax); yl=ylim(ax);
         xSpan=diff(xl); ySpan=diff(yl);
 
-        % Place each label away from its marker and connect it with a clear
-        % arrow so the fixed 6000-FE stopping point is visually unambiguous.
-        serialLabelX=completionX(1)-0.19*xSpan;
-        serialLabelY=completionY(1)+0.11*ySpan;
-        parallelLabelX=completionX(2)+0.07*xSpan;
+        % Keep the labels clear of the curves. The actual arrows are added
+        % after final figure fitting so their heads land on the 6000-FE points.
+        serialLabelX=completionX(1)-0.18*xSpan;
+        serialLabelY=completionY(1)+0.12*ySpan;
+        parallelLabelX=completionX(2)+0.08*xSpan;
         parallelLabelY=completionY(2)+0.14*ySpan;
+        arrowStartX=[serialLabelX;parallelLabelX];
+        arrowStartY=[serialLabelY-0.012*ySpan;parallelLabelY-0.012*ySpan];
 
         text(ax,serialLabelX,serialLabelY,'6000 FE', ...
             'HorizontalAlignment','center','VerticalAlignment','bottom', ...
             'FontName',style.fontName,'FontSize',style.legendFontSize, ...
             'FontWeight','bold','Color',style.optimizerColors(1,:));
-        quiver(ax,serialLabelX,serialLabelY-0.015*ySpan, ...
-            completionX(1)-serialLabelX, ...
-            completionY(1)-(serialLabelY-0.015*ySpan),0, ...
-            'Color',style.optimizerColors(1,:),'LineWidth',1.2, ...
-            'MaxHeadSize',0.75,'HandleVisibility','off');
-
         text(ax,parallelLabelX,parallelLabelY,'6000 FE', ...
             'HorizontalAlignment','center','VerticalAlignment','bottom', ...
             'FontName',style.fontName,'FontSize',style.legendFontSize, ...
             'FontWeight','bold','Color',style.optimizerColors(2,:));
-        quiver(ax,parallelLabelX,parallelLabelY-0.015*ySpan, ...
-            completionX(2)-parallelLabelX, ...
-            completionY(2)-(parallelLabelY-0.015*ySpan),0, ...
-            'Color',style.optimizerColors(2,:),'LineWidth',1.2, ...
-            'MaxHeadSize',0.75,'HandleVisibility','off');
 
         xlabel(ax,'Optimization elapsed time (s)','FontWeight','bold','FontSize',style.labelFontSize);
         stem='parallel_speed_lg_convergence_time';
     end
     ylabel(ax,'Best-so-far objective','FontWeight','bold','FontSize',style.labelFontSize);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
+
+    % Finish all axes/layout formatting first. For the elapsed-time figure,
+    % add ordinary MATLAB annotation arrows afterward so they stay aligned
+    % with the final fitted axes and look like normal arrows rather than quivers.
     drawnow;
     finalize_manuscript_figure(fig);
-    finalize_manuscript_figure(fig); print(fig,char(files(kind)),'-depsc2','-painters','-r600','-loose');
+    drawnow;
+    if kind==2
+        for m=1:2
+            [xStart,yStart]=data_to_figure_normalized(ax,arrowStartX(m),arrowStartY(m));
+            [xEnd,yEnd]=data_to_figure_normalized(ax,completionX(m),completionY(m));
+            annotation(fig,'arrow',[xStart xEnd],[yStart yEnd], ...
+                'Color',style.optimizerColors(m,:), ...
+                'LineWidth',1.3,'HeadLength',9,'HeadWidth',9);
+        end
+    end
+
+    print(fig,char(files(kind)),'-depsc2','-painters','-r600','-loose');
     print(fig,char(replace(files(kind),'.eps','.png')),'-dpng', ...
         sprintf('-r%d',style.exportDpi));
     clear cleanup;
@@ -136,4 +142,16 @@ summaryFile=fullfile(sourceDir,'parallel_speed_summary.txt');
 if isfile(summaryFile) && ~strcmp(string(sourceDir),string(outputDirectory))
     copyfile(summaryFile,fullfile(outputDirectory,'parallel_speed_summary.txt'));
 end
+end
+
+
+function [xFigure,yFigure] = data_to_figure_normalized(ax,xData,yData)
+%DATA_TO_FIGURE_NORMALIZED Convert 2-D axes data coordinates for annotation.
+oldUnits=ax.Units;
+ax.Units='normalized';
+position=ax.Position;
+ax.Units=oldUnits;
+xl=xlim(ax); yl=ylim(ax);
+xFigure=position(1)+(xData-xl(1))/diff(xl)*position(3);
+yFigure=position(2)+(yData-yl(1))/diff(yl)*position(4);
 end
