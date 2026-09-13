@@ -13,6 +13,9 @@ addParameter(p,'NumColumns',[],@(x) isempty(x) || (isscalar(x) && x >= 1));
 parse(p,varargin{:});
 
 labels = string(labels(:));
+% Keep the internal optimizer key "ABC" unchanged in saved results while
+% using the manuscript acronym ABCO everywhere readers see a label.
+labels(labels == "ABC") = "ABCO";
 colors = double(colors);
 assert(size(colors,1) == numel(labels) && size(colors,2) == 3, ...
     'colors must contain one RGB row per legend label.');
