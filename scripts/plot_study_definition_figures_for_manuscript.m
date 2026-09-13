@@ -113,7 +113,8 @@ localStart = max(1,selectedSlot-1);
 localEnd = min(numSlots,nextSlot+1);
 localTime = linspace(slotTime(localStart),slotTime(localEnd),160).';
 localState = interpolant(localTime);
-inset = axes(fig,'Units','normalized','Position',[0.28 0.23 0.38 0.36]);
+insetPosition = [0.35 0.23 0.38 0.36];
+inset = axes(fig,'Units','normalized','Position',insetPosition);
 inset.PositionConstraint = 'innerposition';
 prepare_3d_axes(inset,style);
 plot3(inset,localState(:,1),localState(:,2),localState(:,3),'-', ...
@@ -121,13 +122,15 @@ plot3(inset,localState(:,1),localState(:,2),localState(:,3),'-', ...
 plot3(inset,slotState(localStart:localEnd,1),slotState(localStart:localEnd,2), ...
     slotState(localStart:localEnd,3),'o','MarkerSize',4,'MarkerFaceColor','w', ...
     'MarkerEdgeColor',neutralColor,'LineWidth',0.9,'HandleVisibility','off');
+context_marker(inset,slotState(localStart,:),0.45*[1 1 1]);
+context_marker(inset,slotState(localEnd,:),0.45*[1 1 1]);
 slot_marker(inset,slotState(selectedSlot,:),selectedColor,'o');
 slot_marker(inset,slotState(nextSlot,:),nextColor,'s');
 set_local_limits(inset,[localState(:,1:3);slotState(localStart:localEnd,1:3)],0.18);
 set(inset,'Box','on','FontSize',max(10,style.fontSize-2));
 xlabel(inset,''); ylabel(inset,''); zlabel(inset,'');
-inset.Position = [0.28 0.23 0.38 0.36];
-text(inset,0.04,1.08,'Zoom','Units','normalized','FontName',style.fontName, ...
+inset.Position = insetPosition;
+text(inset,0.04,1.03,'Zoom','Units','normalized','FontName',style.fontName, ...
     'FontSize',style.fontSize-1,'FontWeight','bold','VerticalAlignment','bottom', ...
     'Clipping','off');
 
@@ -254,6 +257,13 @@ h = plot3(ax,state(1),state(2),state(3),marker,'MarkerSize',13, ...
 if marker=='o', inner='+'; else, inner='x'; end
 plot3(ax,state(1),state(2),state(3),inner,'MarkerSize',9,'Color','k', ...
     'LineWidth',1.8,'HandleVisibility','off');
+end
+
+
+function h = context_marker(ax,state,color)
+h = plot3(ax,state(1),state(2),state(3),'o','MarkerSize',8, ...
+    'MarkerFaceColor','w','MarkerEdgeColor',color,'LineWidth',1.6, ...
+    'HandleVisibility','off');
 end
 
 
