@@ -46,7 +46,7 @@ for k = 1:numel(axesList)
             oldUnits = ax.Units;
             ax.Units = 'normalized';
             if is_3d_axes(ax)
-                ax.Position = [0.18 0.36 0.38 0.36];
+                ax.Position = [0.28 0.23 0.38 0.36];
             else
                 ax.Position = [0.63 0.40 0.28 0.20];
             end
