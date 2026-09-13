@@ -113,7 +113,8 @@ localStart = max(1,selectedSlot-1);
 localEnd = min(numSlots,nextSlot+1);
 localTime = linspace(slotTime(localStart),slotTime(localEnd),160).';
 localState = interpolant(localTime);
-inset = axes(fig,'Units','normalized','Position',[0.40 0.46 0.32 0.29]);
+inset = axes(fig,'Units','normalized','Position',[0.22 0.40 0.38 0.38]);
+inset.PositionConstraint = 'innerposition';
 prepare_3d_axes(inset,style);
 plot3(inset,localState(:,1),localState(:,2),localState(:,3),'-', ...
     'Color',orbitColor,'LineWidth',2.1,'HandleVisibility','off');
@@ -125,7 +126,10 @@ slot_marker(inset,slotState(nextSlot,:),nextColor,'s');
 set_local_limits(inset,[localState(:,1:3);slotState(localStart:localEnd,1:3)],0.18);
 set(inset,'Box','on','FontSize',max(10,style.fontSize-2));
 xlabel(inset,''); ylabel(inset,''); zlabel(inset,'');
-text(inset,0.04,1.03,'Zoom','Units','normalized','FontName',style.fontName, ...
+% Reapply the inset rectangle after the 3-D axis formatting so MATLAB does
+% not shift the plot box back toward the right side of the figure.
+inset.Position = [0.22 0.40 0.38 0.38];
+text(inset,0.04,1.08,'Zoom','Units','normalized','FontName',style.fontName, ...
     'FontSize',style.fontSize-1,'FontWeight','bold','VerticalAlignment','bottom', ...
     'Clipping','off');
 
