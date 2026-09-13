@@ -47,6 +47,20 @@ for k = 1:numel(axesList)
         ax.YTickLabel = [];
         ax.ZTickLabel = [];
 
+        % The slot-definition zooms sit below the north-outside legends so
+        % neither the legend nor the inset obscures the other. Keep the 3-D
+        % geometry zoom narrower because its projected box needs more height.
+        if has_zoom_annotation(ax)
+            oldUnits = ax.Units;
+            ax.Units = 'normalized';
+            if is_3d_axes(ax)
+                ax.Position = [0.72 0.39 0.19 0.23];
+            else
+                ax.Position = [0.63 0.40 0.28 0.20];
+            end
+            ax.Units = oldUnits;
+        end
+
         % Keep only compact inset annotations such as "Zoom"; reduce their
         % source size so they do not dominate the small overlay axes.
         insetText = findall(ax,'Type','text');
@@ -142,6 +156,21 @@ for k = 1:numel(objects)
     if isnumeric(z) && ~isempty(z) && any(isfinite(z(:)))
         tf = true;
         return;
+    end
+end
+end
+
+function tf = has_zoom_annotation(ax)
+tf = false;
+textObjects = findall(ax,'Type','text');
+for k = 1:numel(textObjects)
+    try
+        value = string(textObjects(k).String);
+        if any(strcmpi(strtrim(value),"Zoom"))
+            tf = true;
+            return;
+        end
+    catch
     end
 end
 end
