@@ -58,6 +58,18 @@ if isfield(reports,'comparison')
     out = prepare_output(r.analysisDirectory,saveFigures);
     missions = string(r.missions);
     refs = matched_baselines(baselineResults,missions,3,1,'BestJMean','BestJStd');
+    compOptimizers = string(r.optimizers);
+    compColors = colors_for_optimizers(compOptimizers,style);
+    export_shared_result_legend(out,"comparison_6000_metrics_legend", ...
+        [optimizer_labels(compOptimizers);"GA baseline"], ...
+        [compColors;0.30 0.30 0.30],style, ...
+        'LineStyles',[repmat("-",numel(compOptimizers),1);"--"],'NumColumns',2);
+    export_shared_result_legend(out,"comparison_6000_convergence_legend", ...
+        optimizer_labels(compOptimizers),compColors,style,'NumColumns',2);
+    manifest = add_manifest(manifest,"comparison","comparison_6000_metrics_legend", ...
+        "Shared GA/PSO/ABC/ACO and GA-baseline legend for the 6000-FE metric grid.");
+    manifest = add_manifest(manifest,"comparison","comparison_6000_convergence_legend", ...
+        "Shared optimizer legend for the 6000-FE convergence grid.");
 
     plot_comparison_metric(r,'BestJMean','BestJStd','Mean final best objective', ...
         "comparison_6000_objective",out,saveFigures,style,refs);
@@ -85,6 +97,11 @@ if isfield(reports,'comparison')
     end
 
     familyData = build_comparison_family_data(r);
+    export_shared_result_legend(out,"orbit_family_selection_legend", ...
+        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...
+        'Kind','patch','NumColumns',3);
+    manifest = add_manifest(manifest,"comparison","orbit_family_selection_legend", ...
+        "Shared five-family legend for orbit-family selection panels.");
     writetable(familyData,fullfile(char(r.analysisDirectory), ...
         'comparison_orbit_family_selection.csv'));
     plot_family_grouped_all_cases(familyData,"Optimizer", ...
@@ -107,6 +124,26 @@ if isfield(reports,'baseline')
     r = reports.baseline;
     out = prepare_output(r.analysisDirectory,saveFigures);
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
+
+    observerSpecs = { ...
+    export_shared_result_legend(out,"baseline_observer_metric_legend", ...
+        ["Angles only";"Angles + range"],style.measurementColors,style,'NumColumns',2);
+    export_shared_result_legend(out,"baseline_observer_convergence_legend", ...
+        ["3 observers";"5 observers";"7 observers";"10 observers"], ...
+        lines(4),style,'NumColumns',2);
+    export_shared_result_legend(out,"baseline_duration_metric_legend", ...
+        ["3 observers";"5 observers";"7 observers";"10 observers"], ...
+        lines(4),style,'NumColumns',2);
+    export_shared_result_legend(out,"baseline_duration_convergence_legend", ...
+        ["1 period";"3 periods";"5 periods"],lines(3),style,'NumColumns',3);
+    manifest = add_manifest(manifest,"baseline","baseline_observer_metric_legend", ...
+        "Shared AO/AR legend for observer-count metric panels.");
+    manifest = add_manifest(manifest,"baseline","baseline_observer_convergence_legend", ...
+        "Shared observer-count legend for AO/AR convergence panels.");
+    manifest = add_manifest(manifest,"baseline","baseline_duration_metric_legend", ...
+        "Shared observer-count legend for propagation-duration metric panels.");
+    manifest = add_manifest(manifest,"baseline","baseline_duration_convergence_legend", ...
+        "Shared propagation-duration legend for AO/AR convergence panels.");
 
     observerSpecs = { ...
         'BestJMean','BestJStd','Mean final best objective','objective'; ...
@@ -149,6 +186,11 @@ if isfield(reports,'baseline')
     end
 
     familyData = build_baseline_family_data(r);
+    export_shared_result_legend(out,"orbit_family_selection_legend", ...
+        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...
+        'Kind','patch','NumColumns',3);
+    manifest = add_manifest(manifest,"baseline","orbit_family_selection_legend", ...
+        "Shared five-family legend for orbit-family selection panels.");
     writetable(familyData,fullfile(char(r.analysisDirectory), ...
         'baseline_orbit_family_selection.csv'));
     plot_family_grouped_all_cases(familyData,"Number of observers", ...
@@ -169,6 +211,21 @@ if isfield(reports,'objective_screening')
     r = reports.objective_screening;
     out = prepare_output(r.analysisDirectory,saveFigures);
     missions = ["LUNAR_GATEWAY","LOW_THRUST_TRANSFER","GATEWAY_IMPULSE"];
+
+    % Screening ON/OFF: only the physical metrics requested for the paper.
+    export_shared_result_legend(out,"ga_screening_metric_legend", ...
+        ["Screening ON";"Screening OFF"],style.configurationColors(1:2,:),style,'NumColumns',2);
+    export_shared_result_legend(out,"ga_screening_convergence_legend", ...
+        ["Screening ON";"Screening OFF"],style.configurationColors(1:2,:),style,'NumColumns',2);
+    export_shared_result_legend(out,"ga_objective_orbit_family_selection_legend", ...
+        ["NHO";"SHO";"NNRHO";"SNRHO";"DRO"],lines(5),style, ...
+        'Kind','patch','NumColumns',3);
+    manifest = add_manifest(manifest,"objective_screening","ga_screening_metric_legend", ...
+        "Shared screening ON/OFF legend for metric panels.");
+    manifest = add_manifest(manifest,"objective_screening","ga_screening_convergence_legend", ...
+        "Shared screening ON/OFF legend for convergence panels.");
+    manifest = add_manifest(manifest,"objective_screening","ga_objective_orbit_family_selection_legend", ...
+        "Shared five-family legend for objective-component family panels.");
 
     % Screening ON/OFF: only the physical metrics requested for the paper.
     screeningSpecs = { ...
@@ -349,9 +406,7 @@ if ~isempty(baselineRefs)
         legendLabels = [legendLabels;"GA baseline"];
     end
 end
-lgd = legend(ax,legendHandles,cellstr(legendLabels),'Location','northoutside', ...
-    'Orientation','horizontal','NumColumns',min(numel(legendLabels),5),'Box','off');
-style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_comparison_convergence(r,mission,out,stem,saveFigures,style)
@@ -397,9 +452,7 @@ for m = 1:2
 end
 ax.XTick = counts; xlabel(ax,'Number of observers','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,{'Angles only','Angles + range'}, ...
-    'Location','northoutside','Orientation','horizontal','Box','off');
-style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_baseline_duration_metric(r,measurement,valueField,stdField,yLabel,out,stem,saveFigures,style)
@@ -421,8 +474,7 @@ for k = 1:numel(counts)
 end
 ax.XTick = periods; xlabel(ax,'Tracking duration (Gateway periods)','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal','NumColumns',2,'Box','off');
-style_legend(lgd,ax,style); export_figure(fig,out,stem,saveFigures,style);
+export_figure(fig,out,stem,saveFigures,style);
 end
 
 function plot_baseline_observer_convergence(r,mission,measurement,out,stem,saveFigures,style)
@@ -469,8 +521,6 @@ end
 ax.XTick = 1:3; ax.XTickLabel = cellstr(mission_labels(missions));
 xlabel(ax,'Target case','FontWeight','bold');
 ylabel(ax,yLabel,'FontWeight','bold'); style_axes(ax,style);
-lgd = legend(ax,b,{'Screening ON','Screening OFF'},'Location','northoutside', ...
-    'Orientation','horizontal','Box','off'); style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -654,9 +704,6 @@ for m = 1:3
         'Interpreter','none');
 end
 
-lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
-    'Orientation','horizontal','NumColumns',5,'Box','off');
-style_legend(lgd,ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -675,8 +722,7 @@ b = bar(ax,1:4,V,'stacked','BarWidth',0.78); colors = lines(5);
 for f = 1:5, b(f).FaceColor = colors(f,:); end
 ax.XTick = 1:4; ax.XTickLabel = cellstr(labels); ylim(ax,[0 100]);
 xlabel(ax,'Objective configuration','FontWeight','bold'); ylabel(ax,'Observer selections (%)','FontWeight','bold');
-style_axes(ax,style); lgd = legend(ax,b,cellstr(families),'Location','northoutside', ...
-    'Orientation','horizontal','NumColumns',5,'Box','off'); style_legend(lgd,ax,style);
+style_axes(ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -695,8 +741,7 @@ end
 allY = allY(isfinite(allY)); lo = min(allY); hi = max(allY); span = max(hi-lo,0.05*max(1,abs(hi)));
 ylim(ax,[lo-0.06*span hi+0.08*span]); xlim(ax,[60 budget]);
 xlabel(ax,'Function evaluations','FontWeight','bold'); ylabel(ax,'Mean best-so-far objective','FontWeight','bold');
-style_axes(ax,style); lgd = legend(ax,handles,'Location','northoutside','Orientation','horizontal', ...
-    'NumColumns',min(numel(handles),5),'Box','off'); style_legend(lgd,ax,style);
+style_axes(ax,style);
 export_figure(fig,out,stem,saveFigures,style);
 end
 
@@ -743,7 +788,7 @@ movegui(fig,'center'); set(fig,'DefaultAxesFontName',style.fontName,'DefaultAxes
 end
 
 function style_axes(ax,style)
-set(ax,'Units','normalized','Position',style.metricPlotPosition);
+set(ax,'Units','normalized','Position',style.metricPlotPositionNoLegend);
 set(ax,'FontName',style.fontName,'FontSize',style.fontSize,'FontWeight','bold', ...
     'LineWidth',style.axisLineWidth,'TickDir','out','Layer','top', ...
     'Box','off','XGrid','off','YGrid','off','ZGrid','off');

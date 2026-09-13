@@ -22,6 +22,8 @@ style.sharedLegendFontSize = 22;
 style.sharedLegendFigureHeight = 1.05;
 style.sharedGeometryLegendWidth = 3.10;
 style.sharedGeometryLegendHeight = 1.55;
+style.sharedResultLegendWidth = 3.10;
+style.sharedResultLegendHeight = 1.55;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -71,6 +73,7 @@ style.fitMaxIterations = 36;
 % rectangle further when a specific legend/label combination needs more room.
 % -------------------------------------------------------------------------
 style.metricPlotPosition = [0.15 0.18 0.70 0.53];
+style.metricPlotPositionNoLegend = [0.15 0.16 0.70 0.70];
 style.legend2DGap = 0.08;
 style.legendMaxColumns = 8;
 style.legendMaxWidth = 0.96;

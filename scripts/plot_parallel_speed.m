@@ -33,7 +33,7 @@ for kind=1:2
         'PaperPosition',[0 0 style.figureWidth style.figureHeight], ...
         'PaperPositionMode','manual','Renderer','painters','InvertHardcopy','off');
     cleanup=onCleanup(@() close(fig));
-    ax=axes(fig,'Units','normalized','Position',style.metricPlotPosition); hold(ax,'on');
+    ax=axes(fig,'Units','normalized','Position',style.metricPlotPositionNoLegend); hold(ax,'on');
     set(ax,'FontName',style.fontName,'FontSize',style.fontSize, ...
         'LineWidth',style.axisLineWidth,'Box','off','FontWeight','bold', ...
         'TickDir','out','Layer','top','XGrid','off','YGrid','off','ZGrid','off');
@@ -72,8 +72,6 @@ for kind=1:2
         stem='parallel_speed_lg_convergence_time';
     end
     ylabel(ax,'Best-so-far objective','FontWeight','bold','FontSize',style.labelFontSize);
-    lgd=legend(ax,'Location','northoutside','Orientation','horizontal','Box','off');
-    format_manuscript_legend(ax,lgd,style,style.metricPlotPosition);
     files(kind)=string(fullfile(outputDirectory,[stem '.eps']));
     drawnow;
     finalize_manuscript_figure(fig);
@@ -82,6 +80,10 @@ for kind=1:2
         sprintf('-r%d',style.exportDpi));
     clear cleanup;
 end
+% Keep the numeric printout beside the final figures as well as in the raw run.
+export_shared_result_legend(outputDirectory,"parallel_speed_lg_legend", ...
+    ["Serial";"Parallel"],style.optimizerColors(1:2,:),style, ...
+    'LineStyles',["-";"--"],'NumColumns',2);
 % Keep the numeric printout beside the final figures as well as in the raw run.
 writetable(R,fullfile(outputDirectory,'parallel_speed_results.csv'));
 sourceDir=fileparts(sourceFile);

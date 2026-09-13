@@ -225,13 +225,6 @@ insert_after_once(
     "    'LineStyles',[\"-\";\"--\"],'NumColumns',2);\n"
     "% Keep the numeric printout beside the final figures as well as in the raw run.\n",
 )
-# The insertion duplicates the marker comment; collapse it once.
-replace_once(
-    p,
-    "% Keep the numeric printout beside the final figures as well as in the raw run.\n% Keep the numeric printout beside the final figures as well as in the raw run.\n",
-    "% Keep the numeric printout beside the final figures as well as in the raw run.\n",
-)
-
 # -----------------------------------------------------------------------------
 # Static manuscript-figure audit.
 # -----------------------------------------------------------------------------
