@@ -18,12 +18,14 @@ style.geometryLabelFontSize = 24;
 style.legendFontSize = 20;
 style.geometryLegendFontSize = 21;
 style.legendMinFontSize = 17;
-style.sharedLegendFontSize = 22;
-style.sharedLegendFigureHeight = 1.05;
-style.sharedGeometryLegendWidth = 3.10;
-style.sharedGeometryLegendHeight = 1.55;
-style.sharedResultLegendWidth = 3.10;
-style.sharedResultLegendHeight = 1.55;
+% Shared legends use a slightly smaller font and a wider canvas than the
+% data panels so EPS bounding boxes never clip long entries.
+style.sharedLegendFontSize = 18;
+style.sharedLegendFigureHeight = 1.30;
+style.sharedGeometryLegendWidth = 5.40;
+style.sharedGeometryLegendHeight = 2.00;
+style.sharedResultLegendWidth = 5.40;
+style.sharedResultLegendHeight = 1.60;
 style.lineWidth = 1.8;
 style.axisLineWidth = 1.35;
 style.markerSize = 5.5;
@@ -121,6 +123,8 @@ style.maneuverProjections.LOW_THRUST_TRANSFER = 'perspective';
 style.maneuverProjections.GATEWAY_IMPULSE = 'perspective';
 
 % Fixed qualitative palette so optimizer identity never changes by figure.
+% ABC remains the internal solver key; manuscript-facing labels are converted
+% to ABCO during final figure construction/export.
 style.optimizerOrder = ["GA","PSO","BAYESIAN","ABC","ACO"];
 style.optimizerColors = [ ...
     0.0000 0.4470 0.7410; ...
