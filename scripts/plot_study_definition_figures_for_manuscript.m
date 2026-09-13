@@ -113,7 +113,7 @@ localStart = max(1,selectedSlot-1);
 localEnd = min(numSlots,nextSlot+1);
 localTime = linspace(slotTime(localStart),slotTime(localEnd),160).';
 localState = interpolant(localTime);
-insetPosition = [0.35 0.23 0.38 0.36];
+insetPosition = [0.47 0.23 0.38 0.36];
 inset = axes(fig,'Units','normalized','Position',insetPosition);
 inset.PositionConstraint = 'innerposition';
 prepare_3d_axes(inset,style);
