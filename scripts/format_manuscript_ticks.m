@@ -50,5 +50,13 @@ for name = ["X","Y","Z"]
             ax.(name+"TickLabel") = labels(keep);
         end
     end
+
+    % Keep compact symmetric y-axis endpoint labels horizontal. This makes
+    % the LG +/-0.04 LU labels use the same presentation as the GI y-axis
+    % labels and prevents their rotated extents from pushing y (LU) outside
+    % the fixed manuscript canvas.
+    if name == "Y" && isSymmetric && span <= 0.15
+        ax.YTickLabelRotation = 0;
+    end
 end
 end
