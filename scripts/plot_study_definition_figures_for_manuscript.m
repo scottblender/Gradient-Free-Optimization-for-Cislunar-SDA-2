@@ -68,7 +68,8 @@ family = string(T.orbitFamily);
 orbitIndex = find(family=="NNRHL1",1,'first');
 assert(~isempty(orbitIndex),'No representative northern NRHO L1 orbit was found.');
 
-period = T.('Period (TU) ')(orbitIndex);
+periodAll = T.('Period (TU) ');
+period = periodAll(orbitIndex);
 rawTime = T.time{orbitIndex};
 rawState = T.state{orbitIndex};
 [uniqueTime,uniqueIndex] = unique(rawTime);
