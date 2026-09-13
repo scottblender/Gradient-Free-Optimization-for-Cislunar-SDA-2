@@ -46,6 +46,17 @@ for k = 1:numel(axesList)
         ax.XTickLabel = [];
         ax.YTickLabel = [];
         ax.ZTickLabel = [];
+
+        % Keep only compact inset annotations such as "Zoom"; reduce their
+        % source size so they do not dominate the small overlay axes.
+        insetText = findall(ax,'Type','text');
+        for t = 1:numel(insetText)
+            try
+                insetText(t).FontSize = min(insetText(t).FontSize,12);
+                insetText(t).FontWeight = style.fontWeight;
+            catch
+            end
+        end
     elseif numel(axesList) > 1 && k == mainAxesIndex && ...
             is_3d_axes(ax) && numel(ax.XTick) > 2
         % The representative NRHO slot panel has a short projected x axis.
