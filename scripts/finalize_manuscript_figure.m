@@ -200,7 +200,9 @@ tf = false;
 if numel(legends) ~= 1 || ~isgraphics(legends(1)), return; end
 try
     labels = strtrim(string(legends(1).String(:)));
-    tf = isequal(labels,["Nominal Gateway";"Moon";"L1";"L2"]);
+    originalLabels = ["Nominal Gateway";"Moon";"L1";"L2"];
+    manuscriptLabels = ["LG";"Moon";"L1";"L2"];
+    tf = isequal(labels,originalLabels) || isequal(labels,manuscriptLabels);
 catch
 end
 end
