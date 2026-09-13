@@ -47,14 +47,14 @@ for k = 1:numel(axesList)
         ax.YTickLabel = [];
         ax.ZTickLabel = [];
 
-        % The slot-definition zooms sit below the north-outside legends so
-        % neither the legend nor the inset obscures the other. Keep the 3-D
-        % geometry zoom narrower because its projected box needs more height.
+        % Keep slot-definition zooms clear of the north-outside legends. The
+        % 3-D geometry zoom is deliberately large and left-aligned so it does
+        % not cover the right side of the orbit panel.
         if has_zoom_annotation(ax)
             oldUnits = ax.Units;
             ax.Units = 'normalized';
             if is_3d_axes(ax)
-                ax.Position = [0.72 0.39 0.19 0.23];
+                ax.Position = [0.12 0.36 0.42 0.38];
             else
                 ax.Position = [0.63 0.40 0.28 0.20];
             end
