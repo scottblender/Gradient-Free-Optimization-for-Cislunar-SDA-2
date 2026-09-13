@@ -8,6 +8,7 @@ function files = export_shared_result_legend(outputDirectory,stem,labels,colors,
 p = inputParser;
 addParameter(p,'Kind','line',@(x) ischar(x) || isstring(x));
 addParameter(p,'LineStyles',strings(0,1),@(x) ischar(x) || isstring(x) || iscellstr(x));
+addParameter(p,'Markers',strings(0,1),@(x) ischar(x) || isstring(x) || iscellstr(x));
 addParameter(p,'NumColumns',[],@(x) isempty(x) || (isscalar(x) && x >= 1));
 parse(p,varargin{:});
 
@@ -22,6 +23,13 @@ if isempty(lineStyles)
 end
 assert(numel(lineStyles) == numel(labels), ...
     'LineStyles must contain one entry per legend label.');
+
+markers = string(p.Results.Markers(:));
+if isempty(markers)
+    markers = repmat("none",numel(labels),1);
+end
+assert(numel(markers) == numel(labels), ...
+    'Markers must contain one entry per legend label.');
 
 nCols = p.Results.NumColumns;
 if isempty(nCols)
@@ -48,7 +56,9 @@ for k = 1:numel(labels)
             'MarkerEdgeColor','none','DisplayName',labels(k));
     else
         handles(k) = plot(ax,nan,nan,'LineStyle',lineStyles(k), ...
-            'Color',colors(k,:),'LineWidth',style.lineWidth, ...
+            'Marker',markers(k),'Color',colors(k,:), ...
+            'LineWidth',style.lineWidth,'MarkerSize',9, ...
+            'MarkerFaceColor',colors(k,:),'MarkerEdgeColor',colors(k,:), ...
             'DisplayName',labels(k));
     end
 end

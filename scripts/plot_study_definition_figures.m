@@ -194,6 +194,15 @@ cL2 = [0.90,0.16,0.12];
 cMoon = [0.70,0.70,0.70];
 cPoint = [0.85,0.85,0.85];
 
+style = reviewer2_paper_style();
+sharedFamilyLegendFiles = export_shared_result_legend( ...
+    outputDir,"orbit_family_trajectory_legend", ...
+    ["L1";"L2";"Moon";"L1 point";"L2 point"], ...
+    [cL1;cL2;cMoon;cPoint;cPoint],style, ...
+    'LineStyles',["-";"-";"none";"none";"none"], ...
+    'Markers',["none";"none";"o";"^";"v"], ...
+    'NumColumns',3);
+
 numPairOrbitsPerFamily = 16;
 numDroOrbits = 16;
 maxPointsPerOrbit = 300;
@@ -334,18 +343,17 @@ for groupIndex = 1:numel(familyGroups)
     format_publication_axes(ax,12);
 
     if numel(group)==2
-        legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
-            'Location','northoutside','Orientation','horizontal');
-        legendColumns = numel(legendLabels);
+        % The paired halo/NRHO panels use the shared legend-only EPS above
+        % the LaTeX subfigure grid, so no legend is embedded in these panels.
+        legendHandle = gobjects(0);
     else
         legendHandle = legend(ax,legendHandles,cellstr(legendLabels), ...
             'Location','northeast','Orientation','vertical');
-        legendColumns = 1;
+        format_study_legend(legendHandle,1,[14 8]);
     end
-    format_study_legend(legendHandle,legendColumns,[14 8]);
 
     if numel(group)==2
-        finalize_centered_3d_axes(ax,legendHandle,plotPosition);
+        finalize_centered_3d_axes(ax,legendHandle,style.geometryGridPlotPosition);
     else
         ax.Units = 'normalized';
         format_manuscript_legend(ax,legendHandle,style,plotPosition);
@@ -362,6 +370,7 @@ end
 
 outputs = struct();
 outputs.figures = figureFiles;
+outputs.sharedLegend = sharedFamilyLegendFiles(1);
 outputs.familySummary = string(summaryFile);
 outputs.orbitMetrics = string(metricFile);
 outputs.numOrbits = nOrbit;
@@ -1119,7 +1128,15 @@ ylim(ax,pad_axis_limits(ax.YLim,style.geometryYPadding));
 zlim(ax,pad_axis_limits(ax.ZLim,style.geometryZPadding));
 axis(ax,'vis3d');
 
-format_manuscript_legend(ax,legendHandle,style,plotPosition);
+if isempty(legendHandle) || ~isgraphics(legendHandle)
+    ax.Units = 'normalized';
+    ax.PositionConstraint = 'innerposition';
+    ax.Position = plotPosition;
+    format_manuscript_ticks(ax);
+    center_manuscript_content(ancestor(ax,'figure'),ax,[]);
+else
+    format_manuscript_legend(ax,legendHandle,style,plotPosition);
+end
 
 end
 
