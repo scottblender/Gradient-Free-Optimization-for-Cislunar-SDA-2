@@ -7,14 +7,7 @@ if nargin < 1 || isempty(fig) || ~isgraphics(fig), return; end
 style = reviewer2_paper_style();
 axesList = findall(fig,'Type','axes');
 legends = findall(fig,'Type','legend');
-
-% The nominal Lunar Gateway perspective view needs a little more physical
-% paper around the otherwise standard manuscript panel. Expand only its outer
-% canvas by 0.25 in per side while preserving the physical size of the axes
-% and legend. The flag makes this safe because the export path finalizes twice.
-if is_lunar_gateway_case(legends)
-    expand_lunar_gateway_canvas(fig,axesList,legends);
-end
+isGateway = is_lunar_gateway_case(legends);
 
 areas = zeros(numel(axesList),1);
 for k = 1:numel(axesList)
@@ -129,65 +122,49 @@ end
 
 if numel(axesList) == 1
     ax = axesList(1);
+
+    % The finalizer runs twice during export. Restore the native label before
+    % each centering pass so the layout calculation remains deterministic,
+    % then replace it with a figure-level annotation afterward for the one
+    % perspective view where MATLAB renders the native 3-D label incorrectly.
+    if isGateway && isgraphics(ax.YLabel)
+        ax.YLabel.String = 'y (LU)';
+    end
+
     format_manuscript_ticks(ax);
     if isempty(legends), lgd = []; else, lgd = legends(1); end
     center_manuscript_content(fig,ax,lgd);
+
+    if isGateway && is_3d_axes(ax) && isgraphics(ax.YLabel)
+        ax.YLabel.String = '';
+        apply_lunar_gateway_y_label(fig,style);
+    end
 end
 
 drawnow;
 end
 
-function expand_lunar_gateway_canvas(fig,axesList,legends)
-%EXPAND_LUNAR_GATEWAY_CANVAS Add real paper around the nominal LG panel.
-% The normal canvas is 6.5 x 5.2 in. Adding 0.25 in on all four sides gives
-% 7.0 x 5.7 in without scaling the axes, labels, or legend themselves.
+function apply_lunar_gateway_y_label(fig,style)
+%APPLY_LUNAR_GATEWAY_Y_LABEL Draw an EPS-stable figure-level y-axis label.
+% MATLAB's native 3-D YLabel for the nominal Gateway perspective view can be
+% rendered outside its reported TightInset. A figure annotation is independent
+% of the 3-D projection and therefore remains stable in both PNG and EPS.
 
-appDataKey = 'LunarGatewayCanvasExpanded';
-if isappdata(fig,appDataKey) && getappdata(fig,appDataKey)
-    return;
+existing = findall(fig,'Tag','LunarGatewayYLabel');
+if ~isempty(existing)
+    delete(existing);
 end
 
-padInches = 0.25;
-figUnits = fig.Units;
-fig.Units = 'inches';
-figurePosition = fig.Position;
-newWidth = figurePosition(3)+2*padInches;
-newHeight = figurePosition(4)+2*padInches;
-
-axesUnits = cell(numel(axesList),1);
-for k = 1:numel(axesList)
-    axesUnits{k} = axesList(k).Units;
-    axesList(k).Units = 'inches';
-    p = axesList(k).Position;
-    p(1:2) = p(1:2)+padInches;
-    axesList(k).Position = p;
-end
-
-legendUnits = cell(numel(legends),1);
-for k = 1:numel(legends)
-    legendUnits{k} = legends(k).Units;
-    legends(k).Units = 'inches';
-    p = legends(k).Position;
-    p(1:2) = p(1:2)+padInches;
-    legends(k).Position = p;
-end
-
-figurePosition(3:4) = [newWidth,newHeight];
-fig.Position = figurePosition;
-fig.PaperUnits = 'inches';
-fig.PaperSize = [newWidth,newHeight];
-fig.PaperPosition = [0,0,newWidth,newHeight];
-fig.PaperPositionMode = 'manual';
-
-for k = 1:numel(axesList)
-    axesList(k).Units = axesUnits{k};
-end
-for k = 1:numel(legends)
-    legends(k).Units = legendUnits{k};
-end
-fig.Units = figUnits;
-setappdata(fig,appDataKey,true);
-drawnow;
+annotation(fig,'textbox',[0.055 0.055 0.18 0.07], ...
+    'String','y (LU)', ...
+    'LineStyle','none', ...
+    'FontName',style.fontName, ...
+    'FontSize',style.geometryLabelFontSize, ...
+    'FontWeight',style.fontWeight, ...
+    'HorizontalAlignment','left', ...
+    'VerticalAlignment','middle', ...
+    'Interpreter','tex', ...
+    'Tag','LunarGatewayYLabel');
 end
 
 function tf = is_3d_axes(ax)
