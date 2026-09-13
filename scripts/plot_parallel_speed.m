@@ -80,7 +80,6 @@ for kind=1:2
         sprintf('-r%d',style.exportDpi));
     clear cleanup;
 end
-% Keep the numeric printout beside the final figures as well as in the raw run.
 export_shared_result_legend(outputDirectory,"parallel_speed_lg_legend", ...
     ["Serial";"Parallel"],style.optimizerColors(1:2,:),style, ...
     'LineStyles',["-";"--"],'NumColumns',2);
