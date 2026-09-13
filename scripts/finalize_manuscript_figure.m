@@ -1,7 +1,7 @@
 function finalize_manuscript_figure(fig)
 %FINALIZE_MANUSCRIPT_FIGURE Apply common paper typography before export.
-% The data, camera, projection, limits, colors, and annotations are preserved.
-% Only axes/label/legend typography and the final fit/centering pass change.
+% The data, camera, projection, limits, colors, annotations, and plot-specific
+% axes positions are preserved. Only typography and final fit/centering change.
 
 if nargin < 1 || isempty(fig) || ~isgraphics(fig), return; end
 style = reviewer2_paper_style();
@@ -42,14 +42,14 @@ for k = 1:numel(axesList)
         ax.YTickLabel = [];
         ax.ZTickLabel = [];
 
-        if has_zoom_annotation(ax)
+        % Preserve plot-specific 3-D inset placement. The plotting routine
+        % intentionally chooses the 3-D zoom position, so the common export
+        % finalizer must not overwrite it. Retain the legacy placement only
+        % for 2-D zoom insets that rely on the common formatter.
+        if has_zoom_annotation(ax) && ~is_3d_axes(ax)
             oldUnits = ax.Units;
             ax.Units = 'normalized';
-            if is_3d_axes(ax)
-                ax.Position = [0.28 0.23 0.38 0.36];
-            else
-                ax.Position = [0.63 0.40 0.28 0.20];
-            end
+            ax.Position = [0.63 0.40 0.28 0.20];
             ax.Units = oldUnits;
         end
 
