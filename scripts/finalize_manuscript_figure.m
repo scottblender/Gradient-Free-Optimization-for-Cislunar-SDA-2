@@ -125,6 +125,21 @@ if numel(axesList) == 1
     if isempty(legends), lgd = []; else, lgd = legends(1); end
     center_manuscript_content(fig,ax,lgd);
 end
+
+% MATLAB can occasionally place the y-axis label below the export canvas for
+% the Lunar Gateway 3-D view. Pin only that exact case to a safe axes-relative
+% vertical position after all common centering has finished. The minimum
+% position makes this idempotent when a figure is finalized more than once.
+if numel(axesList) == 1 && is_lunar_gateway_case(legends)
+    ax = axesList(1);
+    if is_3d_axes(ax) && isgraphics(ax.YLabel)
+        ax.YLabel.Units = 'normalized';
+        labelPosition = ax.YLabel.Position;
+        labelPosition(2) = max(labelPosition(2),0.12);
+        ax.YLabel.Position = labelPosition;
+    end
+end
+
 drawnow;
 end
 
@@ -153,6 +168,16 @@ for k = 1:numel(textObjects)
         end
     catch
     end
+end
+end
+
+function tf = is_lunar_gateway_case(legends)
+tf = false;
+if numel(legends) ~= 1 || ~isgraphics(legends(1)), return; end
+try
+    labels = strtrim(string(legends(1).String(:)));
+    tf = isequal(labels,["Nominal Gateway";"Moon";"L1";"L2"]);
+catch
 end
 end
 
